@@ -3,7 +3,7 @@
 ;; Author: Laurynas Biveinis
 ;; Keywords: comm, ai, tools
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1") (simple-httpd "1.5.1"))
+;; Package-Requires: ((emacs "27.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -31,7 +31,6 @@
 ;;; Code:
 
 (require 'json)
-(require 'simple-httpd)
 
 ;;; Variables
 
@@ -40,15 +39,15 @@
   :group 'comm
   :prefix "mcp-")
 
-(defcustom mcp-default-port 8000
-  "Default port for the MCP HTTP server.
-This follows the Python SDK default."
-  :type 'integer
-  :group 'mcp)
+;; Global state variables for singleton architecture
+(defvar mcp--running nil
+  "Whether the MCP server is currently running.")
 
-;; Internal variables
-(defvar mcp--servers (make-hash-table :test 'equal)
-  "Hash table of active MCP servers.")
+(defvar mcp--tools (make-hash-table :test 'equal)
+  "Hash table of registered MCP tools.")
+
+(defvar mcp--name "emacs-mcp"
+  "Name of the MCP server.")
 
 ;;; Core Functions
 
@@ -82,95 +81,45 @@ Example:
 
 ;;; Server
 
-(defun mcp-create-server (name &optional port)
-  "Create a new MCP server instance with NAME and optional PORT.
+(defun mcp-start ()
+  "Start the MCP server and begin handling client requests.
 
-This function creates a new Model Context Protocol server that can register
-tools and resources to be exposed to client applications.
-
-Arguments:
-  NAME  A string name for the server
-  PORT  Port number for the HTTP server (defaults to `mcp-default-port')
-
-The server is not started immediately.
-Call `mcp-start-server' to begin accepting client connections.
-
-Example:
-  (setq my-server (mcp-create-server \"my-tool-server\"))
-  (setq custom-server (mcp-create-server \"custom-server\" 9000))"
-  (let ((server (list :name name
-                      :tools (make-hash-table :test 'equal)
-                      :port (or port mcp-default-port)
-                      :running nil)))
-    (puthash name server mcp--servers)
-    server))
-
-(defun mcp-start-server (server)
-  "Start the MCP SERVER and begin handling client requests.
-
-Arguments:
-  SERVER  The MCP server instance created with `mcp-create-server'
-
-This function starts the MCP server with the HTTP transport
-and begins handling client requests asynchronously.  Once started,
-the server will dispatch incoming requests to the appropriate tool
+This function starts the MCP server that can process JSON-RPC
+requests via `mcp-process-jsonrpc`.  Once started, the server
+will dispatch incoming requests to the appropriate tool
 handlers that have been registered with `mcp-register-tool'.
 
 Example:
-  (mcp-start-server my-server)"
-  (let ((port (plist-get server :port)))
-    ;; Set up the HTTP server
-    (setq httpd-port port)
-    (httpd-start)
+  (mcp-start)"
+  (when mcp--running
+    (error "MCP server is already running, stop it first with `mcp-stop`"))
 
-    ;; Define the MCP endpoint
-    (defservlet mcp application/json (_path _query request)
-      (condition-case err
-          (let* ((body (cadr (assoc "Content" request)))
-                 (response (mcp--handle-jsonrpc-request server body)))
-            (insert response))
-        (error
-         (insert (mcp--handle-servlet-error err)))))
+  ;; Mark server as running
+  (setq mcp--running t)
+  t)
 
-    ;; Mark server as running
-    (plist-put server :running t)
-    server))
+(defun mcp-stop ()
+  "Stop the MCP server and release all associated resources.
 
-(defun mcp-stop-server (server)
-  "Stop the MCP SERVER and release all associated resources.
-
-Arguments:
-  SERVER  The MCP server instance to stop
-
-Stops the server, closes all client connections, and performs
-necessary cleanup.  After stopping, the server instance should
-not be reused.
+Stops the server and performs necessary cleanup.
 
 Example:
-  (mcp-stop-server my-server)"
-  ;; Stop the HTTP server
-  (httpd-stop)
-
-  ;; Undefine the servlet
-  (fmakunbound 'httpd/mcp)
+  (mcp-stop)"
+  (unless mcp--running
+    (error "MCP server is not running"))
 
   ;; Mark server as not running
-  (plist-put server :running nil)
-
-  ;; Remove from active servers
-  (remhash (plist-get server :name) mcp--servers)
-  server)
+  (setq mcp--running nil)
+  t)
 
 ;;; Resources
 
 ;;; Tools
 
-(defun mcp-register-tool (server tool-id tool-description handler
-                                 &optional schema)
-  "Register a tool with the MCP SERVER.
+(defun mcp-register-tool (tool-id tool-description handler &optional schema)
+  "Register a tool with the MCP server.
 
 Arguments:
-  SERVER           The MCP server instance
   TOOL-ID          String identifier for the tool (e.g., \"list-files\")
   TOOL-DESCRIPTION String describing what the tool does
   HANDLER          Function to handle tool invocations
@@ -185,26 +134,59 @@ to return information to the client.
 
 Example:
   (mcp-register-tool
-    my-server
     \"org-list-files\"
     \"Lists all available Org mode files for task management\"
     #\\='my-org-files-handler)"
-  (let ((tools (plist-get server :tools))
-        (tool (list :id tool-id
+  (let ((tool (list :id tool-id
                     :description tool-description
                     :handler handler
                     :schema schema)))
-    (puthash tool-id tool tools)
+    (puthash tool-id tool mcp--tools)
     tool))
 
 ;;; Prompts
 
 ;;; Transport Layer
 
+;;;; Stdio Transport
+
+(defun mcp-process-jsonrpc (json-string)
+  "Process a JSON-RPC message JSON-STRING and return the response.
+This is the main entry point for stdio transport in MCP.
+
+The function accepts a JSON-RPC 2.0 message string and returns
+a JSON-RPC response string suitable for returning to clients via stdout.
+
+When using the MCP server with emacsclient, invoke this function like:
+emacsclient -e \\='(mcp-process-jsonrpc \"[JSON-RPC message]\")\\='
+
+Example:
+  (mcp-process-jsonrpc
+   \"{\\\"jsonrpc\\\":\\\"2.0\\\",
+     \\\"method\\\":\\\"mcp.server.describe\\\",\\\"id\\\":1}\")"
+  (unless mcp--running
+    (error "No active MCP server, start server with `mcp-start` first"))
+
+  (condition-case err
+      (mcp--handle-jsonrpc-request-internal json-string)
+    (error
+     (mcp--handle-error err))))
+
+(defun mcp--handle-error (err)
+  "Handle error ERR in MCP process by logging and creating an error response.
+Returns a JSON-RPC error response string for internal errors."
+  (message "MCP error: %s" (error-message-string err))
+  (json-encode
+   `((jsonrpc . "2.0")
+     (id . nil)
+     (error . ((code . -32603)
+               (message . ,(format "Internal error: %s"
+                                   (error-message-string err))))))))
+
 ;;; JSON-RPC Handling
 
-(defun mcp--handle-jsonrpc-request (server request-body)
-  "Handle a JSON-RPC REQUEST-BODY for SERVER.
+(defun mcp--handle-jsonrpc-request-internal (request-body)
+  "Handle a JSON-RPC REQUEST-BODY for the global MCP server.
 Returns a JSON-RPC response string."
   (let* ((request (json-read-from-string request-body))
          (jsonrpc (alist-get 'jsonrpc request))
@@ -217,14 +199,13 @@ Returns a JSON-RPC response string."
     (cond
      ;; Server description
      ((equal method "mcp.server.describe")
-      (mcp--jsonrpc-response id `((name . ,(plist-get server :name))
+      (mcp--jsonrpc-response id `((name . ,mcp--name)
                                   (version . "0.1.0")
                                   (protocol_version . "0.1.0")
                                   (capabilities . ,(vector "tools")))))
      ;; List available tools
      ((equal method "mcp.server.list_tools")
-      (let ((tools-hash (plist-get server :tools))
-            (tool-list (vector)))
+      (let ((tool-list (vector)))
         (maphash (lambda (id tool)
                    (let ((tool-description (plist-get tool :description))
                          (tool-schema (plist-get tool :schema)))
@@ -233,16 +214,15 @@ Returns a JSON-RPC response string."
                                     (vector `((id . ,id)
                                               (description . ,tool-description)
                                               (schema . ,tool-schema)))))))
-                 tools-hash)
+                 mcp--tools)
         (mcp--jsonrpc-response id `((tools . ,tool-list)))))
      ;; Tool invocation
      ((string-match "^mcp\\.tool\\.\\(.+\\)" method)
       (let* ((tool-id (match-string 1 method))
-             (tools (plist-get server :tools))
-             (tool (gethash tool-id tools)))
+             (tool (gethash tool-id mcp--tools)))
         (if tool
             (let ((handler (plist-get tool :handler))
-                  (context (list :id id :server server)))
+                  (context (list :id id)))
               (condition-case err
                   (funcall handler context params)
                 (error
@@ -267,17 +247,6 @@ Returns a JSON-RPC response string."
                  (id . ,id)
                  (error . ((code . ,code)
                            (message . ,message))))))
-
-(defun mcp--handle-servlet-error (err)
-  "Handle error ERR in MCP servlet by logging and creating an error response.
-Returns a JSON-RPC error response string for internal errors."
-  (message "MCP servlet error: %s" (error-message-string err))
-  (json-encode
-   `((jsonrpc . "2.0")
-     (id . nil)
-     (error . ((code . -32603)
-               (message . ,(format "Internal error: %s"
-                                   (error-message-string err))))))))
 
 (provide 'mcp)
 ;;; mcp.el ends here

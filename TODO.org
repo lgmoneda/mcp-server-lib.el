@@ -51,12 +51,9 @@
 
 ** Transport Layer
 - [X] HTTP server setup using =simple-httpd=
-- [X] JSON-RPC over HTTP implementation
+- [X] Stdio transport implementation 
 - [X] Request/response handling
 - [X] Error handling for transport-level issues
-- [ ] Potential Server-Sent Events (SSE) support (like Python's `run_sse_async`)
-- [ ] Support for stdio transport mode (like Python's `run_stdio`)
-
 ** JSON-RPC Message Handling
 - [X] Use built-in =jsonrpc.el= for:
   - JSON-RPC 2.0 message parsing

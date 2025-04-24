@@ -44,7 +44,6 @@ jobs:
                 --eval "(package-refresh-contents)" \
                 --eval "(package-install 'elisp-lint)" \
                 --eval "(package-install 'package-lint)" \
-                --eval "(package-install 'simple-httpd)" \
                 --eval "(package-install 'dash)"
 
       - name: elisp-lint
@@ -58,7 +57,6 @@ jobs:
         run: |
           emacs -Q --batch \
                 --eval "(package-initialize)" \
-                --eval "(require 'simple-httpd)" \
                 --eval "(add-to-list 'load-path (expand-file-name \".\"))" \
                 --eval "(require 'ert)" \
                 -l mcp.el -l mcp-test.el \

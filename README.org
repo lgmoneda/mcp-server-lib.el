@@ -22,6 +22,97 @@ This library enables Emacs users and developers to create MCP servers that can p
 
 * Usage
 
+** MCP API
+
+=mcp.el= provides a simple API for setting up and using the Model Context Protocol in Emacs.
+
+*** Core Functions
+
+#+begin_src elisp
+;; Start the MCP server
+(mcp-start)
+
+;; Register a tool
+(mcp-register-tool "tool-name" "Tool description" #'tool-handler-function)
+
+;; Stop the MCP server
+(mcp-stop)
+#+end_src
+
+*** Stdio Transport
+
+The main entry point for MCP communication via stdio is =mcp-process-jsonrpc=:
+
+#+begin_src elisp
+(defun mcp-process-jsonrpc (json-string)
+  "Process a JSON-RPC message JSON-STRING and return the response.
+This is the main entry point for stdio transport in MCP.")
+#+end_src
+
+*** Usage Pattern with emacsclient
+
+LLMs and other clients can interact with MCP.el using =emacsclient=:
+
+#+begin_src shell
+emacsclient -e '(mcp-process-jsonrpc "{\"jsonrpc\":\"2.0\",\"method\":\"mcp.server.describe\",\"id\":1}")'
+#+end_src
+
+The response is returned as stdout from the emacsclient process.
+
+** Implementation Details
+
+*** Server Architecture
+
+mcp.el uses a singleton server pattern:
+
+#+begin_src elisp
+;; Start the MCP server
+(mcp-start)
+
+;; Register tools with the global server
+(mcp-register-tool "my-tool" "Tool description" #'my-handler-function)
+
+;; Stop the server when done
+(mcp-stop)
+#+end_src
+
+*** Transport
+
+mcp.el uses stdio transport via emacsclient.
+
+*** Client-Server Interaction Flow
+
+1. LLM prepares a JSON-RPC request
+2. LLM executes emacsclient with the request
+3. emacsclient sends the command to the Emacs server
+4. Emacs processes the request via =mcp-process-jsonrpc=
+5. Response is returned to emacsclient as a string
+6. emacsclient outputs the response to stdout
+7. LLM reads and processes the response
+
+*** Message Format
+
+The function accepts and returns standard JSON-RPC 2.0 messages:
+
+*Input Example:*
+#+begin_src json
+{
+  "jsonrpc": "2.0",
+  "method": "mcp.tool.my-tool",
+  "params": {"param1": "value1"},
+  "id": 1
+}
+#+end_src
+
+*Output Example:*
+#+begin_src json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {"key": "value"}
+}
+#+end_src
+
 * License
 
 This project is licensed under the GNU General Public License v3.0 (GPLv3) - see the LICENSE file for details.
