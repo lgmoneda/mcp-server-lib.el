@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Check Markdown files: `mdl *.md`
 - Format YAML files: `prettier --write .github/workflows/*.yml`
 - Check YAML formatting: `prettier --check .github/workflows/*.yml`
+- Check terminology: `textlint --rule terminology *.md`
 
 ## Style Guide
 
