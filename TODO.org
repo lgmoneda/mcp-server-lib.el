@@ -97,7 +97,7 @@
 
 ** CI and Linting
 - [X] Fix package dependency issue (Package json is not installable)
-- [ ] Fix long lines exceeding fill-column (70 characters)
+- [X] Fix long lines exceeding fill-column (70 characters)
 - [X] Fix indentation (use spaces instead of tabs as configured in .dir-locals.el)
 - [X] Remove trailing whitespace
 - [ ] Fix checkdoc issues:

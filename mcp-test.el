@@ -38,6 +38,9 @@
   "Port used for MCP server during tests.
 Matches the default port from `mcp-default-port`.")
 
+(defconst mcp-test-content-type-headers '(("Content-Type" . "application/json"))
+  "Standard Content-Type headers used in HTTP requests.")
+
 ;;; Server Tests
 
 (ert-deftest mcp-test-minimal-server ()
@@ -59,8 +62,9 @@ Tests the basic server lifecycle with no tools or resources."
                                `(("jsonrpc" . "2.0")
                                  ("method" . "mcp.server.status")
                                  ("id" . 1))))
-            (url-request-extra-headers '(("Content-Type" . "application/json"))))
-        (url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port))
+            (url-request-extra-headers mcp-test-content-type-headers))
+        (url-insert-file-contents 
+         (format "http://localhost:%d/mcp" mcp-test-port))
         (let* ((response (json-read-from-string (buffer-string)))
                (result (alist-get 'result response)))
           ;; Check if server responded with status info
@@ -79,8 +83,9 @@ Tests the basic server lifecycle with no tools or resources."
                                 `(("jsonrpc" . "2.0")
                                   ("method" . "mcp.server.status")
                                   ("id" . 2))))
-             (url-request-extra-headers '(("Content-Type" . "application/json"))))
-         (url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port)))))))
+             (url-request-extra-headers mcp-test-content-type-headers))
+         (url-insert-file-contents 
+          (format "http://localhost:%d/mcp" mcp-test-port)))))))
 
 ;;; Resource Tests
 
@@ -105,8 +110,9 @@ Tests the basic server lifecycle with no tools or resources."
                                      `(("jsonrpc" . "2.0")
                                        ("method" . "mcp.server.describe")
                                        ("id" . 1))))
-                  (url-request-extra-headers '(("Content-Type" . "application/json"))))
-              (url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port))
+                  (url-request-extra-headers mcp-test-content-type-headers))
+              (url-insert-file-contents 
+               (format "http://localhost:%d/mcp" mcp-test-port))
               (let* ((response (json-read-from-string (buffer-string)))
                      (result (alist-get 'result response)))
                 ;; Server should return description with capabilities
@@ -122,8 +128,9 @@ Tests the basic server lifecycle with no tools or resources."
                                      `(("jsonrpc" . "2.0")
                                        ("method" . "mcp.server.list_tools")
                                        ("id" . 2))))
-                  (url-request-extra-headers '(("Content-Type" . "application/json"))))
-              (url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port))
+                  (url-request-extra-headers mcp-test-content-type-headers))
+              (url-insert-file-contents 
+               (format "http://localhost:%d/mcp" mcp-test-port))
               (let* ((response (json-read-from-string (buffer-string)))
                      (result (alist-get 'result response)))
                 ;; Should return empty tools array for minimal server
