@@ -1,5 +1,6 @@
 #+TITLE: mcp.el - Model Context Protocol for Emacs Lisp
 
+[[https://github.com/laurynas-biveinis/mcp.el/actions/workflows/elisp-test.yml/badge.svg][https://github.com/laurynas-biveinis/mcp.el/actions/workflows/elisp-test.yml]]
 [[https://github.com/laurynas-biveinis/mcp.el/actions/workflows/linter.yml][https://github.com/laurynas-biveinis/mcp.el/actions/workflows/linter.yml/badge.svg]]
 
 * Overview
