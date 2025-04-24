@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
     (add-to-list 'load-path dir))
   (require 'elisp-lint)
   (elisp-lint-file \"mcp.el\"))"`
+- Check GitHub workflows: `actionlint .github/workflows/*.yml`
 
 ## Style Guide
 
