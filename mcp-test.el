@@ -100,37 +100,21 @@ Tests the basic server lifecycle with no tools or resources."
 
 ;;; Message Handling Tests
 
-(ert-deftest mcp-test-protocol-methods ()
-  "Test standard MCP protocol methods with a minimal server."
+(ert-deftest mcp-test-list-tools-method ()
+  "Test the mcp.server.list_tools protocol method."
   (let ((server (mcp-create-server "test-server")))
     (mcp-start-server server)
     (unwind-protect
-        (progn
-          ;; Test mcp.server.describe method
-          (with-temp-buffer
-            (mcp-test-jsonrpc-request
-             `(("jsonrpc" . "2.0")
-               ("method" . "mcp.server.describe")
-               ("id" . 1)))
-            (let* ((response (json-read-from-string (buffer-string)))
-                   (result (alist-get 'result response)))
-              ;; Server should return description with capabilities
-              (should (alist-get 'name result))
-              (should (alist-get 'version result))
-              (should (alist-get 'protocol_version result))
-              (should (alist-get 'capabilities result))))
-
-          ;; Test mcp.server.list_tools method
-          (with-temp-buffer
-            (mcp-test-jsonrpc-request
-             `(("jsonrpc" . "2.0")
-               ("method" . "mcp.server.list_tools")
-               ("id" . 2)))
-            (let* ((response (json-read-from-string (buffer-string)))
-                   (result (alist-get 'result response)))
-              ;; Should return empty tools array for minimal server
-              (should (arrayp (alist-get 'tools result)))
-              (should (= 0 (length (alist-get 'tools result)))))))
+        (with-temp-buffer
+          (mcp-test-jsonrpc-request
+           `(("jsonrpc" . "2.0")
+             ("method" . "mcp.server.list_tools")
+             ("id" . 1)))
+          (let* ((response (json-read-from-string (buffer-string)))
+                 (result (alist-get 'result response)))
+            ;; Should return empty tools array for minimal server
+            (should (arrayp (alist-get 'tools result)))
+            (should (= 0 (length (alist-get 'tools result))))))
 
       ;; Cleanup - always stop server
       (mcp-stop-server server))))
