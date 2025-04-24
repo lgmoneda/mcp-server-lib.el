@@ -55,7 +55,7 @@ Tests the basic server lifecycle with no tools or resources."
     ;; We'll use a simple HTTP request to check server status
     (with-temp-buffer
       (let ((url-request-method "POST")
-            (url-request-data (json-encode 
+            (url-request-data (json-encode
                                `(("jsonrpc" . "2.0")
                                  ("method" . "mcp.server.status")
                                  ("id" . 1))))
@@ -67,15 +67,15 @@ Tests the basic server lifecycle with no tools or resources."
           (should (alist-get 'name result))
           (should (equal (alist-get 'name result) "test-server"))
           (should (alist-get 'version result)))))
-    
+
     ;; Stop the server
     (mcp-stop-server server)
-    
+
     ;; Verify server is stopped (request should fail)
     (should-error
      (with-temp-buffer
        (let ((url-request-method "POST")
-             (url-request-data (json-encode 
+             (url-request-data (json-encode
                                 `(("jsonrpc" . "2.0")
                                   ("method" . "mcp.server.status")
                                   ("id" . 2))))
@@ -101,7 +101,7 @@ Tests the basic server lifecycle with no tools or resources."
           ;; Test mcp.server.describe method
           (with-temp-buffer
             (let ((url-request-method "POST")
-                  (url-request-data (json-encode 
+                  (url-request-data (json-encode
                                      `(("jsonrpc" . "2.0")
                                        ("method" . "mcp.server.describe")
                                        ("id" . 1))))
@@ -114,11 +114,11 @@ Tests the basic server lifecycle with no tools or resources."
                 (should (alist-get 'version result))
                 (should (alist-get 'protocol_version result))
                 (should (alist-get 'capabilities result)))))
-          
+
           ;; Test mcp.server.list_tools method
           (with-temp-buffer
             (let ((url-request-method "POST")
-                  (url-request-data (json-encode 
+                  (url-request-data (json-encode
                                      `(("jsonrpc" . "2.0")
                                        ("method" . "mcp.server.list_tools")
                                        ("id" . 2))))
@@ -129,7 +129,7 @@ Tests the basic server lifecycle with no tools or resources."
                 ;; Should return empty tools array for minimal server
                 (should (arrayp (alist-get 'tools result)))
                 (should (= 0 (length (alist-get 'tools result))))))))
-      
+
       ;; Cleanup - always stop server
       (mcp-stop-server server))))
 
