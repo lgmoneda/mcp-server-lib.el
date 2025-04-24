@@ -1,5 +1,7 @@
 #+TITLE: mcp.el - Model Context Protocol for Emacs Lisp
 
+[[https://github.com/laurynas-biveinis/mcp.el/actions/workflows/linter.yml][https://github.com/laurynas-biveinis/mcp.el/actions/workflows/linter.yml/badge.svg]]
+
 * Overview
 
 =mcp.el= is an Emacs Lisp implementation of the [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP), an open standard for communication between AI applications, servers, and language models.
