@@ -7,7 +7,7 @@ with code in this repository.
 
 - Run all tests:
 
-  ```
+  ```shell
   emacs -batch --eval "(let ((pkg-dir (locate-user-emacs-file \"elpa/simple-httpd-1.5.1\")))
                          (add-to-list 'load-path pkg-dir)
                          (add-to-list 'load-path \".\")
@@ -18,7 +18,7 @@ with code in this repository.
 
 - Run single test:
 
-  ```
+  ```shell
   emacs -batch --eval "(let ((pkg-dir (locate-user-emacs-file \"elpa/simple-httpd-1.5.1\")))
                          (add-to-list 'load-path pkg-dir)
                          (add-to-list 'load-path \".\")
@@ -29,7 +29,7 @@ with code in this repository.
 
 - Byte-compile:
 
-  ```
+  ```shell
   emacs -batch --eval "(let ((pkg-dir (locate-user-emacs-file \"elpa/simple-httpd-1.5.1\")))
                          (add-to-list 'load-path pkg-dir)
                          (add-to-list 'load-path \".\")
@@ -38,7 +38,7 @@ with code in this repository.
 
 - Run elisp-lint:
 
-  ```
+  ```shell
   emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
                                           (locate-user-emacs-file \"elpa/package-lint-0.26\")
                                           (locate-user-emacs-file \"elpa/simple-httpd-1.5.1\")
