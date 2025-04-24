@@ -13,6 +13,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   (require 'elisp-lint)
   (elisp-lint-file \"mcp.el\"))"`
 - Check GitHub workflows: `actionlint .github/workflows/*.yml`
+- Check Markdown files: `mdl *.md`
+- Format YAML files: `prettier --write .github/workflows/*.yml`
+- Check YAML formatting: `prettier --check .github/workflows/*.yml`
 
 ## Style Guide
 
