@@ -48,7 +48,8 @@ with code in this repository.
 - Format YAML files: `prettier --write .github/workflows/*.yml`
 - Check YAML formatting: `prettier --check .github/workflows/*.yml`
 - Check terminology: `textlint --rule terminology *.md`
-- Check Org files: 
+- Check Org files:
+
   ```shell
   emacs -Q --batch --eval "(require 'org)" --eval "(require 'org-lint)" \
         --eval "(with-temp-buffer (insert-file-contents \"FILE.org\") \
