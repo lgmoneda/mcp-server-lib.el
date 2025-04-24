@@ -165,7 +165,8 @@ Example:
 
 ;;; Tools
 
-(defun mcp-register-tool (server tool-id tool-description handler &optional schema)
+(defun mcp-register-tool (server tool-id tool-description handler
+                            &optional schema)
   "Register a tool with the MCP SERVER.
 
 Arguments:
@@ -232,8 +233,10 @@ Returns a JSON-RPC response string."
                    (setq tool-list
                          (vconcat tool-list
                                   (vector `((id . ,id)
-                                            (description . ,(plist-get tool :description))
-                                            (schema . ,(plist-get tool :schema)))))))
+                                            (description . 
+                                             ,(plist-get tool :description))
+                                            (schema . 
+                                             ,(plist-get tool :schema)))))))
                  tools-hash)
         (mcp--jsonrpc-response id `((tools . ,tool-list)))))
      ;; Tool invocation
@@ -247,11 +250,14 @@ Returns a JSON-RPC response string."
               (condition-case err
                   (funcall handler context params)
                 (error
-                 (mcp--jsonrpc-error id -32603 (format "Internal error: %s" 
-                                                       (error-message-string err))))))
-          (mcp--jsonrpc-error id -32601 (format "Tool not found: %s" tool-id)))))
+                 (mcp--jsonrpc-error id -32603 
+                                   (format "Internal error: %s"
+                                          (error-message-string err))))))
+          (mcp--jsonrpc-error id -32601 
+                              (format "Tool not found: %s" tool-id)))))
      ;; Method not found
-     (t (mcp--jsonrpc-error id -32601 (format "Method not found: %s" method))))))
+     (t (mcp--jsonrpc-error id -32601 
+                            (format "Method not found: %s" method))))))
 
 (defun mcp--jsonrpc-response (id result)
   "Create a JSON-RPC response with ID and RESULT."
