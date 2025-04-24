@@ -284,9 +284,11 @@ version and capabilities between the client and server."
     (mcp--jsonrpc-response
      id
      `((protocolVersion . ,mcp--protocol-version)
-       (capabilities . ((tools . t)
-                        (resources . nil)
-                        (prompts . nil)))))))
+       (serverInfo . ((name . ,mcp--name)
+                      (version . ,mcp--protocol-version)))
+       (capabilities . ((tools . (()))
+                        (resources . (()))
+                        (prompts . (()))))))))
 
 (defun mcp--handle-initialized ()
   "Handle initialized notification from client.

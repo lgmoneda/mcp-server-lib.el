@@ -100,9 +100,12 @@
                            (alist-get 'protocolVersion initialize-result)))
           ;; Verify server capabilities
           (should (alist-get 'capabilities initialize-result))
-          (should (eq t (alist-get 'tools
-                                   (alist-get 'capabilities
-                                              initialize-result))))))
+          ;; Verify server info
+          (should (alist-get 'serverInfo initialize-result))
+          (let ((server-name (alist-get 'name
+                                        (alist-get 'serverInfo
+                                                   initialize-result))))
+            (should (string= mcp--name server-name)))))
     ;; Cleanup - always stop server
     (mcp-stop)))
 
