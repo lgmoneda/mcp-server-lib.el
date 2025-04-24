@@ -286,9 +286,10 @@ version and capabilities between the client and server."
      `((protocolVersion . ,mcp--protocol-version)
        (serverInfo . ((name . ,mcp--name)
                       (version . ,mcp--protocol-version)))
-       (capabilities . ((tools . nil)  ; nil encodes as {} empty object in JSON
-                        (resources . nil)
-                        (prompts . nil)))))))
+       ;; Hash-tables encode as {} in JSON
+       (capabilities . ((tools . ,(make-hash-table))
+                        (resources . ,(make-hash-table))
+                        (prompts . ,(make-hash-table))))))))
 
 (defun mcp--handle-initialized ()
   "Handle initialized notification from client.
