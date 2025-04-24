@@ -34,9 +34,9 @@
 (require 'url)
 
 ;; Test configuration
-(defvar mcp--test-port 8000
+(defvar mcp-test-port 8000
   "Port used for MCP server during tests.
-Matches the default port from mcp-default-port.")
+Matches the default port from `mcp-default-port`.")
 
 ;;; Server Tests
 
@@ -60,7 +60,7 @@ Tests the basic server lifecycle with no tools or resources."
 				 ("method" . "mcp.server.status")
 				 ("id" . 1))))
 	    (url-request-extra-headers '(("Content-Type" . "application/json"))))
-	(url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
+	(url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port))
 	(let* ((response (json-read-from-string (buffer-string)))
 	       (result (alist-get 'result response)))
 	  ;; Check if server responded with status info
@@ -80,7 +80,7 @@ Tests the basic server lifecycle with no tools or resources."
 				  ("method" . "mcp.server.status")
 				  ("id" . 2))))
 	     (url-request-extra-headers '(("Content-Type" . "application/json"))))
-	 (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port)))))))
+	 (url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port)))))))
 
 ;;; Resource Tests
 
@@ -106,7 +106,7 @@ Tests the basic server lifecycle with no tools or resources."
 				       ("method" . "mcp.server.describe")
 				       ("id" . 1))))
 		  (url-request-extra-headers '(("Content-Type" . "application/json"))))
-	      (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
+	      (url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port))
 	      (let* ((response (json-read-from-string (buffer-string)))
 		     (result (alist-get 'result response)))
 		;; Server should return description with capabilities
@@ -123,7 +123,7 @@ Tests the basic server lifecycle with no tools or resources."
 				       ("method" . "mcp.server.list_tools")
 				       ("id" . 2))))
 		  (url-request-extra-headers '(("Content-Type" . "application/json"))))
-	      (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
+	      (url-insert-file-contents (format "http://localhost:%d/mcp" mcp-test-port))
 	      (let* ((response (json-read-from-string (buffer-string)))
 		     (result (alist-get 'result response)))
 		;; Should return empty tools array for minimal server

@@ -104,7 +104,7 @@
   - Add two spaces after periods
   - Quote Lisp symbols properly
   - Remove whitespace at end of lines
-- [ ] Fix naming convention (mcp--test-port → mcp-test-port)
+- [X] Fix naming convention (mcp--test-port → mcp-test-port)
 
 ** Documentation
 - [ ] Complete package documentation (similar to Python SDK's documentation)
