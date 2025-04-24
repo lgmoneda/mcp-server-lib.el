@@ -130,13 +130,7 @@ Example:
                  (response (mcp--handle-jsonrpc-request server body)))
             (insert response))
         (error
-         (message "MCP servlet error: %s" (error-message-string err))
-         (insert (json-encode
-                  `((jsonrpc . "2.0")
-                    (id . nil)
-                    (error . ((code . -32603)
-                              (message . ,(format "Internal error: %s"
-                                                   (error-message-string err)))))))))))
+         (insert (mcp--handle-servlet-error err)))))
 
     ;; Mark server as running
     (plist-put server :running t)
@@ -253,7 +247,8 @@ Returns a JSON-RPC response string."
               (condition-case err
                   (funcall handler context params)
                 (error
-                 (mcp--jsonrpc-error id -32603 (format "Internal error: %s" (error-message-string err))))))
+                 (mcp--jsonrpc-error id -32603 (format "Internal error: %s" 
+                                                       (error-message-string err))))))
           (mcp--jsonrpc-error id -32601 (format "Tool not found: %s" tool-id)))))
      ;; Method not found
      (t (mcp--jsonrpc-error id -32601 (format "Method not found: %s" method))))))
@@ -270,6 +265,17 @@ Returns a JSON-RPC response string."
                  (id . ,id)
                  (error . ((code . ,code)
                            (message . ,message))))))
+
+(defun mcp--handle-servlet-error (err)
+  "Handle error ERR in MCP servlet by logging and creating an error response.
+Returns a JSON-RPC error response string for internal errors."
+  (message "MCP servlet error: %s" (error-message-string err))
+  (json-encode
+   `((jsonrpc . "2.0")
+     (id . nil)
+     (error . ((code . -32603)
+               (message . ,(format "Internal error: %s"
+                                   (error-message-string err))))))))
 
 (provide 'mcp)
 ;;; mcp.el ends here
