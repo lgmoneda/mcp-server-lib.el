@@ -85,7 +85,7 @@
                    ("method" . "initialize")
                    ("id" . 3)
                    ("params" .
-                    (("protocolVersion" . "0.1.0")
+                    (("protocolVersion" . "2024-11-05")
                      ("capabilities" .
                       (("tools" . t)
                        ("resources" . nil)
@@ -96,7 +96,7 @@
                            (json-read-from-string initialize-response))))
           ;; Verify the server responded with its protocol version
           (should (stringp (alist-get 'protocolVersion initialize-result)))
-          (should (string= "0.1.0"
+          (should (string= "2024-11-05"
                            (alist-get 'protocolVersion initialize-result)))
           ;; Verify server capabilities
           (should (alist-get 'capabilities initialize-result))
@@ -119,7 +119,7 @@
                   ("method" . "initialize")
                   ("id" . 4)
                   ("params" .
-                   (("protocolVersion" . "0.1.0")
+                   (("protocolVersion" . "2024-11-05")
                     ("capabilities" . (("tools" . t)))))))))
           (mcp-process-jsonrpc initialize-request))
         ;; Test notification (no response expected for notifications)

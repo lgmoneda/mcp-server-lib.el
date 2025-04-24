@@ -49,8 +49,9 @@
 (defvar mcp--name "emacs-mcp"
   "Name of the MCP server.")
 
-(defvar mcp--protocol-version "0.1.0"
-  "Current MCP protocol version supported by this server.")
+(defvar mcp--protocol-version "2024-11-05"
+  "Current MCP protocol version supported by this server.
+Uses date-based versioning format to match current MCP practices.")
 
 (defvar mcp--client-capabilities nil
   "Store client capabilities received during initialization.")
@@ -208,7 +209,7 @@ Returns a JSON-RPC response string."
      ;; Server description
      ((equal method "mcp.server.describe")
       (mcp--jsonrpc-response id `((name . ,mcp--name)
-                                  (version . "0.1.0")
+                                  (version . ,mcp--protocol-version)
                                   (protocol_version . ,mcp--protocol-version)
                                   (capabilities . ,(vector "tools")))))
      ;; Initialize handshake
