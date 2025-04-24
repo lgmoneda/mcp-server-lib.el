@@ -24,7 +24,8 @@
 ;;; Commentary:
 
 ;; An Emacs Lisp implementation of the Model Context Protocol (MCP),
-;; an open standard for communication between AI applications and language models.
+;; an open standard for communication between AI applications and
+;; language models.
 ;; See https://modelcontextprotocol.io/ for the protocol specification.
 
 ;;; Code:
@@ -134,7 +135,8 @@ Example:
                   `((jsonrpc . "2.0")
                     (id . nil)
                     (error . ((code . -32603)
-                              (message . ,(format "Internal error: %s" (error-message-string err)))))))))))
+                              (message . ,(format "Internal error: %s"
+                                                   (error-message-string err)))))))))))
 
     ;; Mark server as running
     (plist-put server :running t)

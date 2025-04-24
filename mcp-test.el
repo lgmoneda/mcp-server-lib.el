@@ -63,7 +63,7 @@ Tests the basic server lifecycle with no tools or resources."
                                  ("method" . "mcp.server.status")
                                  ("id" . 1))))
             (url-request-extra-headers mcp-test-content-type-headers))
-        (url-insert-file-contents 
+        (url-insert-file-contents
          (format "http://localhost:%d/mcp" mcp-test-port))
         (let* ((response (json-read-from-string (buffer-string)))
                (result (alist-get 'result response)))
@@ -84,7 +84,7 @@ Tests the basic server lifecycle with no tools or resources."
                                   ("method" . "mcp.server.status")
                                   ("id" . 2))))
              (url-request-extra-headers mcp-test-content-type-headers))
-         (url-insert-file-contents 
+         (url-insert-file-contents
           (format "http://localhost:%d/mcp" mcp-test-port)))))))
 
 ;;; Resource Tests
@@ -111,7 +111,7 @@ Tests the basic server lifecycle with no tools or resources."
                                        ("method" . "mcp.server.describe")
                                        ("id" . 1))))
                   (url-request-extra-headers mcp-test-content-type-headers))
-              (url-insert-file-contents 
+              (url-insert-file-contents
                (format "http://localhost:%d/mcp" mcp-test-port))
               (let* ((response (json-read-from-string (buffer-string)))
                      (result (alist-get 'result response)))
@@ -129,7 +129,7 @@ Tests the basic server lifecycle with no tools or resources."
                                        ("method" . "mcp.server.list_tools")
                                        ("id" . 2))))
                   (url-request-extra-headers mcp-test-content-type-headers))
-              (url-insert-file-contents 
+              (url-insert-file-contents
                (format "http://localhost:%d/mcp" mcp-test-port))
               (let* ((response (json-read-from-string (buffer-string)))
                      (result (alist-get 'result response)))
