@@ -166,7 +166,7 @@ Example:
 ;;; Tools
 
 (defun mcp-register-tool (server tool-id tool-description handler
-                            &optional schema)
+                                 &optional schema)
   "Register a tool with the MCP SERVER.
 
 Arguments:
@@ -230,13 +230,13 @@ Returns a JSON-RPC response string."
       (let ((tools-hash (plist-get server :tools))
             (tool-list (vector)))
         (maphash (lambda (id tool)
-                   (setq tool-list
-                         (vconcat tool-list
-                                  (vector `((id . ,id)
-                                            (description . 
-                                             ,(plist-get tool :description))
-                                            (schema . 
-                                             ,(plist-get tool :schema)))))))
+                   (let ((tool-description (plist-get tool :description))
+                         (tool-schema (plist-get tool :schema)))
+                     (setq tool-list
+                           (vconcat tool-list
+                                    (vector `((id . ,id)
+                                              (description . ,tool-description)
+                                              (schema . ,tool-schema)))))))
                  tools-hash)
         (mcp--jsonrpc-response id `((tools . ,tool-list)))))
      ;; Tool invocation
@@ -250,13 +250,13 @@ Returns a JSON-RPC response string."
               (condition-case err
                   (funcall handler context params)
                 (error
-                 (mcp--jsonrpc-error id -32603 
-                                   (format "Internal error: %s"
-                                          (error-message-string err))))))
-          (mcp--jsonrpc-error id -32601 
+                 (mcp--jsonrpc-error id -32603
+                                     (format "Internal error: %s"
+                                             (error-message-string err))))))
+          (mcp--jsonrpc-error id -32601
                               (format "Tool not found: %s" tool-id)))))
      ;; Method not found
-     (t (mcp--jsonrpc-error id -32601 
+     (t (mcp--jsonrpc-error id -32601
                             (format "Method not found: %s" method))))))
 
 (defun mcp--jsonrpc-response (id result)
