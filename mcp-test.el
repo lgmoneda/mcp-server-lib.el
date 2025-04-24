@@ -55,22 +55,24 @@ Tests the basic server lifecycle with no tools or resources."
     (mcp-start-server server)
 
     ;; Verify server is running
-    ;; We'll use a simple HTTP request to check server status
+    ;; We'll use a simple HTTP request to check server capabilities
     (with-temp-buffer
       (let ((url-request-method "POST")
             (url-request-data (json-encode
                                `(("jsonrpc" . "2.0")
-                                 ("method" . "mcp.server.status")
+                                 ("method" . "mcp.server.describe")
                                  ("id" . 1))))
             (url-request-extra-headers mcp-test-content-type-headers))
         (url-insert-file-contents
          (format "http://localhost:%d/mcp" mcp-test-port))
         (let* ((response (json-read-from-string (buffer-string)))
                (result (alist-get 'result response)))
-          ;; Check if server responded with status info
+          ;; Check if server responded with description info
           (should (alist-get 'name result))
           (should (equal (alist-get 'name result) "test-server"))
-          (should (alist-get 'version result)))))
+          (should (alist-get 'version result))
+          (should (alist-get 'protocol_version result))
+          (should (alist-get 'capabilities result)))))
 
     ;; Stop the server
     (mcp-stop-server server)
@@ -81,7 +83,7 @@ Tests the basic server lifecycle with no tools or resources."
        (let ((url-request-method "POST")
              (url-request-data (json-encode
                                 `(("jsonrpc" . "2.0")
-                                  ("method" . "mcp.server.status")
+                                  ("method" . "mcp.server.describe")
                                   ("id" . 2))))
              (url-request-extra-headers mcp-test-content-type-headers))
          (url-insert-file-contents

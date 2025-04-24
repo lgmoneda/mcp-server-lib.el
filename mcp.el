@@ -215,10 +215,6 @@ Returns a JSON-RPC response string."
       (mcp--jsonrpc-error id -32600 "Invalid Request: Not JSON-RPC 2.0"))
 
     (cond
-     ;; Server status - for debugging, not part of official MCP
-     ((equal method "mcp.server.status")
-      (mcp--jsonrpc-response id `((name . ,(plist-get server :name))
-                                  (version . "0.1.0"))))
      ;; Server description
      ((equal method "mcp.server.describe")
       (mcp--jsonrpc-response id `((name . ,(plist-get server :name))
