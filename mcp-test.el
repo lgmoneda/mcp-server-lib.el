@@ -41,6 +41,18 @@ Matches the default port from `mcp-default-port`.")
 (defconst mcp-test-content-type-headers '(("Content-Type" . "application/json"))
   "Standard Content-Type headers used in HTTP requests.")
 
+;;; Test Helpers
+
+(defun mcp-test-jsonrpc-request (request-data)
+  "Make a JSON-RPC request with REQUEST-DATA.
+REQUEST-DATA should be an alist suitable for `json-encode`.
+Sets up the request environment and calls `url-insert-file-contents`."
+  (let ((url-request-method "POST")
+        (url-request-data (json-encode request-data))
+        (url-request-extra-headers mcp-test-content-type-headers))
+    (url-insert-file-contents
+     (format "http://localhost:%d/mcp" mcp-test-port))))
+
 ;;; Server Tests
 
 (ert-deftest mcp-test-minimal-server ()
@@ -57,22 +69,18 @@ Tests the basic server lifecycle with no tools or resources."
     ;; Verify server is running
     ;; We'll use a simple HTTP request to check server capabilities
     (with-temp-buffer
-      (let ((url-request-method "POST")
-            (url-request-data (json-encode
-                               `(("jsonrpc" . "2.0")
-                                 ("method" . "mcp.server.describe")
-                                 ("id" . 1))))
-            (url-request-extra-headers mcp-test-content-type-headers))
-        (url-insert-file-contents
-         (format "http://localhost:%d/mcp" mcp-test-port))
-        (let* ((response (json-read-from-string (buffer-string)))
-               (result (alist-get 'result response)))
-          ;; Check if server responded with description info
-          (should (alist-get 'name result))
-          (should (equal (alist-get 'name result) "test-server"))
-          (should (alist-get 'version result))
-          (should (alist-get 'protocol_version result))
-          (should (alist-get 'capabilities result)))))
+      (mcp-test-jsonrpc-request
+       `(("jsonrpc" . "2.0")
+         ("method" . "mcp.server.describe")
+         ("id" . 1)))
+      (let* ((response (json-read-from-string (buffer-string)))
+             (result (alist-get 'result response)))
+        ;; Check if server responded with description info
+        (should (alist-get 'name result))
+        (should (equal (alist-get 'name result) "test-server"))
+        (should (alist-get 'version result))
+        (should (alist-get 'protocol_version result))
+        (should (alist-get 'capabilities result))))
 
     ;; Stop the server
     (mcp-stop-server server)
@@ -80,14 +88,10 @@ Tests the basic server lifecycle with no tools or resources."
     ;; Verify server is stopped (request should fail)
     (should-error
      (with-temp-buffer
-       (let ((url-request-method "POST")
-             (url-request-data (json-encode
-                                `(("jsonrpc" . "2.0")
-                                  ("method" . "mcp.server.describe")
-                                  ("id" . 2))))
-             (url-request-extra-headers mcp-test-content-type-headers))
-         (url-insert-file-contents
-          (format "http://localhost:%d/mcp" mcp-test-port)))))))
+       (mcp-test-jsonrpc-request
+        `(("jsonrpc" . "2.0")
+          ("method" . "mcp.server.describe")
+          ("id" . 2)))))))
 
 ;;; Resource Tests
 
@@ -107,37 +111,29 @@ Tests the basic server lifecycle with no tools or resources."
         (progn
           ;; Test mcp.server.describe method
           (with-temp-buffer
-            (let ((url-request-method "POST")
-                  (url-request-data (json-encode
-                                     `(("jsonrpc" . "2.0")
-                                       ("method" . "mcp.server.describe")
-                                       ("id" . 1))))
-                  (url-request-extra-headers mcp-test-content-type-headers))
-              (url-insert-file-contents
-               (format "http://localhost:%d/mcp" mcp-test-port))
-              (let* ((response (json-read-from-string (buffer-string)))
-                     (result (alist-get 'result response)))
-                ;; Server should return description with capabilities
-                (should (alist-get 'name result))
-                (should (alist-get 'version result))
-                (should (alist-get 'protocol_version result))
-                (should (alist-get 'capabilities result)))))
+            (mcp-test-jsonrpc-request
+             `(("jsonrpc" . "2.0")
+               ("method" . "mcp.server.describe")
+               ("id" . 1)))
+            (let* ((response (json-read-from-string (buffer-string)))
+                   (result (alist-get 'result response)))
+              ;; Server should return description with capabilities
+              (should (alist-get 'name result))
+              (should (alist-get 'version result))
+              (should (alist-get 'protocol_version result))
+              (should (alist-get 'capabilities result))))
 
           ;; Test mcp.server.list_tools method
           (with-temp-buffer
-            (let ((url-request-method "POST")
-                  (url-request-data (json-encode
-                                     `(("jsonrpc" . "2.0")
-                                       ("method" . "mcp.server.list_tools")
-                                       ("id" . 2))))
-                  (url-request-extra-headers mcp-test-content-type-headers))
-              (url-insert-file-contents
-               (format "http://localhost:%d/mcp" mcp-test-port))
-              (let* ((response (json-read-from-string (buffer-string)))
-                     (result (alist-get 'result response)))
-                ;; Should return empty tools array for minimal server
-                (should (arrayp (alist-get 'tools result)))
-                (should (= 0 (length (alist-get 'tools result))))))))
+            (mcp-test-jsonrpc-request
+             `(("jsonrpc" . "2.0")
+               ("method" . "mcp.server.list_tools")
+               ("id" . 2)))
+            (let* ((response (json-read-from-string (buffer-string)))
+                   (result (alist-get 'result response)))
+              ;; Should return empty tools array for minimal server
+              (should (arrayp (alist-get 'tools result)))
+              (should (= 0 (length (alist-get 'tools result)))))))
 
       ;; Cleanup - always stop server
       (mcp-stop-server server))))
