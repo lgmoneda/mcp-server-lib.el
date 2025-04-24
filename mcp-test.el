@@ -38,9 +38,6 @@
   "Port used for MCP server during tests.
 Matches the default port from `mcp-default-port`.")
 
-(defconst mcp-test-content-type-headers '(("Content-Type" . "application/json"))
-  "Standard Content-Type headers used in HTTP requests.")
-
 ;;; Test Helpers
 
 (defun mcp-test-jsonrpc-request (request-data)
@@ -49,7 +46,7 @@ REQUEST-DATA should be an alist suitable for `json-encode`.
 Sets up the request environment and calls `url-insert-file-contents`."
   (let ((url-request-method "POST")
         (url-request-data (json-encode request-data))
-        (url-request-extra-headers mcp-test-content-type-headers))
+        (url-request-extra-headers '(("Content-Type" . "application/json"))))
     (url-insert-file-contents
      (format "http://localhost:%d/mcp" mcp-test-port))))
 
