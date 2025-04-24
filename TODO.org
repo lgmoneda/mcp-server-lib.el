@@ -63,7 +63,7 @@
 - [ ] Implement MCP "initialize" method
   - [ ] Handle protocol version negotiation
   - [ ] Exchange capability information
-  - [ ] Support "initialized" notification
+  - [X] Support "initialized" notification (including "notifications/initialized" format)
   - [ ] Add version compatibility validation
 
 ** Configuration Variables
@@ -101,7 +101,7 @@
   - [ ] Test valid initialize request handling
   - [ ] Test protocol version compatibility
   - [ ] Test capability reporting
-  - [ ] Test initialized notification handling
+  - [X] Test initialized notification handling (including "notifications/initialized" format)
   - [ ] Test error cases (invalid version, etc.)
 - [ ] Unit tests for tool registration and execution
 - [ ] Unit tests for resource handling

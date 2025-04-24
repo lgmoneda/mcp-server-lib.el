@@ -216,6 +216,10 @@ Returns a JSON-RPC response string."
      ((equal method "initialized")
       (mcp--handle-initialized)
       (mcp--jsonrpc-response id nil))
+     ;; Notifications/initialized format
+     ((equal method "notifications/initialized")
+      (mcp--handle-initialized)
+      "")
      ;; List available tools
      ((equal method "mcp.server.list_tools")
       (let ((tool-list (vector)))
@@ -291,7 +295,8 @@ version and capabilities between the client and server."
 This is called after successful initialization to complete the handshake.
 The client sends this notification to acknowledge the server's response
 to the initialize request."
-  ;; Currently just a placeholder for future functionality)
+  ;; Currently just a placeholder for future functionality
+  nil)
 
 (provide 'mcp)
 ;;; mcp.el ends here

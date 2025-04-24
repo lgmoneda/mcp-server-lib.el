@@ -139,5 +139,24 @@
     ;; Cleanup - always stop server
     (mcp-stop)))
 
+(ert-deftest mcp-test-notifications-initialized-format ()
+  "Test the MCP notifications/initialized format handling."
+  ;; Start the MCP server using the singleton API
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Test notifications/initialized format
+        (let* ((notifications-initialized
+                (json-encode
+                 `(("jsonrpc" . "2.0")
+                   ("method" . "notifications/initialized")
+                   ("id" . null))))
+               (response (mcp-process-jsonrpc notifications-initialized)))
+          ;; For true notifications, the server should return an empty string
+          ;; or something that indicates no response is needed
+          (should (string= "" response))))
+    ;; Cleanup - always stop server
+    (mcp-stop)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
