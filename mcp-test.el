@@ -34,7 +34,7 @@
 (require 'url)
 
 ;; Test configuration
-(defvar mcp-test-port 8000
+(defconst mcp-test-port 8000
   "Port used for MCP server during tests.
 Matches the default port from `mcp-default-port`.")
 
