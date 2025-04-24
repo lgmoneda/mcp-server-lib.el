@@ -1,0 +1,104 @@
+#+TITLE: mcp.el - TODO List
+
+* Implementation Decisions
+
+** JSON-RPC Implementation
+- [X] Use built-in =jsonrpc.el= package (Emacs 27+) for JSON-RPC communication
+  - Provides JSON-RPC 2.0 protocol support
+  - Handles request/response tracking
+  - Offers error handling mechanisms
+  - Supports asynchronous communication
+  - Manages connection lifecycle
+
+** Transport Layer
+- [X] Use =simple-httpd= package for HTTP transport
+  - Server runs in a long-running Emacs session
+  - Clients connect via HTTP to send/receive JSON-RPC messages
+  - Easier debugging with standard HTTP tools
+  - Potential for future extensions (WebSockets, SSE)
+  - Better security options (TLS, authentication)
+
+** Minimum Viable Implementation
+- Focus on basic server + tool registration for initial release
+- Defer resource and prompt implementation to future releases
+
+* API Components to Implement
+
+** Python SDK Parity (Based on Python SDK)
+- [X] Server creation (`mcp-create-server`)
+- [X] Server start/stop (`mcp-start-server`, `mcp-stop-server`)
+- [X] Tool registration (`mcp-register-tool`)
+- [ ] Resource registration (`mcp-register-resource`)
+- [ ] Prompt registration (`mcp-register-prompt`)
+- [ ] Server discovery (similar to Python SDK's `mcp.server_discovery`)
+- [ ] LLM integration support (similar to `mcp.llm`)
+- [ ] Client functionality (similar to `mcp.client`)
+- [ ] Sampling support (similar to Python SDK's `settings.sampling`)
+- [ ] Progress reporting (similar to Python SDK's context features)
+- [ ] Image handling (support for multimodal resources)
+
+** Resource Registration
+- [ ] `mcp-register-resource` function for exposing data to clients
+- [ ] Resource implementation and data serialization
+- [ ] Resource metadata handling
+- [ ] Resource streaming capabilities
+
+** Prompt Registration
+- [ ] Prompt template definition API
+- [ ] Prompt variable handling
+- [ ] Prompt execution functions
+- [ ] Chat template support
+
+** Transport Layer
+- [X] HTTP server setup using =simple-httpd=
+- [X] JSON-RPC over HTTP implementation
+- [X] Request/response handling
+- [X] Error handling for transport-level issues
+- [ ] Potential Server-Sent Events (SSE) support (like Python's `run_sse_async`)
+- [ ] Support for stdio transport mode (like Python's `run_stdio`)
+
+** JSON-RPC Message Handling
+- [X] Use built-in =jsonrpc.el= for:
+  - JSON-RPC 2.0 message parsing
+  - Request/response management
+  - Error handling and reporting
+- [ ] Adapt MCP-specific message formats to jsonrpc framework
+
+** Configuration Variables
+- [X] Server port configuration (similar to Python SDK's port setting)
+  - [X] Configurable via function parameter (vs. Python's constructor parameter)
+  - [ ] Environment variable support (similar to Python's FASTMCP_PORT)
+- [ ] Server host configuration (similar to Python SDK's host setting)
+  - [ ] Environment variable support (similar to Python's FASTMCP_HOST)
+- [ ] Log level settings (similar to Python SDK's log_level setting)
+  - [ ] Environment variable support (similar to Python's FASTMCP_LOG_LEVEL)
+- [ ] Debug/trace options
+- [ ] Authentication/security options
+- [ ] Support for .env-like configuration files
+
+* Implementation Tasks
+
+** Core Implementation
+- [X] Server instance representation (plist)
+- [X] Tool registry data structure
+- [ ] Resource registry data structure
+- [ ] Prompt registry data structure
+- [ ] Async process management for stdio transport
+- [ ] Server synchronization with MCP clients
+
+** Testing
+- [X] Unit tests for basic server lifecycle
+- [X] Unit tests for core protocol methods
+- [ ] Unit tests for tool registration and execution
+- [ ] Unit tests for resource handling
+- [ ] Unit tests for prompt templating
+- [ ] Integration tests with actual LLM clients (Claude, OpenAI, etc.)
+- [ ] Test fixtures and helper functions
+
+** Documentation
+- [ ] Complete package documentation (similar to Python SDK's documentation)
+- [ ] Usage examples
+- [ ] API reference documentation
+- [ ] Example server implementations
+- [ ] Example integrations with Emacs packages (org-mode, etc.)
+- [ ] Example client applications

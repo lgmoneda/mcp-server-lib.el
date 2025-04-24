@@ -1,0 +1,29 @@
+#+TITLE: mcp.el - Model Context Protocol for Emacs Lisp
+
+* Overview
+
+=mcp.el= is an Emacs Lisp implementation of the [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP), an open standard for communication between AI applications, servers, and language models.
+
+This library enables Emacs users and developers to create MCP servers that can provide context, tools, resources, and prompts to Large Language Models (LLMs).
+
+* Features
+
+- MCP server creation and management in Emacs
+- Resource registration for exposing data to LLMs
+- Tool definitions for enabling LLMs to execute Elisp functions
+- Prompt templating for structured LLM interactions
+- Transport layer implementations (stdio, potentially others)
+- JSON-RPC message handling
+
+* Installation
+
+* Usage
+
+* License
+
+This project is licensed under the GNU General Public License v3.0 (GPLv3) - see the LICENSE file for details.
+
+* Acknowledgments
+
+- [[https://modelcontextprotocol.io/][Model Context Protocol]] specification
+- [[https://github.com/modelcontextprotocol/python-sdk][Python MCP SDK]] implementation
