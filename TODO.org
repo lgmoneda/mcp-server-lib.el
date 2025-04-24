@@ -60,6 +60,11 @@
   - Request/response management
   - Error handling and reporting
 - [ ] Adapt MCP-specific message formats to jsonrpc framework
+- [ ] Implement MCP "initialize" method
+  - [ ] Handle protocol version negotiation
+  - [ ] Exchange capability information
+  - [ ] Support "initialized" notification
+  - [ ] Add version compatibility validation
 
 ** Configuration Variables
 - [X] Server port configuration (similar to Python SDK's port setting)
@@ -82,10 +87,22 @@
 - [ ] Prompt registry data structure
 - [ ] Async process management for stdio transport
 - [ ] Server synchronization with MCP clients
+- [ ] Initialize method implementation
+  - [ ] Define `mcp--handle-initialize` function for the handshake process
+  - [ ] Store client capabilities in server state
+  - [ ] Return server capabilities in response
+  - [ ] Add connection lifecycle management
+  - [ ] Support capability-based feature negotiation
 
 ** Testing
 - [X] Unit tests for basic server lifecycle
 - [X] Unit tests for core protocol methods
+- [ ] Unit tests for initialize handshake
+  - [ ] Test valid initialize request handling
+  - [ ] Test protocol version compatibility
+  - [ ] Test capability reporting
+  - [ ] Test initialized notification handling
+  - [ ] Test error cases (invalid version, etc.)
 - [ ] Unit tests for tool registration and execution
 - [ ] Unit tests for resource handling
 - [ ] Unit tests for prompt templating

@@ -49,6 +49,12 @@
 (defvar mcp--name "emacs-mcp"
   "Name of the MCP server.")
 
+(defvar mcp--protocol-version "0.1.0"
+  "Current MCP protocol version supported by this server.")
+
+(defvar mcp--client-capabilities nil
+  "Store client capabilities received during initialization.")
+
 ;;; Core Functions
 
 (defun mcp-respond-with-result (request-context result-data)
@@ -201,8 +207,15 @@ Returns a JSON-RPC response string."
      ((equal method "mcp.server.describe")
       (mcp--jsonrpc-response id `((name . ,mcp--name)
                                   (version . "0.1.0")
-                                  (protocol_version . "0.1.0")
+                                  (protocol_version . ,mcp--protocol-version)
                                   (capabilities . ,(vector "tools")))))
+     ;; Initialize handshake
+     ((equal method "initialize")
+      (mcp--handle-initialize id params))
+     ;; Initialized notification
+     ((equal method "initialized")
+      (mcp--handle-initialized)
+      (mcp--jsonrpc-response id nil))
      ;; List available tools
      ((equal method "mcp.server.list_tools")
       (let ((tool-list (vector)))
@@ -247,6 +260,42 @@ Returns a JSON-RPC response string."
                  (id . ,id)
                  (error . ((code . ,code)
                            (message . ,message))))))
+
+;;; MCP Protocol Methods
+
+(defun mcp--handle-initialize (id params)
+  "Handle initialize request with ID and PARAMS.
+
+This implements the MCP initialize handshake, which negotiates protocol
+version and capabilities between the client and server."
+  (let ((client-version (alist-get 'protocolVersion params))
+        (client-capabilities (alist-get 'capabilities params)))
+    ;; Check protocol version compatibility
+    (if (and client-version (string= client-version mcp--protocol-version))
+        (progn
+          ;; Store client capabilities for future use
+          (setq mcp--client-capabilities client-capabilities)
+          ;; Respond with server capabilities
+          (mcp--jsonrpc-response
+           id
+           `((protocolVersion . ,mcp--protocol-version)
+             (capabilities . ((tools . t)
+                              (resources . nil)
+                              (prompts . nil))))))
+      ;; Invalid protocol version
+      (mcp--jsonrpc-error
+       id -32602
+       (format "Unsupported protocol version: %s (server: %s)"
+               client-version mcp--protocol-version)))))
+
+(defun mcp--handle-initialized ()
+  "Handle initialized notification from client.
+
+This is called after successful initialization to complete the handshake.
+The client sends this notification to acknowledge the server's response
+to the initialize request."
+  ;; Currently just logs the event, but could trigger additional setup
+  (message "MCP client connection initialized"))
 
 (provide 'mcp)
 ;;; mcp.el ends here
