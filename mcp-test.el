@@ -136,29 +136,5 @@
     ;; Cleanup - always stop server
     (mcp-stop)))
 
-(ert-deftest mcp-test-initialize-version-compatibility ()
-  "Test protocol version compatibility in initialize request."
-  ;; Start the MCP server using the singleton API
-  (mcp-start)
-  (unwind-protect
-      (progn
-        ;; Test with incompatible version
-        (let* ((initialize-request
-                (json-encode
-                 `(("jsonrpc" . "2.0")
-                   ("method" . "initialize")
-                   ("id" . 5)
-                   ("params" .
-                    (("protocolVersion" . "99.0.0")
-                     ("capabilities" . (("tools" . t))))))))
-               (initialize-response (mcp-process-jsonrpc initialize-request))
-               (response-obj (json-read-from-string initialize-response)))
-          ;; Should return an error for incompatible version
-          (should (alist-get 'error response-obj))
-          (should (eq -32602
-                      (alist-get 'code (alist-get 'error response-obj))))))
-    ;; Cleanup - always stop server
-    (mcp-stop)))
-
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

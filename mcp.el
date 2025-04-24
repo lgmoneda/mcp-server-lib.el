@@ -275,23 +275,17 @@ version and capabilities between the client and server."
     ;; Debug logging for initialize params
     (message "MCP: Initialize with version: %s, capabilities: %s"
              client-version client-capabilities)
-    ;; Check protocol version compatibility
-    (if (and client-version (string= client-version mcp--protocol-version))
-        (progn
-          ;; Store client capabilities for future use
-          (setq mcp--client-capabilities client-capabilities)
-          ;; Respond with server capabilities
-          (mcp--jsonrpc-response
-           id
-           `((protocolVersion . ,mcp--protocol-version)
-             (capabilities . ((tools . t)
-                              (resources . nil)
-                              (prompts . nil))))))
-      ;; Invalid protocol version
-      (mcp--jsonrpc-error
-       id -32602
-       (format "Unsupported protocol version: %s (server: %s)"
-               client-version mcp--protocol-version)))))
+    ;; TODO: Add proper protocol version compatibility check
+    ;; For now, accept any protocol version for compatibility
+    ;; Store client capabilities for future use
+    (setq mcp--client-capabilities client-capabilities)
+    ;; Respond with server capabilities
+    (mcp--jsonrpc-response
+     id
+     `((protocolVersion . ,mcp--protocol-version)
+       (capabilities . ((tools . t)
+                        (resources . nil)
+                        (prompts . nil)))))))
 
 (defun mcp--handle-initialized ()
   "Handle initialized notification from client.
