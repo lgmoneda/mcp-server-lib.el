@@ -199,6 +199,8 @@ Returns a JSON-RPC response string."
          (id (alist-get 'id request))
          (method (alist-get 'method request))
          (params (alist-get 'params request)))
+    ;; Debug logging for method dispatch
+    (message "MCP: Processing method: %s" method)
     (unless (equal jsonrpc "2.0")
       (mcp--jsonrpc-error id -32600 "Invalid Request: Not JSON-RPC 2.0"))
 
@@ -270,6 +272,9 @@ This implements the MCP initialize handshake, which negotiates protocol
 version and capabilities between the client and server."
   (let ((client-version (alist-get 'protocolVersion params))
         (client-capabilities (alist-get 'capabilities params)))
+    ;; Debug logging for initialize params
+    (message "MCP: Initialize with version: %s, capabilities: %s"
+             client-version client-capabilities)
     ;; Check protocol version compatibility
     (if (and client-version (string= client-version mcp--protocol-version))
         (progn
