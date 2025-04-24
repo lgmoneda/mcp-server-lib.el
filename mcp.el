@@ -3,7 +3,7 @@
 ;; Author: Laurynas Biveinis
 ;; Keywords: comm, ai, tools
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1") (json "1.5") (simple-httpd "1.5.1"))
+;; Package-Requires: ((emacs "27.1") (simple-httpd "1.5.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -130,12 +130,12 @@ Example:
             (insert response))
         (error
          (message "MCP servlet error: %s" (error-message-string err))
-         (insert (json-encode 
+         (insert (json-encode
                   `((jsonrpc . "2.0")
                     (id . nil)
                     (error . ((code . -32603)
                               (message . ,(format "Internal error: %s" (error-message-string err)))))))))))
-    
+
     ;; Mark server as running
     (plist-put server :running t)
     server))
@@ -147,7 +147,7 @@ Arguments:
   SERVER  The MCP server instance to stop
 
 Stops the server, closes all client connections, and performs
-necessary cleanup. After stopping, the server instance should
+necessary cleanup.  After stopping, the server instance should
 not be reused.
 
 Example:
@@ -214,23 +214,20 @@ Returns a JSON-RPC response string."
          (id (alist-get 'id request))
          (method (alist-get 'method request))
          (params (alist-get 'params request)))
-    
     (unless (equal jsonrpc "2.0")
       (mcp--jsonrpc-error id -32600 "Invalid Request: Not JSON-RPC 2.0"))
-    
+
     (cond
      ;; Server status - for debugging, not part of official MCP
      ((equal method "mcp.server.status")
       (mcp--jsonrpc-response id `((name . ,(plist-get server :name))
                                   (version . "0.1.0"))))
-     
      ;; Server description
      ((equal method "mcp.server.describe")
       (mcp--jsonrpc-response id `((name . ,(plist-get server :name))
                                   (version . "0.1.0")
                                   (protocol_version . "0.1.0")
                                   (capabilities . ,(vector "tools")))))
-     
      ;; List available tools
      ((equal method "mcp.server.list_tools")
       (let ((tools-hash (plist-get server :tools))
@@ -243,7 +240,6 @@ Returns a JSON-RPC response string."
                                             (schema . ,(plist-get tool :schema)))))))
                  tools-hash)
         (mcp--jsonrpc-response id `((tools . ,tool-list)))))
-     
      ;; Tool invocation
      ((string-match "^mcp\\.tool\\.\\(.+\\)" method)
       (let* ((tool-id (match-string 1 method))
@@ -257,7 +253,6 @@ Returns a JSON-RPC response string."
                 (error
                  (mcp--jsonrpc-error id -32603 (format "Internal error: %s" (error-message-string err))))))
           (mcp--jsonrpc-error id -32601 (format "Tool not found: %s" tool-id)))))
-     
      ;; Method not found
      (t (mcp--jsonrpc-error id -32601 (format "Method not found: %s" method))))))
 

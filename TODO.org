@@ -95,6 +95,17 @@
 - [ ] Integration tests with actual LLM clients (Claude, OpenAI, etc.)
 - [ ] Test fixtures and helper functions
 
+** CI and Linting
+- [X] Fix package dependency issue (Package json is not installable)
+- [ ] Fix long lines exceeding fill-column (70 characters)
+- [ ] Fix indentation (use tabs instead of spaces per convention)
+- [ ] Remove trailing whitespace
+- [ ] Fix checkdoc issues:
+  - Add two spaces after periods
+  - Quote Lisp symbols properly
+  - Remove whitespace at end of lines
+- [ ] Fix naming convention (mcp--test-port → mcp-test-port)
+
 ** Documentation
 - [ ] Complete package documentation (similar to Python SDK's documentation)
 - [ ] Usage examples
