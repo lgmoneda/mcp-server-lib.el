@@ -93,7 +93,7 @@
 - [ ] Unit tests for resource handling
 - [ ] Unit tests for prompt templating
 - [ ] Integration tests with actual LLM clients (Claude, OpenAI, etc.)
-- [ ] Test fixtures and helper functions
+- [X] Test fixtures and helper functions (mcp-test-jsonrpc-request)
 
 ** CI and Linting
 - [X] Fix package dependency issue (Package json is not installable)
@@ -105,6 +105,9 @@
   - Quote Lisp symbols properly
   - Remove whitespace at end of lines
 - [X] Fix naming convention (mcp--test-port → mcp-test-port)
+- [X] Add byte-compilation checks to test suite
+- [X] Integrate elisp-lint into workflow
+- [X] Add markdown linting for documentation files
 
 ** Documentation
 - [ ] Complete package documentation (similar to Python SDK's documentation)
