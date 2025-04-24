@@ -8,10 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Run single test: `emacs -batch --eval "(let ((pkg-dir (locate-user-emacs-file \"elpa/simple-httpd-1.5.1\"))) (add-to-list 'load-path pkg-dir) (add-to-list 'load-path \".\") (load-file \"mcp.el\") (load-file \"mcp-test.el\") (ert-run-tests-batch-and-exit \"test-name\"))"`
 - Byte-compile: `emacs -batch --eval "(let ((pkg-dir (locate-user-emacs-file \"elpa/simple-httpd-1.5.1\"))) (add-to-list 'load-path pkg-dir) (add-to-list 'load-path \".\") (byte-compile-file \"mcp.el\"))"`
 - Run elisp-lint: `emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\") (locate-user-emacs-file \"elpa/package-lint-0.26\") (locate-user-emacs-file \"elpa/simple-httpd-1.5.1\") (locate-user-emacs-file \"elpa/dash-20250312.1307\") (expand-file-name \".\"))))
-  (dolist (dir pkg-dirs)
-    (add-to-list 'load-path dir))
-  (require 'elisp-lint)
-  (elisp-lint-file \"mcp.el\"))"`
+(dolist (dir pkg-dirs)
+  (add-to-list 'load-path dir))
+(require 'elisp-lint)
+(elisp-lint-file \"mcp.el\"))"`
 - Check GitHub workflows: `actionlint .github/workflows/*.yml`
 - Check Markdown files: `mdl *.md`
 - Format YAML files: `prettier --write .github/workflows/*.yml`
@@ -31,6 +31,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Roadmap
 
 For implementation details and roadmap, refer to the TODO.org file which contains:
+
 - Implementation decisions (JSON-RPC, transport layer, etc.)
 - Python SDK parity goals
 - Transport implementation plans
