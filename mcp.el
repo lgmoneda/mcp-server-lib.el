@@ -286,9 +286,9 @@ version and capabilities between the client and server."
      `((protocolVersion . ,mcp--protocol-version)
        (serverInfo . ((name . ,mcp--name)
                       (version . ,mcp--protocol-version)))
-       (capabilities . ((tools . (()))
-                        (resources . (()))
-                        (prompts . (()))))))))
+       (capabilities . ((tools . ())  ; Empty alist becomes {} in JSON
+                        (resources . ())
+                        (prompts . ())))))))
 
 (defun mcp--handle-initialized ()
   "Handle initialized notification from client.
