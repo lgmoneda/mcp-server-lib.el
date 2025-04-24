@@ -30,7 +30,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Roadmap
 
-For implementation details and roadmap, refer to the TODO.org file which contains:
+For implementation details and roadmap, refer to the `TODO.org` file which contains:
 
 - Implementation decisions (JSON-RPC, transport layer, etc.)
 - Python SDK parity goals
