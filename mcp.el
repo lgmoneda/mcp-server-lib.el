@@ -72,10 +72,10 @@ Example:
   (defun my-weather-handler (request-context tool-args)
     (let ((location (alist-get \\='location tool-args)))
       (mcp-respond-with-result
-	request-context
-	`((temperature . 72)
-	  (conditions . \"sunny\")
-	  (location . ,location)))))"
+        request-context
+        `((temperature . 72)
+          (conditions . \"sunny\")
+          (location . ,location)))))"
   (let ((id (plist-get request-context :id)))
     (mcp--jsonrpc-response id result-data)))
 
@@ -98,9 +98,9 @@ Example:
   (setq my-server (mcp-create-server \"my-tool-server\"))
   (setq custom-server (mcp-create-server \"custom-server\" 9000))"
   (let ((server (list :name name
-		      :tools (make-hash-table :test 'equal)
-		      :port (or port mcp-default-port)
-		      :running nil)))
+                      :tools (make-hash-table :test 'equal)
+                      :port (or port mcp-default-port)
+                      :running nil)))
     (puthash name server mcp--servers)
     server))
 
@@ -125,16 +125,16 @@ Example:
     ;; Define the MCP endpoint
     (defservlet mcp application/json (_path _query request)
       (condition-case err
-	  (let* ((body (cadr (assoc "Content" request)))
-		 (response (mcp--handle-jsonrpc-request server body)))
-	    (insert response))
-	(error
-	 (message "MCP servlet error: %s" (error-message-string err))
-	 (insert (json-encode
-		  `((jsonrpc . "2.0")
-		    (id . nil)
-		    (error . ((code . -32603)
-			      (message . ,(format "Internal error: %s" (error-message-string err)))))))))))
+          (let* ((body (cadr (assoc "Content" request)))
+                 (response (mcp--handle-jsonrpc-request server body)))
+            (insert response))
+        (error
+         (message "MCP servlet error: %s" (error-message-string err))
+         (insert (json-encode
+                  `((jsonrpc . "2.0")
+                    (id . nil)
+                    (error . ((code . -32603)
+                              (message . ,(format "Internal error: %s" (error-message-string err)))))))))))
 
     ;; Mark server as running
     (plist-put server :running t)
@@ -193,10 +193,10 @@ Example:
     \"Lists all available Org mode files for task management\"
     #\\='my-org-files-handler)"
   (let ((tools (plist-get server :tools))
-	(tool (list :id tool-id
-		    :description tool-description
-		    :handler handler
-		    :schema schema)))
+        (tool (list :id tool-id
+                    :description tool-description
+                    :handler handler
+                    :schema schema)))
     (puthash tool-id tool tools)
     tool))
 
@@ -210,10 +210,10 @@ Example:
   "Handle a JSON-RPC REQUEST-BODY for SERVER.
 Returns a JSON-RPC response string."
   (let* ((request (json-read-from-string request-body))
-	 (jsonrpc (alist-get 'jsonrpc request))
-	 (id (alist-get 'id request))
-	 (method (alist-get 'method request))
-	 (params (alist-get 'params request)))
+         (jsonrpc (alist-get 'jsonrpc request))
+         (id (alist-get 'id request))
+         (method (alist-get 'method request))
+         (params (alist-get 'params request)))
     (unless (equal jsonrpc "2.0")
       (mcp--jsonrpc-error id -32600 "Invalid Request: Not JSON-RPC 2.0"))
 
@@ -221,53 +221,53 @@ Returns a JSON-RPC response string."
      ;; Server status - for debugging, not part of official MCP
      ((equal method "mcp.server.status")
       (mcp--jsonrpc-response id `((name . ,(plist-get server :name))
-				  (version . "0.1.0"))))
+                                  (version . "0.1.0"))))
      ;; Server description
      ((equal method "mcp.server.describe")
       (mcp--jsonrpc-response id `((name . ,(plist-get server :name))
-				  (version . "0.1.0")
-				  (protocol_version . "0.1.0")
-				  (capabilities . ,(vector "tools")))))
+                                  (version . "0.1.0")
+                                  (protocol_version . "0.1.0")
+                                  (capabilities . ,(vector "tools")))))
      ;; List available tools
      ((equal method "mcp.server.list_tools")
       (let ((tools-hash (plist-get server :tools))
-	    (tool-list (vector)))
-	(maphash (lambda (id tool)
-		   (setq tool-list
-			 (vconcat tool-list
-				  (vector `((id . ,id)
-					    (description . ,(plist-get tool :description))
-					    (schema . ,(plist-get tool :schema)))))))
-		 tools-hash)
-	(mcp--jsonrpc-response id `((tools . ,tool-list)))))
+            (tool-list (vector)))
+        (maphash (lambda (id tool)
+                   (setq tool-list
+                         (vconcat tool-list
+                                  (vector `((id . ,id)
+                                            (description . ,(plist-get tool :description))
+                                            (schema . ,(plist-get tool :schema)))))))
+                 tools-hash)
+        (mcp--jsonrpc-response id `((tools . ,tool-list)))))
      ;; Tool invocation
      ((string-match "^mcp\\.tool\\.\\(.+\\)" method)
       (let* ((tool-id (match-string 1 method))
-	     (tools (plist-get server :tools))
-	     (tool (gethash tool-id tools)))
-	(if tool
-	    (let ((handler (plist-get tool :handler))
-		  (context (list :id id :server server)))
-	      (condition-case err
-		  (funcall handler context params)
-		(error
-		 (mcp--jsonrpc-error id -32603 (format "Internal error: %s" (error-message-string err))))))
-	  (mcp--jsonrpc-error id -32601 (format "Tool not found: %s" tool-id)))))
+             (tools (plist-get server :tools))
+             (tool (gethash tool-id tools)))
+        (if tool
+            (let ((handler (plist-get tool :handler))
+                  (context (list :id id :server server)))
+              (condition-case err
+                  (funcall handler context params)
+                (error
+                 (mcp--jsonrpc-error id -32603 (format "Internal error: %s" (error-message-string err))))))
+          (mcp--jsonrpc-error id -32601 (format "Tool not found: %s" tool-id)))))
      ;; Method not found
      (t (mcp--jsonrpc-error id -32601 (format "Method not found: %s" method))))))
 
 (defun mcp--jsonrpc-response (id result)
   "Create a JSON-RPC response with ID and RESULT."
   (json-encode `((jsonrpc . "2.0")
-		 (id . ,id)
-		 (result . ,result))))
+                 (id . ,id)
+                 (result . ,result))))
 
 (defun mcp--jsonrpc-error (id code message)
   "Create a JSON-RPC error response with ID, error CODE and MESSAGE."
   (json-encode `((jsonrpc . "2.0")
-		 (id . ,id)
-		 (error . ((code . ,code)
-			   (message . ,message))))))
+                 (id . ,id)
+                 (error . ((code . ,code)
+                           (message . ,message))))))
 
 (provide 'mcp)
 ;;; mcp.el ends here
