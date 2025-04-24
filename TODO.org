@@ -98,7 +98,7 @@
 ** CI and Linting
 - [X] Fix package dependency issue (Package json is not installable)
 - [ ] Fix long lines exceeding fill-column (70 characters)
-- [ ] Fix indentation (use tabs instead of spaces per convention)
+- [X] Fix indentation (use tabs instead of spaces per convention)
 - [X] Remove trailing whitespace
 - [ ] Fix checkdoc issues:
   - Add two spaces after periods

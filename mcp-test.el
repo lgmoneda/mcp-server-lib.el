@@ -55,18 +55,18 @@ Tests the basic server lifecycle with no tools or resources."
     ;; We'll use a simple HTTP request to check server status
     (with-temp-buffer
       (let ((url-request-method "POST")
-            (url-request-data (json-encode
-                               `(("jsonrpc" . "2.0")
-                                 ("method" . "mcp.server.status")
-                                 ("id" . 1))))
-            (url-request-extra-headers '(("Content-Type" . "application/json"))))
-        (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
-        (let* ((response (json-read-from-string (buffer-string)))
-               (result (alist-get 'result response)))
-          ;; Check if server responded with status info
-          (should (alist-get 'name result))
-          (should (equal (alist-get 'name result) "test-server"))
-          (should (alist-get 'version result)))))
+	    (url-request-data (json-encode
+			       `(("jsonrpc" . "2.0")
+				 ("method" . "mcp.server.status")
+				 ("id" . 1))))
+	    (url-request-extra-headers '(("Content-Type" . "application/json"))))
+	(url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
+	(let* ((response (json-read-from-string (buffer-string)))
+	       (result (alist-get 'result response)))
+	  ;; Check if server responded with status info
+	  (should (alist-get 'name result))
+	  (should (equal (alist-get 'name result) "test-server"))
+	  (should (alist-get 'version result)))))
 
     ;; Stop the server
     (mcp-stop-server server)
@@ -75,12 +75,12 @@ Tests the basic server lifecycle with no tools or resources."
     (should-error
      (with-temp-buffer
        (let ((url-request-method "POST")
-             (url-request-data (json-encode
-                                `(("jsonrpc" . "2.0")
-                                  ("method" . "mcp.server.status")
-                                  ("id" . 2))))
-             (url-request-extra-headers '(("Content-Type" . "application/json"))))
-         (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port)))))))
+	     (url-request-data (json-encode
+				`(("jsonrpc" . "2.0")
+				  ("method" . "mcp.server.status")
+				  ("id" . 2))))
+	     (url-request-extra-headers '(("Content-Type" . "application/json"))))
+	 (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port)))))))
 
 ;;; Resource Tests
 
@@ -97,38 +97,38 @@ Tests the basic server lifecycle with no tools or resources."
   (let ((server (mcp-create-server "test-server")))
     (mcp-start-server server)
     (unwind-protect
-        (progn
-          ;; Test mcp.server.describe method
-          (with-temp-buffer
-            (let ((url-request-method "POST")
-                  (url-request-data (json-encode
-                                     `(("jsonrpc" . "2.0")
-                                       ("method" . "mcp.server.describe")
-                                       ("id" . 1))))
-                  (url-request-extra-headers '(("Content-Type" . "application/json"))))
-              (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
-              (let* ((response (json-read-from-string (buffer-string)))
-                     (result (alist-get 'result response)))
-                ;; Server should return description with capabilities
-                (should (alist-get 'name result))
-                (should (alist-get 'version result))
-                (should (alist-get 'protocol_version result))
-                (should (alist-get 'capabilities result)))))
+	(progn
+	  ;; Test mcp.server.describe method
+	  (with-temp-buffer
+	    (let ((url-request-method "POST")
+		  (url-request-data (json-encode
+				     `(("jsonrpc" . "2.0")
+				       ("method" . "mcp.server.describe")
+				       ("id" . 1))))
+		  (url-request-extra-headers '(("Content-Type" . "application/json"))))
+	      (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
+	      (let* ((response (json-read-from-string (buffer-string)))
+		     (result (alist-get 'result response)))
+		;; Server should return description with capabilities
+		(should (alist-get 'name result))
+		(should (alist-get 'version result))
+		(should (alist-get 'protocol_version result))
+		(should (alist-get 'capabilities result)))))
 
-          ;; Test mcp.server.list_tools method
-          (with-temp-buffer
-            (let ((url-request-method "POST")
-                  (url-request-data (json-encode
-                                     `(("jsonrpc" . "2.0")
-                                       ("method" . "mcp.server.list_tools")
-                                       ("id" . 2))))
-                  (url-request-extra-headers '(("Content-Type" . "application/json"))))
-              (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
-              (let* ((response (json-read-from-string (buffer-string)))
-                     (result (alist-get 'result response)))
-                ;; Should return empty tools array for minimal server
-                (should (arrayp (alist-get 'tools result)))
-                (should (= 0 (length (alist-get 'tools result))))))))
+	  ;; Test mcp.server.list_tools method
+	  (with-temp-buffer
+	    (let ((url-request-method "POST")
+		  (url-request-data (json-encode
+				     `(("jsonrpc" . "2.0")
+				       ("method" . "mcp.server.list_tools")
+				       ("id" . 2))))
+		  (url-request-extra-headers '(("Content-Type" . "application/json"))))
+	      (url-insert-file-contents (format "http://localhost:%d/mcp" mcp--test-port))
+	      (let* ((response (json-read-from-string (buffer-string)))
+		     (result (alist-get 'result response)))
+		;; Should return empty tools array for minimal server
+		(should (arrayp (alist-get 'tools result)))
+		(should (= 0 (length (alist-get 'tools result))))))))
 
       ;; Cleanup - always stop server
       (mcp-stop-server server))))
