@@ -262,14 +262,19 @@ Returns a JSON-RPC response string."
      ;; Tool invocation
      ((equal method "tools/call")
       (let* ((tool-name (alist-get 'name params))
-             (tool (gethash tool-name mcp--tools)))
+             (tool (gethash tool-name mcp--tools))
+             (tool-args (alist-get 'arguments params)))
         (if tool
             (let ((handler (plist-get tool :handler))
                   (context (list :id id)))
-              ;; TODO: Add support for handlers that accept arguments
-              ;; Currently assumes handler takes zero arguments
               (condition-case err
-                  (let* ((result (funcall handler))
+                  (let* ((result
+                          ;; Pass first arg value for single-string-arg tools
+                          ;; when arguments are present
+                          (if (and tool-args (not (equal tool-args '())))
+                              (let ((first-arg-value (cdr (car tool-args))))
+                                (funcall handler first-arg-value))
+                            (funcall handler)))
                          ;; Wrap the handler result in the MCP format
                          (formatted-result
                           `((content . ,(vector
