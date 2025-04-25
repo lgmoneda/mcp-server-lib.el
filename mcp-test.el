@@ -468,9 +468,28 @@ Verifies that result has a content array with a proper text item."
   (mcp-start)
   (unwind-protect
       (progn
+        ;; Clear any previously registered tools to ensure only this tool exists
+        (clrhash mcp--tools)
+
         (mcp-register-tool
          "empty-string-tool" "A tool that returns an empty string"
          #'mcp-test--empty-array-tool-handler)
+
+        ;; First check the schema for this zero-arg handler
+        (let* ((list-req (json-encode
+                          `(("jsonrpc" . "2.0")
+                            ("method" . "tools/list")
+                            ("id" . 100))))
+               (list-response (mcp-process-jsonrpc list-req))
+               (list-obj (json-read-from-string list-response))
+               (tools (alist-get 'tools (alist-get 'result list-obj)))
+               (tool (aref tools 0))
+               (schema (alist-get 'inputSchema tool)))
+
+          ;; Verify schema is correct for a zero-arg function
+          (should (equal '((type . "object")) schema)))
+
+        ;; Then test the actual tool execution
         (let* ((req (mcp-test--tools-call-request 10 "empty-string-tool"))
                (response (mcp-process-jsonrpc req))
                (response-obj (json-read-from-string response))
@@ -501,13 +520,12 @@ Verifies that result has a content array with a proper text item."
                (tool (aref tool-list 0))
                (schema (alist-get 'inputSchema tool)))
 
-          ;; Schema should indicate required parameter
-          (should schema)
-          (should (equal "object" (alist-get 'type schema)))
-          (should (alist-get 'properties schema))
-          (should (alist-get 'required schema))
-          (should (vectorp (alist-get 'required schema)))
-          (should (= 1 (length (alist-get 'required schema))))))
+          ;; Verify complete schema structure
+          (should (equal
+                   `((type . "object")
+                     (properties . ((input-string . ((type . "string")))))
+                     (required . ["input-string"]))
+                   schema))))
     (mcp-stop)
     (mcp-unregister-tool "requires-arg")))
 

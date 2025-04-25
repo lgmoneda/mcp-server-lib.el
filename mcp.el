@@ -137,9 +137,10 @@ Supports functions with zero or one argument only."
      ((and (= 1 (length arglist))
            (symbolp (car arglist))
            (not (memq (car arglist) '(&optional &rest))))
-      `((type . "object")
-        (properties . ((file . ((type . "string")))))
-        (required . [,(symbol-name (car arglist))])))
+      (let ((arg-name (symbol-name (car arglist))))
+        `((type . "object")
+          (properties . ((,arg-name . ((type . "string")))))
+          (required . [,arg-name]))))
 
      ;; Everything else is unsupported
      (t
