@@ -18,12 +18,6 @@ with code in this repository.
         --eval "(ert-run-tests-batch-and-exit \"test-name\")"
   ```
 
-- Byte-compile:
-
-  ```shell
-  emacs -Q -batch --eval "(byte-compile-file \"mcp.el\")"
-  ```
-
 - Run elisp-lint:
 
   ```shell
@@ -52,13 +46,43 @@ with code in this repository.
                (message \"No issues found\"))))"
   ```
 
-## Standing Orders
+## Development Workflow
 
-After each code change:
+Always follow Test-Driven Development (TDD) principles:
 
-- Run elisp-lint to catch potential issues
-- Byte-compile the code to check for warnings
+### Step 1: Start with a failing test
+
+Always begin by writing a test that verifies the expected behavior before
+implementing the feature or fix.
+
+Run linters on the test code - some linting failures like "symbol not defined"
+are expected at this point since you're testing functionality that doesn't
+exist yet. Fix any style or formatting issues.
+
+### Step 2: Run the test and verify it fails
+
+Confirm the test fails as expected before making any implementation changes.
+
+### Step 3: Implement the code
+
+Only after having a failing test, implement the minimal code necessary to
+make the test pass.
+
+### Step 4: Verify the test passes
+
+Run the tests to confirm your implementation works correctly.
+
+### Step 5: Run linters and tests after each change
+
+- Run elisp-lint to catch style and code issues (this includes byte-compilation)
 - Run all tests to ensure nothing was broken
+- Check markdown linting if documentation files were changed
+
+### Step 6: Refactor if needed
+
+Clean up the code while ensuring tests still pass.
+
+Never implement features without first writing tests that verify the expected behavior.
 
 ## Style Guide
 
