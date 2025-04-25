@@ -53,19 +53,30 @@ with code in this repository.
 **If anything prevents following these steps, STOP and ask for guidance.**
 
 **Task Focus: Never switch tasks mid-development.**
-**If you discover additional work needed, ask for permission to file a TODO note.**
+**If you discover additional work needed, ask for permission to file a todo note.**
+
+**Commands: Do not modify the commands in this file.**
+**If commands don't work or need modification, ask for explicit permission.**
+
+**IMPORTANT: Never use direct byte-compilation commands.**
+**Always use elisp-lint which already includes byte-compilation checks.**
 
 ### Step 1: Understand the feature
 
 Before writing any code:
 
 - Understand the feature requirements and specifications
-- Review related code and documentation (e.g., TODO.org)
+- Review related code and documentation (e.g., `TODO.org`)
 - Ask questions to clarify any ambiguities
 
 ### Step 2: Test-Driven Development
 
 1. **Write tests**: Create tests that verify the expected behavior
+
+- Test only public interfaces, not implementation details
+- Do not depend on internals of the tested component
+- If you see no alternative to testing internals, ask for guidance
+
 1. **Run linters**: Run elisp-lint on test code
 
 - Note: Some errors (e.g., undefined symbols) are expected at this stage
@@ -76,7 +87,7 @@ Before writing any code:
 1. **Verify success**: Run tests to confirm implementation works
 1. **Run all quality checks**:
 
-- Run elisp-lint (includes byte-compilation)
+- Run elisp-lint (which already includes byte-compilation checks)
 - Run all tests
 - Check documentation linting if applicable
 
@@ -95,6 +106,7 @@ Before writing any code:
 - **Whitespace**: Avoid trailing whitespace; two spaces after period in docstrings
 - **Error Handling**: Use `condition-case` for handling errors in user-facing functions
 - **Line Length**: Keep lines under 80 columns when possible
+- **Comments**: Do not add obvious comments that merely restate the code
 
 ## Project Roadmap
 
