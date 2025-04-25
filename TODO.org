@@ -59,7 +59,7 @@
   - JSON-RPC 2.0 message parsing
   - Request/response management
   - Error handling and reporting
-- [ ] Adapt MCP-specific message formats to jsonrpc framework
+- [X] Adapt MCP-specific message formats to jsonrpc framework
 - [ ] Implement MCP "initialize" method
   - [ ] Handle protocol version negotiation
   - [ ] Exchange capability information
@@ -103,8 +103,9 @@
   - [ ] Test capability reporting
   - [X] Test initialized notification handling (including "notifications/initialized" format)
   - [ ] Test error cases (invalid version, etc.)
-- [ ] Unit tests for tool registration and execution
+- [X] Unit tests for tool registration and execution
   - [X] Add test for tools/list method
+  - [X] Add test for tools/call method
 - [ ] Unit tests for resource handling
 - [ ] Unit tests for prompt templating
 - [ ] Integration tests with actual LLM clients (Claude, OpenAI, etc.)
