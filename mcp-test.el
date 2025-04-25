@@ -313,20 +313,16 @@
 ;;; Tool Call Tests
 
 (defconst mcp-test--string-list-result
-  (vector "item1" "item2" "item3")
+  "item1 item2 item3"
   "Test data for string list tool.")
 
-(defconst mcp-test--empty-array-result
-  (vector)
-  "Test data for empty array tool.")
-
 (defun mcp-test--string-list-tool-handler ()
-  "Test tool handler function to return a list of strings."
+  "Test tool handler function to return a string with items."
   mcp-test--string-list-result)
 
 (defun mcp-test--empty-array-tool-handler ()
-  "Test tool handler function to return an empty array."
-  mcp-test--empty-array-result)
+  "Test tool handler function to return an empty string."
+  "")
 
 (defun mcp-test--tools-call-request (id tool-name)
   "Create a tools/call JSON-RPC request with ID for TOOL-NAME.
@@ -338,42 +334,58 @@ Uses empty argument list."
      ("params" . (("name" . ,tool-name)
                   ("arguments" . ()))))))
 
+(defun mcp-test--check-mcp-content-format (result expected-text)
+  "Check that RESULT follows the MCP content format with EXPECTED-TEXT.
+Verifies that result has a content array with a proper text item."
+  ;; Check for proper MCP format
+  (should (alist-get 'content result))
+  (should (arrayp (alist-get 'content result)))
+  (should (= 1 (length (alist-get 'content result))))
+  ;; Check first content item
+  (let ((content-item (aref (alist-get 'content result) 0)))
+    (should (alist-get 'type content-item))
+    (should (string= "text" (alist-get 'type content-item)))
+    (should (alist-get 'text content-item))
+    ;; Verify the text field contains expected text
+    (should (string= expected-text (alist-get 'text content-item))))
+  ;; Check isError field
+  (should (not (null (alist-get 'isError result nil t))))
+  (should (eq :json-false (alist-get 'isError result))))
+
 (ert-deftest mcp-test-tools-call-no-args ()
   "Test the `tools/call` method with a tool that takes no arguments."
   (mcp-start)
   (unwind-protect
       (progn
         (mcp-register-tool
-         "string-list-tool" "A tool that returns a list of strings"
+         "string-list-tool" "A tool that returns a string with items"
          #'mcp-test--string-list-tool-handler)
         (let* ((response (mcp-process-jsonrpc
                           (mcp-test--tools-call-request 9 "string-list-tool")))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj)))
           (should result)
-          (should (arrayp result))
-          (should (equal mcp-test--string-list-result result))))
+          (mcp-test--check-mcp-content-format
+           result mcp-test--string-list-result)))
     (mcp-stop)
     (mcp-unregister-tool "string-list-tool")))
 
-(ert-deftest mcp-test-tools-call-empty-array ()
-  "Test the `tools/call` method with a tool that returns an empty array."
+(ert-deftest mcp-test-tools-call-empty-string ()
+  "Test the `tools/call` method with a tool that returns an empty string."
   (mcp-start)
   (unwind-protect
       (progn
         (mcp-register-tool
-         "empty-array-tool" "A tool that returns an empty array"
+         "empty-string-tool" "A tool that returns an empty string"
          #'mcp-test--empty-array-tool-handler)
-        (let* ((response (mcp-process-jsonrpc
-                          (mcp-test--tools-call-request 10 "empty-array-tool")))
+        (let* ((req (mcp-test--tools-call-request 10 "empty-string-tool"))
+               (response (mcp-process-jsonrpc req))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj)))
           (should result)
-          (should (arrayp result))
-          (should (= 0 (length result)))
-          (should (equal mcp-test--empty-array-result result))))
+          (mcp-test--check-mcp-content-format result "")))
     (mcp-stop)
-    (mcp-unregister-tool "empty-array-tool")))
+    (mcp-unregister-tool "empty-string-tool")))
 
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

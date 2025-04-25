@@ -258,8 +258,14 @@ Returns a JSON-RPC response string."
               ;; TODO: Add support for handlers that accept arguments
               ;; Currently assumes handler takes zero arguments
               (condition-case err
-                  (let ((result (funcall handler)))
-                    (mcp-respond-with-result context result))
+                  (let* ((result (funcall handler))
+                         ;; Wrap the handler result in the MCP format
+                         (formatted-result
+                          `((content . ,(vector
+                                         `((type . "text")
+                                           (text . ,result))))
+                            (isError . :json-false))))
+                    (mcp-respond-with-result context formatted-result))
                 (error
                  (mcp--jsonrpc-error id -32603
                                      (format "Internal error executing tool: %s"
