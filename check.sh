@@ -20,7 +20,7 @@ echo "Running all tests..."
 emacs -Q -batch -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)' || { echo "ERT tests failed"; ERRORS=$((ERRORS+1)); }
 
 echo "Checking Markdown files..."
-mdl *.md || { echo "mdl check failed"; ERRORS=$((ERRORS+1)); }
+mdl ./*.md || { echo "mdl check failed"; ERRORS=$((ERRORS+1)); }
 
 echo "Checking README.org..."
 emacs -Q --batch --eval "(require 'org)" --eval "(require 'org-lint)" \
@@ -46,7 +46,10 @@ echo "Checking YAML formatting..."
 prettier --check .github/workflows/*.yml || { echo "prettier check failed"; ERRORS=$((ERRORS+1)); }
 
 echo "Checking terminology..."
-textlint --rule terminology *.md || { echo "textlint check failed"; ERRORS=$((ERRORS+1)); }
+textlint --rule terminology ./*.md || { echo "textlint check failed"; ERRORS=$((ERRORS+1)); }
+
+echo "Running shellcheck..."
+shellcheck check.sh || { echo "shellcheck check failed"; ERRORS=$((ERRORS+1)); }
 
 # Final result
 if [ $ERRORS -eq 0 ]; then
