@@ -36,6 +36,7 @@ with code in this repository.
 - Format YAML files: `prettier --write .github/workflows/*.yml`
 - Check YAML formatting: `prettier --check .github/workflows/*.yml`
 - Check terminology: `textlint --rule terminology *.md`
+- Check for code duplication: `jscpd -r consoleFull -t 0 .`
 - Check Org files:
 
   ```shell

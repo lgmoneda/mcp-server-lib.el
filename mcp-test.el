@@ -40,6 +40,13 @@ REQUEST-CONTEXT is the context from which to respond.
 _TOOL-ARGS are the arguments passed to the tool (unused)."
   (mcp-respond-with-result request-context '((result . "test result"))))
 
+(defun mcp-test--tools-list-request (id)
+  "Create a tools/list JSON-RPC request with ID."
+  (json-encode
+   `(("jsonrpc" . "2.0")
+     ("method" . "tools/list")
+     ("id" . ,id))))
+
 (ert-deftest mcp-test-tool-registration-in-capabilities ()
   "Test registered tool appears in server capabilities."
   (mcp-register-tool "test-tool" "A tool for testing" #'mcp-test--tool-handler)
@@ -206,14 +213,9 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
   (mcp-start)
   (unwind-protect
       (progn
-        (let* ((request (json-encode
-                         `(("jsonrpc" . "2.0")
-                           ("method" . "tools/list")
-                           ("id" . 5))))
-               (response (mcp-process-jsonrpc request))
+        (let* ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 5)))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj)))
-          
           (should result)
           (should (alist-get 'tools result))
           (should (arrayp (alist-get 'tools result)))
@@ -225,25 +227,20 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool "test-tool" "A tool for testing" #'mcp-test--tool-handler)
-        
-        (let* ((request (json-encode
-                         `(("jsonrpc" . "2.0")
-                           ("method" . "tools/list")
-                           ("id" . 6))))
-               (response (mcp-process-jsonrpc request))
+        (mcp-register-tool
+         "test-tool" "A tool for testing" #'mcp-test--tool-handler)
+        (let* ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 6)))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj))
                (tools (alist-get 'tools result)))
-          
           (should result)
           (should tools)
           (should (arrayp tools))
           (should (= 1 (length tools)))
-          
           (let ((tool (aref tools 0)))
             (should (string= "test-tool" (alist-get 'name tool)))
-            (should (string= "A tool for testing" (alist-get 'description tool)))
+            (should (string= "A tool for testing"
+                             (alist-get 'description tool)))
             (should (alist-get 'inputSchema tool nil t)))))
     (mcp-stop)
     (mcp-unregister-tool "test-tool")))
@@ -253,23 +250,18 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool "test-tool-1" "First tool for testing" #'mcp-test--tool-handler)
-        (mcp-register-tool "test-tool-2" "Second tool for testing" #'mcp-test--tool-handler)
-        
-        (let* ((request (json-encode
-                         `(("jsonrpc" . "2.0")
-                           ("method" . "tools/list")
-                           ("id" . 7))))
-               (response (mcp-process-jsonrpc request))
+        (mcp-register-tool "test-tool-1" "First tool for testing"
+                           #'mcp-test--tool-handler)
+        (mcp-register-tool "test-tool-2" "Second tool for testing"
+                           #'mcp-test--tool-handler)
+        (let* ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 7)))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj))
                (tools (alist-get 'tools result)))
-          
           (should result)
           (should tools)
           (should (arrayp tools))
           (should (= 2 (length tools)))
-          
           (let ((found-tool-1 nil)
                 (found-tool-2 nil))
             (dotimes (i 2)
@@ -278,11 +270,12 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
                   (setq found-tool-1 tool))
                 (when (string= "test-tool-2" (alist-get 'name tool))
                   (setq found-tool-2 tool))))
-            
             (should found-tool-1)
             (should found-tool-2)
-            (should (string= "First tool for testing" (alist-get 'description found-tool-1)))
-            (should (string= "Second tool for testing" (alist-get 'description found-tool-2)))
+            (should (string= "First tool for testing"
+                             (alist-get 'description found-tool-1)))
+            (should (string= "Second tool for testing"
+                             (alist-get 'description found-tool-2)))
             (should (alist-get 'inputSchema found-tool-1 nil t))
             (should (alist-get 'inputSchema found-tool-2 nil t)))))
     (mcp-stop)
@@ -290,24 +283,24 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
     (mcp-unregister-tool "test-tool-2")))
 
 (ert-deftest mcp-test-unregister-tool ()
-  "Test that mcp-unregister-tool removes a tool correctly."
+  "Test that `mcp-unregister-tool' removes a tool correctly."
   (let ((tools-before (hash-table-count mcp--tools)))
-    (mcp-register-tool "test-unregister" "Tool for unregister test" #'mcp-test--tool-handler)
+    (mcp-register-tool "test-unregister" "Tool for unregister test"
+                       #'mcp-test--tool-handler)
     (should (= (1+ tools-before) (hash-table-count mcp--tools)))
     (should (gethash "test-unregister" mcp--tools))
-    
     (should (mcp-unregister-tool "test-unregister"))
     (should-not (gethash "test-unregister" mcp--tools))
     (should (= tools-before (hash-table-count mcp--tools)))))
 
 (ert-deftest mcp-test-unregister-nonexistent-tool ()
-  "Test that mcp-unregister-tool returns nil for nonexistent tools."
+  "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
   (mcp-register-tool "test-other" "Other test tool" #'mcp-test--tool-handler)
   (should-not (mcp-unregister-tool "nonexistent-tool"))
   (mcp-unregister-tool "test-other"))
 
 (ert-deftest mcp-test-unregister-when-no-tools ()
-  "Test that mcp-unregister-tool works when no tools are registered."
+  "Test that `mcp-unregister-tool' works when no tools are registered."
   (should-not (mcp-unregister-tool "any-tool")))
 
 (provide 'mcp-test)
