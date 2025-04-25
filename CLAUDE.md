@@ -49,41 +49,38 @@ with code in this repository.
 
 ## Development Workflow
 
-Always follow Test-Driven Development (TDD) principles:
+**EXTREMELY IMPORTANT: Strictly follow this workflow for all changes.**
+**If anything prevents following these steps, STOP and ask for guidance.**
 
-### Step 1: Start with a failing test
+**Task Focus: Never switch tasks mid-development.**
+**If you discover additional work needed, ask for permission to file a TODO note.**
 
-Always begin by writing a test that verifies the expected behavior before
-implementing the feature or fix.
+### Step 1: Understand the feature
 
-Run linters on the test code - some linting failures like "symbol not defined"
-are expected at this point since you're testing functionality that doesn't
-exist yet. Fix any style or formatting issues.
+Before writing any code:
 
-### Step 2: Run the test and verify it fails
+- Understand the feature requirements and specifications
+- Review related code and documentation (e.g., TODO.org)
+- Ask questions to clarify any ambiguities
 
-Confirm the test fails as expected before making any implementation changes.
+### Step 2: Test-Driven Development
 
-### Step 3: Implement the code
+1. **Write tests**: Create tests that verify the expected behavior
+1. **Run linters**: Run elisp-lint on test code
 
-Only after having a failing test, implement the minimal code necessary to
-make the test pass.
+- Note: Some errors (e.g., undefined symbols) are expected at this stage
+- Fix style and formatting issues only
 
-### Step 4: Verify the test passes
+1. **Verify failure**: Run tests to confirm they fail as expected
+1. **Implement**: Write the minimal code needed to make tests pass
+1. **Verify success**: Run tests to confirm implementation works
+1. **Run all quality checks**:
 
-Run the tests to confirm your implementation works correctly.
+- Run elisp-lint (includes byte-compilation)
+- Run all tests
+- Check documentation linting if applicable
 
-### Step 5: Run linters and tests after each change
-
-- Run elisp-lint to catch style and code issues (this includes byte-compilation)
-- Run all tests to ensure nothing was broken
-- Check Markdown linting if documentation files were changed
-
-### Step 6: Refactor if needed
-
-Clean up the code while ensuring tests still pass.
-
-Never implement features without first writing tests that verify the expected behavior.
+1. **Refactor**: Clean up code while maintaining passing tests
 
 ## Style Guide
 
