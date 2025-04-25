@@ -267,7 +267,23 @@ Returns a JSON-RPC response string."
      ;; List available prompts
      ((equal method "prompts/list")
       (mcp--jsonrpc-response id `((prompts . ,(vector)))))
-     ;; Tool invocation
+     ;; Tool invocation (MCP standard method)
+     ((equal method "tools/call")
+      (let* ((tool-name (alist-get 'name params))
+             (tool-arguments (alist-get 'arguments params))
+             (tool (gethash tool-name mcp--tools)))
+        (if tool
+            (let ((handler (plist-get tool :handler))
+                  (context (list :id id)))
+              (condition-case err
+                  (funcall handler context tool-arguments)
+                (error
+                 (mcp--jsonrpc-error id -32603
+                                     (format "Internal error executing tool: %s"
+                                             (error-message-string err))))))
+          (mcp--jsonrpc-error id -32601
+                              (format "Tool not found: %s" tool-name)))))
+     ;; Tool invocation (legacy method)
      ((string-match "^mcp\\.tool\\.\\(.+\\)" method)
       (let* ((tool-id (match-string 1 method))
              (tool (gethash tool-id mcp--tools)))

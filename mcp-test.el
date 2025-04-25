@@ -327,5 +327,45 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
           (should (= 0 (length (alist-get 'prompts result))))))
     (mcp-stop)))
 
+;;; Tool Call Tests
+
+(defconst mcp-test--string-list-result
+  (vector "item1" "item2" "item3")
+  "Test data for string list tool.")
+
+(defun mcp-test--string-list-tool-handler (request-context _tool-args)
+  "Test tool handler function to return a list of strings.
+REQUEST-CONTEXT is the context from which to respond.
+_TOOL-ARGS are the arguments passed to the tool (unused)."
+  (mcp-respond-with-result request-context mcp-test--string-list-result))
+
+(defun mcp-test--tools-call-request (id tool-name)
+  "Create a tools/call JSON-RPC request with ID for TOOL-NAME.
+Uses empty argument list."
+  (json-encode
+   `(("jsonrpc" . "2.0")
+     ("method" . "tools/call")
+     ("id" . ,id)
+     ("params" . (("name" . ,tool-name)
+                  ("arguments" . ()))))))
+
+(ert-deftest mcp-test-tools-call-no-args ()
+  "Test the `tools/call` method with a tool that takes no arguments."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        (mcp-register-tool
+         "string-list-tool" "A tool that returns a list of strings"
+         #'mcp-test--string-list-tool-handler)
+        (let* ((response (mcp-process-jsonrpc
+                          (mcp-test--tools-call-request 9 "string-list-tool")))
+               (response-obj (json-read-from-string response))
+               (result (alist-get 'result response-obj)))
+          (should result)
+          (should (arrayp result))
+          (should (equal mcp-test--string-list-result result))))
+    (mcp-stop)
+    (mcp-unregister-tool "string-list-tool")))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
