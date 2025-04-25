@@ -34,6 +34,51 @@
 
 ;;; Test Helpers
 
+(defun mcp-test--tool-handler (request-context _tool-args)
+  "Test tool handler function for MCP tool testing.
+REQUEST-CONTEXT is the context from which to respond.
+_TOOL-ARGS are the arguments passed to the tool (unused)."
+  (mcp-respond-with-result request-context '((result . "test result"))))
+
+(ert-deftest mcp-test-tool-registration-in-capabilities ()
+  "Test registered tool appears in server capabilities."
+  ;; Register a test tool
+  (mcp-register-tool "test-tool" "A tool for testing" #'mcp-test--tool-handler)
+
+  ;; Start the MCP server
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Send initialize request
+        (let* ((initialize-request
+                (json-encode
+                 `(("jsonrpc" . "2.0")
+                   ("method" . "initialize")
+                   ("id" . 1)
+                   ("params" .
+                    (("protocolVersion" . "2024-11-05")
+                     ("capabilities" .
+                      (("tools" . t))))))))
+               (initialize-response (mcp-process-jsonrpc initialize-request))
+               (response-obj (json-read-from-string initialize-response)))
+
+          ;; There should be a result
+          (should (alist-get 'result response-obj))
+
+          (let* ((result (alist-get 'result response-obj))
+                 (capabilities (alist-get 'capabilities result))
+                 (tools-capability (alist-get 'tools capabilities)))
+
+            ;; The tools capability should exist
+            (should tools-capability)
+
+            ;; It should have a listChanged property set to true
+            (should (alist-get 'listChanged tools-capability))
+            (should (eq t (alist-get 'listChanged tools-capability))))))
+
+    ;; Cleanup - always stop server
+    (mcp-stop)))
+
 ;;; Transport Tests
 
 (ert-deftest mcp-test-stdio-transport ()
@@ -100,6 +145,13 @@
                            (alist-get 'protocolVersion initialize-result)))
           ;; Verify server capabilities
           (should (alist-get 'capabilities initialize-result))
+
+          ;; Verify capability objects are present and properly formatted
+          ;; (empty objects deserialize to nil)
+          (let ((capabilities (alist-get 'capabilities initialize-result)))
+            (should (equal nil (alist-get 'tools capabilities)))
+            (should (equal nil (alist-get 'resources capabilities)))
+            (should (equal nil (alist-get 'prompts capabilities))))
           ;; Verify server info
           (should (alist-get 'serverInfo initialize-result))
           (let ((server-name (alist-get 'name

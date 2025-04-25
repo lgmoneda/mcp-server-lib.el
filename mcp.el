@@ -272,22 +272,27 @@ Returns a JSON-RPC response string."
 
 This implements the MCP initialize handshake, which negotiates protocol
 version and capabilities between the client and server."
-  (let ((client-version (alist-get 'protocolVersion params))
-        (client-capabilities (alist-get 'capabilities params)))
+  (let ((client-capabilities (alist-get 'capabilities params)))
     ;; TODO: Add proper protocol version compatibility check
     ;; For now, accept any protocol version for compatibility
     ;; Store client capabilities for future use
     (setq mcp--client-capabilities client-capabilities)
-    ;; Respond with server capabilities
-    (mcp--jsonrpc-response
-     id
-     `((protocolVersion . ,mcp--protocol-version)
-       (serverInfo . ((name . ,mcp--name)
-                      (version . ,mcp--protocol-version)))
-       ;; Hash-tables encode as {} in JSON
-       (capabilities . ((tools . ,(make-hash-table))
-                        (resources . ,(make-hash-table))
-                        (prompts . ,(make-hash-table))))))))
+
+    ;; Determine if we need to include tools capabilities
+    ;; Include listChanged:true when tools are registered
+    (let ((tools-capability (if (> (hash-table-count mcp--tools) 0)
+                                '((listChanged . t))
+                              (make-hash-table))))
+      ;; Respond with server capabilities
+      (mcp--jsonrpc-response
+       id
+       `((protocolVersion . ,mcp--protocol-version)
+         (serverInfo . ((name . ,mcp--name)
+                        (version . ,mcp--protocol-version)))
+         ;; Format server capabilities according to MCP spec
+         (capabilities . ((tools . ,tools-capability)
+                          (resources . ,(make-hash-table))
+                          (prompts . ,(make-hash-table)))))))))
 
 (defun mcp--handle-initialized ()
   "Handle initialized notification from client.

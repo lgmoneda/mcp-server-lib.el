@@ -8,26 +8,20 @@ with code in this repository.
 - Run all tests:
 
   ```shell
-  emacs -batch --eval "(add-to-list 'load-path \".\")
-                        (load-file \"mcp.el\")
-                        (load-file \"mcp-test.el\")
-                        (ert-run-tests-batch-and-exit t)"
+  emacs -Q -batch -l mcp.el -l mcp-test.el --eval "(ert-run-tests-batch-and-exit)"
   ```
 
 - Run single test:
 
   ```shell
-  emacs -batch --eval "(add-to-list 'load-path \".\")
-                        (load-file \"mcp.el\")
-                        (load-file \"mcp-test.el\")
-                        (ert-run-tests-batch-and-exit \"test-name\")"
+  emacs -Q -batch -l mcp.el -l mcp-test.el \
+        --eval "(ert-run-tests-batch-and-exit \"test-name\")"
   ```
 
 - Byte-compile:
 
   ```shell
-  emacs -batch --eval "(add-to-list 'load-path \".\")
-                        (byte-compile-file \"mcp.el\")"
+  emacs -Q -batch --eval "(byte-compile-file \"mcp.el\")"
   ```
 
 - Run elisp-lint:
