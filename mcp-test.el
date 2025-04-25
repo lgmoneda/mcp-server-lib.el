@@ -36,7 +36,7 @@
 
 (defun mcp-test--tool-handler ()
   "Test tool handler function for MCP tool testing."
-  '((result . "test result")))
+  "test result")
 
 (defun mcp-test--tools-list-request (id)
   "Create a tools/list JSON-RPC request with ID."
@@ -268,12 +268,14 @@
     (mcp-unregister-tool "generic-error-tool")))
 
 (ert-deftest mcp-test-tools-list-one ()
-  "Test the `tools/list` method returns one tool with correct fields."
+  "Test tools/list returns one tool with correct fields and schema."
   (mcp-start)
   (unwind-protect
       (progn
+        ;; Register zero-arg handler tool
         (mcp-register-tool
          "test-tool" "A tool for testing" #'mcp-test--tool-handler)
+
         (let* ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 6)))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj))
@@ -286,7 +288,12 @@
             (should (string= "test-tool" (alist-get 'name tool)))
             (should (string= "A tool for testing"
                              (alist-get 'description tool)))
-            (should (alist-get 'inputSchema tool nil t)))))
+
+            ;; Check schema derived from zero-arg function
+            (let ((schema (alist-get 'inputSchema tool)))
+              (should schema)
+              (should (equal "object" (alist-get 'type schema)))
+              (should-not (alist-get 'required schema))))))
     (mcp-stop)
     (mcp-unregister-tool "test-tool")))
 
@@ -386,15 +393,20 @@
   "Test tool handler function to return an empty string."
   "")
 
-(defun mcp-test--tools-call-request (id tool-name)
+(defun mcp-test--string-arg-tool-handler (input-string)
+  "Test tool handler that accepts a string argument.
+INPUT-STRING is the string argument passed to the tool."
+  (concat "Echo: " input-string))
+
+(defun mcp-test--tools-call-request (id tool-name &optional args)
   "Create a tools/call JSON-RPC request with ID for TOOL-NAME.
-Uses empty argument list."
+Optional ARGS is an association list of tool arguments."
   (json-encode
    `(("jsonrpc" . "2.0")
      ("method" . "tools/call")
      ("id" . ,id)
      ("params" . (("name" . ,tool-name)
-                  ("arguments" . ()))))))
+                  ("arguments" . ,(or args '())))))))
 
 (defun mcp-test--check-mcp-content-format (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT.
@@ -448,6 +460,58 @@ Verifies that result has a content array with a proper text item."
           (mcp-test--check-mcp-content-format result "")))
     (mcp-stop)
     (mcp-unregister-tool "empty-string-tool")))
+
+(ert-deftest mcp-test-schema-for-one-arg-handler ()
+  "Test that schema for one-arg handler shows required parameter."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Register a tool with a handler that requires one argument
+        (mcp-register-tool
+         "requires-arg" "A tool that requires an argument"
+         #'mcp-test--string-arg-tool-handler)
+
+        ;; Get schema via tools/list
+        (let* ((list-req (json-encode
+                          `(("jsonrpc" . "2.0")
+                            ("method" . "tools/list")
+                            ("id" . 42))))
+               (list-response (mcp-process-jsonrpc list-req))
+               (list-obj (json-read-from-string list-response))
+               (tool-list (alist-get 'tools (alist-get 'result list-obj)))
+               (tool (aref tool-list 0))
+               (schema (alist-get 'inputSchema tool)))
+
+          ;; Schema should indicate required parameter
+          (should schema)
+          (should (equal "object" (alist-get 'type schema)))
+          (should (alist-get 'properties schema))
+          (should (alist-get 'required schema))
+          (should (vectorp (alist-get 'required schema)))
+          (should (= 1 (length (alist-get 'required schema))))))
+    (mcp-stop)
+    (mcp-unregister-tool "requires-arg")))
+
+(ert-deftest mcp-test-tools-call-with-string-arg ()
+  "Test the `tools/call` method with a tool that takes a string argument."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        (mcp-register-tool
+         "string-arg-tool" "A tool that echoes a string argument"
+         #'mcp-test--string-arg-tool-handler)
+        (let* ((test-input "Hello, world!")
+               (args `(("input" . ,test-input)))
+               (req (mcp-test--tools-call-request 13 "string-arg-tool" args))
+               (response (mcp-process-jsonrpc req))
+               (response-obj (json-read-from-string response))
+               (result (alist-get 'result response-obj)))
+          (should result)
+          (mcp-test--check-mcp-content-format
+           result
+           (concat "Echo: " test-input))))
+    (mcp-stop)
+    (mcp-unregister-tool "string-arg-tool")))
 
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

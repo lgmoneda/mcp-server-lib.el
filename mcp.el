@@ -123,18 +123,38 @@ Example:
 
 ;;; Tools
 
-(defun mcp-register-tool (tool-id tool-description handler &optional schema)
+(defun mcp--generate-schema-from-function (func)
+  "Generate JSON schema by analyzing FUNC's signature.
+Returns a schema object suitable for tool registration.
+Supports functions with zero or one argument only."
+  (let ((arglist (help-function-arglist func)))
+    (cond
+     ;; No arguments case
+     ((null arglist)
+      '((type . "object")))
+
+     ;; One argument case
+     ((and (= 1 (length arglist))
+           (symbolp (car arglist))
+           (not (memq (car arglist) '(&optional &rest))))
+      `((type . "object")
+        (properties . ((file . ((type . "string")))))
+        (required . [,(symbol-name (car arglist))])))
+
+     ;; Everything else is unsupported
+     (t
+      (error "Only functions with zero or one argument are supported")))))
+
+(defun mcp-register-tool (tool-id tool-description handler)
   "Register a tool with the MCP server.
 
 Arguments:
   TOOL-ID          String identifier for the tool (e.g., \"list-files\")
   TOOL-DESCRIPTION String describing what the tool does
   HANDLER          Function to handle tool invocations
-  SCHEMA           Optional JSON schema for tool parameters as Elisp alist
 
-The HANDLER function must accept two arguments:
-  REQUEST-CONTEXT  An MCP request context with response methods
-  TOOL-ARGS        Tool arguments as native Elisp values
+The HANDLER function's signature determines its input schema.
+Currently only no-argument handlers are supported.
 
 The handler should call (mcp-respond-with-result request-context result-data)
 to return information to the client.
@@ -144,10 +164,11 @@ Example:
     \"org-list-files\"
     \"Lists all available Org mode files for task management\"
     #\\='my-org-files-handler)"
-  (let ((tool (list :id tool-id
-                    :description tool-description
-                    :handler handler
-                    :schema schema)))
+  (let* ((schema (mcp--generate-schema-from-function handler))
+         (tool (list :id tool-id
+                     :description tool-description
+                     :handler handler
+                     :schema schema)))
     (puthash tool-id tool mcp--tools)
     tool))
 
