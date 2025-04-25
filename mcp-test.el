@@ -85,27 +85,12 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
   (mcp-start)
   (unwind-protect
       (progn
-        ;; Test server description
-        (let* ((describe-request
-                (json-encode
-                 `(("jsonrpc" . "2.0")
-                   ("method" . "mcp.server.describe")
-                   ("id" . 1))))
-               (describe-response (mcp-process-jsonrpc describe-request))
-               (describe-result
-                (alist-get 'result
-                           (json-read-from-string describe-response))))
-          (should (stringp (alist-get 'name describe-result)))
-          (should (stringp (alist-get 'version describe-result)))
-          (should (stringp (alist-get 'protocol_version describe-result)))
-          (should (arrayp (alist-get 'capabilities describe-result))))
-
         ;; Test listing tools
         (let* ((list-request
                 (json-encode
                  `(("jsonrpc" . "2.0")
-                   ("method" . "mcp.server.list_tools")
-                   ("id" . 2))))
+                   ("method" . "tools/list")
+                   ("id" . 1))))
                (list-response (mcp-process-jsonrpc list-request))
                (list-result
                 (alist-get 'result

@@ -220,12 +220,6 @@ Returns a JSON-RPC response string."
       (mcp--jsonrpc-error id -32600 "Invalid Request: Not JSON-RPC 2.0"))
 
     (cond
-     ;; Server description
-     ((equal method "mcp.server.describe")
-      (mcp--jsonrpc-response id `((name . ,mcp--name)
-                                  (version . ,mcp--protocol-version)
-                                  (protocol_version . ,mcp--protocol-version)
-                                  (capabilities . ,(vector "tools")))))
      ;; Initialize handshake
      ((equal method "initialize")
       (mcp--handle-initialize id params))
@@ -237,20 +231,7 @@ Returns a JSON-RPC response string."
      ((equal method "notifications/initialized")
       (mcp--handle-initialized)
       "")
-     ;; List available tools (legacy method)
-     ((equal method "mcp.server.list_tools")
-      (let ((tool-list (vector)))
-        (maphash (lambda (id tool)
-                   (let ((tool-description (plist-get tool :description))
-                         (tool-schema (plist-get tool :schema)))
-                     (setq tool-list
-                           (vconcat tool-list
-                                    (vector `((id . ,id)
-                                              (description . ,tool-description)
-                                              (schema . ,tool-schema)))))))
-                 mcp--tools)
-        (mcp--jsonrpc-response id `((tools . ,tool-list)))))
-     ;; List available tools (MCP standard method)
+     ;; List available tools
      ((equal method "tools/list")
       (let ((tool-list (vector)))
         (maphash (lambda (id tool)
@@ -267,7 +248,7 @@ Returns a JSON-RPC response string."
      ;; List available prompts
      ((equal method "prompts/list")
       (mcp--jsonrpc-response id `((prompts . ,(vector)))))
-     ;; Tool invocation (MCP standard method)
+     ;; Tool invocation
      ((equal method "tools/call")
       (let* ((tool-name (alist-get 'name params))
              (tool-arguments (alist-get 'arguments params))
@@ -283,21 +264,6 @@ Returns a JSON-RPC response string."
                                              (error-message-string err))))))
           (mcp--jsonrpc-error id -32601
                               (format "Tool not found: %s" tool-name)))))
-     ;; Tool invocation (legacy method)
-     ((string-match "^mcp\\.tool\\.\\(.+\\)" method)
-      (let* ((tool-id (match-string 1 method))
-             (tool (gethash tool-id mcp--tools)))
-        (if tool
-            (let ((handler (plist-get tool :handler))
-                  (context (list :id id)))
-              (condition-case err
-                  (funcall handler context params)
-                (error
-                 (mcp--jsonrpc-error id -32603
-                                     (format "Internal error: %s"
-                                             (error-message-string err))))))
-          (mcp--jsonrpc-error id -32601
-                              (format "Tool not found: %s" tool-id)))))
      ;; Method not found
      (t (mcp--jsonrpc-error id -32601
                             (format "Method not found: %s" method))))))
