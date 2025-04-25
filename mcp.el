@@ -251,13 +251,15 @@ Returns a JSON-RPC response string."
      ;; Tool invocation
      ((equal method "tools/call")
       (let* ((tool-name (alist-get 'name params))
-             (tool-arguments (alist-get 'arguments params))
              (tool (gethash tool-name mcp--tools)))
         (if tool
             (let ((handler (plist-get tool :handler))
                   (context (list :id id)))
+              ;; TODO: Add support for handlers that accept arguments
+              ;; Currently assumes handler takes zero arguments
               (condition-case err
-                  (funcall handler context tool-arguments)
+                  (let ((result (funcall handler)))
+                    (mcp-respond-with-result context result))
                 (error
                  (mcp--jsonrpc-error id -32603
                                      (format "Internal error executing tool: %s"

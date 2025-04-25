@@ -34,11 +34,9 @@
 
 ;;; Test Helpers
 
-(defun mcp-test--tool-handler (request-context _tool-args)
-  "Test tool handler function for MCP tool testing.
-REQUEST-CONTEXT is the context from which to respond.
-_TOOL-ARGS are the arguments passed to the tool (unused)."
-  (mcp-respond-with-result request-context '((result . "test result"))))
+(defun mcp-test--tool-handler ()
+  "Test tool handler function for MCP tool testing."
+  '((result . "test result")))
 
 (defun mcp-test--tools-list-request (id)
   "Create a tools/list JSON-RPC request with ID."
@@ -322,17 +320,13 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
   (vector)
   "Test data for empty array tool.")
 
-(defun mcp-test--string-list-tool-handler (request-context _tool-args)
-  "Test tool handler function to return a list of strings.
-REQUEST-CONTEXT is the context from which to respond.
-_TOOL-ARGS are the arguments passed to the tool (unused)."
-  (mcp-respond-with-result request-context mcp-test--string-list-result))
+(defun mcp-test--string-list-tool-handler ()
+  "Test tool handler function to return a list of strings."
+  mcp-test--string-list-result)
 
-(defun mcp-test--empty-array-tool-handler (request-context _tool-args)
-  "Test tool handler function to return an empty array.
-REQUEST-CONTEXT is the context from which to respond.
-_TOOL-ARGS are the arguments passed to the tool (unused)."
-  (mcp-respond-with-result request-context mcp-test--empty-array-result))
+(defun mcp-test--empty-array-tool-handler ()
+  "Test tool handler function to return an empty array."
+  mcp-test--empty-array-result)
 
 (defun mcp-test--tools-call-request (id tool-name)
   "Create a tools/call JSON-RPC request with ID for TOOL-NAME.
