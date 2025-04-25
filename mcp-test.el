@@ -303,5 +303,29 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
   "Test that `mcp-unregister-tool' works when no tools are registered."
   (should-not (mcp-unregister-tool "any-tool")))
 
+;;; Prompts Tests
+
+(defun mcp-test--prompts-list-request (id)
+  "Create a prompt list JSON-RPC request with ID."
+  (json-encode
+   `(("jsonrpc" . "2.0")
+     ("method" . "prompts/list")
+     ("id" . ,id))))
+
+(ert-deftest mcp-test-prompts-list-zero ()
+  "Test the `prompts/list` method returns empty array with no prompts."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        (let* ((response (mcp-process-jsonrpc
+                          (mcp-test--prompts-list-request 8)))
+               (response-obj (json-read-from-string response))
+               (result (alist-get 'result response-obj)))
+          (should result)
+          (should (alist-get 'prompts result))
+          (should (arrayp (alist-get 'prompts result)))
+          (should (= 0 (length (alist-get 'prompts result))))))
+    (mcp-stop)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

@@ -167,6 +167,9 @@ Example:
 
 ;;; Prompts
 
+(defvar mcp--prompts (make-hash-table :test 'equal)
+  "Hash table of registered MCP prompts.")
+
 ;;; Transport Layer
 
 ;;;; Stdio Transport
@@ -261,6 +264,9 @@ Returns a JSON-RPC response string."
                                               (inputSchema . ,tool-schema)))))))
                  mcp--tools)
         (mcp--jsonrpc-response id `((tools . ,tool-list)))))
+     ;; List available prompts
+     ((equal method "prompts/list")
+      (mcp--jsonrpc-response id `((prompts . ,(vector)))))
      ;; Tool invocation
      ((string-match "^mcp\\.tool\\.\\(.+\\)" method)
       (let* ((tool-id (match-string 1 method))
