@@ -191,6 +191,25 @@
     ;; Cleanup - always stop server
     (mcp-stop)))
 
+(ert-deftest mcp-test-notifications-cancelled-format ()
+  "Test the MCP notifications/cancelled format handling."
+  ;; Start the MCP server using the singleton API
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Test notifications/cancelled format
+        (let* ((notifications-cancelled
+                (json-encode
+                 `(("jsonrpc" . "2.0")
+                   ("method" . "notifications/cancelled")
+                   ("id" . null))))
+               (response (mcp-process-jsonrpc notifications-cancelled)))
+          ;; For true notifications, the server should return an empty string
+          ;; or something that indicates no response is needed
+          (should (string= "" response))))
+    ;; Cleanup - always stop server
+    (mcp-stop)))
+
 (ert-deftest mcp-test-tools-list-zero ()
   "Test the `tools/list` method returns empty array with no tools."
   (mcp-start)

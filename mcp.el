@@ -263,6 +263,9 @@ Returns a JSON-RPC response string."
      ((equal method "notifications/initialized")
       (mcp--handle-initialized)
       "")
+     ;; Notifications/cancelled format
+     ((equal method "notifications/cancelled")
+      "")
      ;; List available tools
      ((equal method "tools/list")
       (let ((tool-list (vector)))
