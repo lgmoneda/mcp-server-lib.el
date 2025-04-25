@@ -5,10 +5,10 @@ with code in this repository.
 
 ## Commands
 
-- Run all tests:
+- Run all quality checks:
 
   ```shell
-  emacs -Q -batch -l mcp.el -l mcp-test.el --eval "(ert-run-tests-batch-and-exit)"
+  ./check.sh
   ```
 
 - Run single test:
@@ -18,34 +18,7 @@ with code in this repository.
         --eval "(ert-run-tests-batch-and-exit \"test-name\")"
   ```
 
-- Run elisp-lint:
-
-  ```shell
-  emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
-                                          (locate-user-emacs-file \"elpa/package-lint-0.26\")
-                                          (locate-user-emacs-file \"elpa/dash-20250312.1307\")
-                                          (expand-file-name \".\"))))
-                         (dolist (dir pkg-dirs)
-                           (add-to-list 'load-path dir))
-                         (require 'elisp-lint)
-                         (elisp-lint-file \"mcp.el\"))"
-  ```
-
-- Check GitHub workflows: `actionlint .github/workflows/*.yml`
-- Check Markdown files: `mdl *.md`
 - Format YAML files: `prettier --write .github/workflows/*.yml`
-- Check YAML formatting: `prettier --check .github/workflows/*.yml`
-- Check terminology: `textlint --rule terminology *.md`
-- Check for code duplication: `jscpd -r consoleFull -t 0 .`
-- Check Org files:
-
-  ```shell
-  emacs -Q --batch --eval "(require 'org)" --eval "(require 'org-lint)" \
-        --eval "(with-temp-buffer (insert-file-contents \"FILE.org\") \
-               (org-mode) (let ((results (org-lint))) \
-               (if results (message \"Found issues: %S\" results) \
-               (message \"No issues found\"))))"
-  ```
 
 ## Development Workflow
 
@@ -59,7 +32,7 @@ with code in this repository.
 **If commands don't work or need modification, ask for explicit permission.**
 
 **IMPORTANT: Never use direct byte-compilation commands.**
-**Always use elisp-lint which already includes byte-compilation checks.**
+**Always use check.sh which runs elisp-lint and includes byte-compilation checks.**
 
 ### Step 1: Understand the feature
 
@@ -77,7 +50,7 @@ Before writing any code:
 - Do not depend on internals of the tested component
 - If you see no alternative to testing internals, ask for guidance
 
-1. **Run linters**: Run elisp-lint on test code
+1. **Run linters**: Run check.sh
 
 - Note: Some errors (e.g., undefined symbols) are expected at this stage
 - Fix style and formatting issues only
@@ -87,9 +60,8 @@ Before writing any code:
 1. **Verify success**: Run tests to confirm implementation works
 1. **Run all quality checks**:
 
-- Run elisp-lint (which already includes byte-compilation checks)
-- Run all tests
-- Check documentation linting if applicable
+- Run `./check.sh` to verify all quality checks pass
+- It includes elisp-lint, tests, and documentation linting
 
 1. **Refactor**: Clean up code while maintaining passing tests
 
