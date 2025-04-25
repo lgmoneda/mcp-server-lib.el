@@ -76,7 +76,7 @@ Run the tests to confirm your implementation works correctly.
 
 - Run elisp-lint to catch style and code issues (this includes byte-compilation)
 - Run all tests to ensure nothing was broken
-- Check markdown linting if documentation files were changed
+- Check Markdown linting if documentation files were changed
 
 ### Step 6: Refactor if needed
 
