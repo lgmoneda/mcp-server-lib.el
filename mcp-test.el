@@ -205,6 +205,68 @@
           (should (= 0 (length (alist-get 'tools result))))))
     (mcp-stop)))
 
+(defun mcp-test--failing-tool-handler ()
+  "Test tool handler that always fails with `mcp-tool-throw'."
+  (mcp-tool-throw "This tool intentionally fails"))
+
+(ert-deftest mcp-test-tools-call-error ()
+  "Test that tool errors are properly formatted with isError=true."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        (mcp-register-tool
+         "failing-tool" "A tool that always fails"
+         #'mcp-test--failing-tool-handler)
+        (let* ((response (mcp-process-jsonrpc
+                          (mcp-test--tools-call-request 11 "failing-tool")))
+               (response-obj (json-read-from-string response))
+               (result (alist-get 'result response-obj)))
+          ;; Check for proper MCP format
+          (should result)
+          (should (alist-get 'content result))
+          (should (arrayp (alist-get 'content result)))
+          (should (= 1 (length (alist-get 'content result))))
+          ;; Check content item
+          (let ((content-item (aref (alist-get 'content result) 0)))
+            (should (alist-get 'type content-item))
+            (should (string= "text" (alist-get 'type content-item)))
+            (should (alist-get 'text content-item))
+            (should (string= "This tool intentionally fails"
+                             (alist-get 'text content-item))))
+          ;; Check isError field is true
+          (should (alist-get 'isError result))
+          (should (eq t (alist-get 'isError result)))))
+    (mcp-stop)
+    (mcp-unregister-tool "failing-tool")))
+
+(defun mcp-test--generic-error-handler ()
+  "Test tool handler that throws a generic error."
+  (error "Generic error occurred"))
+
+(ert-deftest mcp-test-tools-call-generic-error ()
+  "Test that generic errors use standard JSON-RPC error format."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        (mcp-register-tool
+         "generic-error-tool" "A tool that throws a generic error"
+         #'mcp-test--generic-error-handler)
+        (let* ((response (mcp-process-jsonrpc
+                          (mcp-test--tools-call-request
+                           12 "generic-error-tool")))
+               (response-obj (json-read-from-string response))
+               ;; Should have error field at the top level of the response
+               (error-obj (alist-get 'error response-obj)))
+          ;; Check it has a standard JSON-RPC error
+          (should error-obj)
+          (should (alist-get 'code error-obj))
+          (should (= -32603 (alist-get 'code error-obj)))
+          (should (alist-get 'message error-obj))
+          (should (string-match "Internal error executing tool"
+                                (alist-get 'message error-obj)))))
+    (mcp-stop)
+    (mcp-unregister-tool "generic-error-tool")))
+
 (ert-deftest mcp-test-tools-list-one ()
   "Test the `tools/list` method returns one tool with correct fields."
   (mcp-start)

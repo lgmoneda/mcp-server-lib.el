@@ -170,6 +170,17 @@ Example:
 (defvar mcp--prompts (make-hash-table :test 'equal)
   "Hash table of registered MCP prompts.")
 
+;; Define custom error type for tool errors
+(define-error 'mcp-tool-error "MCP tool error" 'user-error)
+
+(defun mcp-tool-throw (error-message)
+  "Signal a tool error with ERROR-MESSAGE.
+The error will be properly formatted and sent to the client.
+
+Arguments:
+  ERROR-MESSAGE  String describing the error"
+  (signal 'mcp-tool-error (list error-message)))
+
 ;;; Transport Layer
 
 ;;;; Stdio Transport
@@ -266,6 +277,15 @@ Returns a JSON-RPC response string."
                                            (text . ,result))))
                             (isError . :json-false))))
                     (mcp-respond-with-result context formatted-result))
+                ;; Handle tool-specific errors thrown with mcp-tool-throw
+                (mcp-tool-error
+                 (let ((formatted-error
+                        `((content . ,(vector
+                                       `((type . "text")
+                                         (text . ,(cadr err)))))
+                          (isError . t))))
+                   (mcp-respond-with-result context formatted-error)))
+                ;; Keep existing handling for all other errors
                 (error
                  (mcp--jsonrpc-error id -32603
                                      (format "Internal error executing tool: %s"
