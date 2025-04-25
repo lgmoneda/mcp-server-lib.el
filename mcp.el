@@ -151,6 +151,20 @@ Example:
     (puthash tool-id tool mcp--tools)
     tool))
 
+(defun mcp-unregister-tool (tool-id)
+  "Unregister a tool with ID TOOL-ID from the MCP server.
+
+Arguments:
+  TOOL-ID  String identifier for the tool to unregister
+
+Returns t if the tool was found and removed, nil otherwise.
+
+Example:
+  (mcp-unregister-tool \"org-list-files\")"
+  (when (gethash tool-id mcp--tools)
+    (remhash tool-id mcp--tools)
+    t))
+
 ;;; Prompts
 
 ;;; Transport Layer
@@ -220,7 +234,7 @@ Returns a JSON-RPC response string."
      ((equal method "notifications/initialized")
       (mcp--handle-initialized)
       "")
-     ;; List available tools
+     ;; List available tools (legacy method)
      ((equal method "mcp.server.list_tools")
       (let ((tool-list (vector)))
         (maphash (lambda (id tool)
@@ -231,6 +245,20 @@ Returns a JSON-RPC response string."
                                     (vector `((id . ,id)
                                               (description . ,tool-description)
                                               (schema . ,tool-schema)))))))
+                 mcp--tools)
+        (mcp--jsonrpc-response id `((tools . ,tool-list)))))
+     ;; List available tools (MCP standard method)
+     ((equal method "tools/list")
+      (let ((tool-list (vector)))
+        (maphash (lambda (id tool)
+                   (let ((tool-description (plist-get tool :description))
+                         (tool-schema (or (plist-get tool :schema)
+                                          '((type . "object")))))
+                     (setq tool-list
+                           (vconcat tool-list
+                                    (vector `((name . ,id)
+                                              (description . ,tool-description)
+                                              (inputSchema . ,tool-schema)))))))
                  mcp--tools)
         (mcp--jsonrpc-response id `((tools . ,tool-list)))))
      ;; Tool invocation

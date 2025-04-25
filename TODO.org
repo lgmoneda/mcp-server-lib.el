@@ -104,10 +104,12 @@
   - [X] Test initialized notification handling (including "notifications/initialized" format)
   - [ ] Test error cases (invalid version, etc.)
 - [ ] Unit tests for tool registration and execution
+  - [X] Add test for tools/list method
 - [ ] Unit tests for resource handling
 - [ ] Unit tests for prompt templating
 - [ ] Integration tests with actual LLM clients (Claude, OpenAI, etc.)
 - [X] Test fixtures and helper functions (mcp-test-jsonrpc-request)
+- [ ] Ensure clean state at the start of each test
 
 ** CI and Linting
 - [X] Fix package dependency issue (Package json is not installable)
