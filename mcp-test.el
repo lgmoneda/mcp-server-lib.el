@@ -318,11 +318,21 @@ _TOOL-ARGS are the arguments passed to the tool (unused)."
   (vector "item1" "item2" "item3")
   "Test data for string list tool.")
 
+(defconst mcp-test--empty-array-result
+  (vector)
+  "Test data for empty array tool.")
+
 (defun mcp-test--string-list-tool-handler (request-context _tool-args)
   "Test tool handler function to return a list of strings.
 REQUEST-CONTEXT is the context from which to respond.
 _TOOL-ARGS are the arguments passed to the tool (unused)."
   (mcp-respond-with-result request-context mcp-test--string-list-result))
+
+(defun mcp-test--empty-array-tool-handler (request-context _tool-args)
+  "Test tool handler function to return an empty array.
+REQUEST-CONTEXT is the context from which to respond.
+_TOOL-ARGS are the arguments passed to the tool (unused)."
+  (mcp-respond-with-result request-context mcp-test--empty-array-result))
 
 (defun mcp-test--tools-call-request (id tool-name)
   "Create a tools/call JSON-RPC request with ID for TOOL-NAME.
@@ -351,6 +361,25 @@ Uses empty argument list."
           (should (equal mcp-test--string-list-result result))))
     (mcp-stop)
     (mcp-unregister-tool "string-list-tool")))
+
+(ert-deftest mcp-test-tools-call-empty-array ()
+  "Test the `tools/call` method with a tool that returns an empty array."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        (mcp-register-tool
+         "empty-array-tool" "A tool that returns an empty array"
+         #'mcp-test--empty-array-tool-handler)
+        (let* ((response (mcp-process-jsonrpc
+                          (mcp-test--tools-call-request 10 "empty-array-tool")))
+               (response-obj (json-read-from-string response))
+               (result (alist-get 'result response-obj)))
+          (should result)
+          (should (arrayp result))
+          (should (= 0 (length result)))
+          (should (equal mcp-test--empty-array-result result))))
+    (mcp-stop)
+    (mcp-unregister-tool "empty-array-tool")))
 
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
