@@ -39,6 +39,11 @@
   :group 'comm
   :prefix "mcp-")
 
+(defcustom mcp-log-io nil
+  "If non-nil, log all JSON-RPC messages to the *mcp-log* buffer."
+  :group 'mcp
+  :type 'boolean)
+
 ;; Global state variables for singleton architecture
 (defvar mcp--running nil
   "Whether the MCP server is currently running.")
@@ -203,6 +208,26 @@ Arguments:
   ERROR-MESSAGE  String describing the error"
   (signal 'mcp-tool-error (list error-message)))
 
+;;; Logging
+
+(defun mcp--log-json-rpc (direction json-message)
+  "Log JSON-RPC message in DIRECTION with JSON-MESSAGE.
+DIRECTION should be \"in\" for incoming, \"out\" for outgoing."
+  (when mcp-log-io
+    (let ((buffer (get-buffer-create "*mcp-log*"))
+          (direction-prefix (if (string= direction "in") "->" "<-"))
+          (direction-name (if (string= direction "in")
+                              "(request)"
+                            "(response)")))
+      (with-current-buffer buffer
+        (goto-char (point-max))
+        (let ((inhibit-read-only t))
+          (view-mode 1)
+          (insert (format "%s %s [%s]\n"
+                          direction-prefix
+                          direction-name
+                          json-message)))))))
+
 ;;; Transport Layer
 
 ;;;; Stdio Transport
@@ -224,10 +249,13 @@ Example:
   (unless mcp--running
     (error "No active MCP server, start server with `mcp-start` first"))
 
-  (condition-case err
-      (mcp--handle-jsonrpc-request-internal json-string)
-    (error
-     (mcp--handle-error err))))
+  (mcp--log-json-rpc "in" json-string)
+  (let ((response (condition-case err
+                      (mcp--handle-jsonrpc-request-internal json-string)
+                    (error
+                     (mcp--handle-error err)))))
+    (mcp--log-json-rpc "out" response)
+    response))
 
 (defun mcp--handle-error (err)
   "Handle error ERR in MCP process by logging and creating an error response.

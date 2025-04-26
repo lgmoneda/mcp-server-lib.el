@@ -550,5 +550,37 @@ Verifies that result has a content array with a proper text item."
     (mcp-stop)
     (mcp-unregister-tool "string-arg-tool")))
 
+;;; Logging Tests
+
+(ert-deftest mcp-test-log-io-t ()
+  "Test that when `mcp-log-io' is t, JSON-RPC messages are logged."
+  ;; Set logging to enabled
+  (setq mcp-log-io t)
+
+  ;; Start MCP server
+  (mcp-start)
+
+  (unwind-protect
+      (progn
+        ;; Make a tools/list request with a known ID
+        (let* ((request (mcp-test--tools-list-request 100))
+               (response (mcp-process-jsonrpc request)))
+
+          ;; Check that log buffer exists
+          (let ((log-buffer (get-buffer "*mcp-log*")))
+            (should log-buffer)
+
+            ;; Check buffer contents exactly - compare with expected content
+            (with-current-buffer log-buffer
+              (let ((content (buffer-string))
+                    (expected-content (concat
+                                       "-> (request) [" request "]\n"
+                                       "<- (response) [" response "]\n")))
+                (should (equal expected-content content)))))))
+
+    ;; Clean up
+    (mcp-stop)
+    (setq mcp-log-io nil)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
