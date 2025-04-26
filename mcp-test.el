@@ -582,5 +582,18 @@ Verifies that result has a content array with a proper text item."
     (mcp-stop)
     (setq mcp-log-io nil)))
 
+(ert-deftest mcp-test-log-io-nil ()
+  "Test that when `mcp-log-io' is nil, JSON-RPC messages are not logged."
+  (setq mcp-log-io nil)
+  (mcp-start)
+
+  (unwind-protect
+      (progn
+        (let ((request (mcp-test--tools-list-request 101)))
+          (mcp-process-jsonrpc request)
+          (should-not (get-buffer "*mcp-log*"))))
+
+    (mcp-stop)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
