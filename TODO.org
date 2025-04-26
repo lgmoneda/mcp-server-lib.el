@@ -75,9 +75,9 @@
 - [ ] Log level settings (similar to Python SDK's log_level setting)
   - [ ] Environment variable support (similar to Python's FASTMCP_LOG_LEVEL)
 - [ ] Debug/trace options
-  - [ ] Add debug logging functionality controlled by customization option, similar to lsp-mode
+  - [X] Add debug logging functionality controlled by customization option, similar to lsp-mode
   - [ ] Support different verbosity levels
-  - [ ] Add dedicated logging buffer
+  - [X] Add dedicated logging buffer
 - [ ] Authentication/security options
 - [ ] Support for .env-like configuration files
 
