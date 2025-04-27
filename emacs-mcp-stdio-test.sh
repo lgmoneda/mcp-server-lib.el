@@ -13,29 +13,29 @@ SERVER_PID=$!
 MAX_TRIES=50
 COUNT=0
 while ! emacsclient -s "$TEST_SERVER_NAME" -e 't' >/dev/null 2>&1; do
-  sleep 0.2
-  COUNT=$((COUNT+1))
-  if [ $COUNT -ge $MAX_TRIES ]; then
-    echo "ERROR: Server failed to start after 10 seconds"
-    kill -9 $SERVER_PID >/dev/null 2>&1 || true
-    exit 1
-  fi
+	sleep 0.2
+	COUNT=$((COUNT + 1))
+	if [ $COUNT -ge $MAX_TRIES ]; then
+		echo "ERROR: Server failed to start after 10 seconds"
+		kill -9 $SERVER_PID >/dev/null 2>&1 || true
+		exit 1
+	fi
 done
 echo "Server started"
 
 # Test case: tools/list request with our test server
 # Direct test with emacsclient - this will be more reliable than using the stdio script
 # to isolate where the issue is
-emacsclient -s "$TEST_SERVER_NAME" -e '(progn (mcp-start) (mcp-process-jsonrpc "{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}"))' > direct-response.txt
-echo "Direct response:" 
+emacsclient -s "$TEST_SERVER_NAME" -e '(progn (mcp-start) (mcp-process-jsonrpc "{\"jsonrpc\":\"2.0\",\"method\":\"tools/list\",\"id\":1}"))' >direct-response.txt
+echo "Direct response:"
 cat direct-response.txt
 
 # Now try with the stdio script
 # One final test: unquote the direct response ourselves and use it as the test result
-sed 's/^"\(.*\)"$/\1/' < direct-response.txt | sed 's/\\"/"/g' > test-response.txt
+sed 's/^"\(.*\)"$/\1/' <direct-response.txt | sed 's/\\"/"/g' >test-response.txt
 
 # Debug output
-echo "Response received:" 
+echo "Response received:"
 cat test-response.txt
 echo "End of response"
 
@@ -50,11 +50,11 @@ trap 'emacsclient -s "$TEST_SERVER_NAME" -e "(kill-emacs)" >/dev/null 2>&1 || tr
 
 # Exact string comparison
 if [ "$(cat test-response.txt)" = "$EXPECTED" ]; then
-  echo "PASS: Received expected response"
-  exit 0
+	echo "PASS: Received expected response"
+	exit 0
 else
-  echo "FAIL: Response doesn't match expected"
-  echo "Expected: $EXPECTED"
-  echo "Actual: $(cat test-response.txt)"
-  exit 1
+	echo "FAIL: Response doesn't match expected"
+	echo "Expected: $EXPECTED"
+	echo "Actual: $(cat test-response.txt)"
+	exit 1
 fi

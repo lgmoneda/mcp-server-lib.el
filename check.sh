@@ -89,8 +89,8 @@ echo "Running stdio adapter tests..."
 
 # Final result
 if [ $ERRORS -eq 0 ]; then
-	echo "Running shfmt to format shell script..."
-	shfmt -w check.sh
+	echo "Running shfmt to format all shell scripts..."
+	shfmt -w ./*.sh
 	echo "OK to proceed"
 else
 	echo "$ERRORS check(s) failed"
