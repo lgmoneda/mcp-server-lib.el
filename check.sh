@@ -76,8 +76,14 @@ textlint --rule terminology ./*.md || {
 }
 
 echo "Running shellcheck..."
-shellcheck check.sh || {
+shellcheck check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh || {
 	echo "shellcheck check failed"
+	ERRORS=$((ERRORS + 1))
+}
+
+echo "Running stdio adapter tests..."
+./emacs-mcp-stdio-test.sh || {
+	echo "stdio adapter tests failed"
 	ERRORS=$((ERRORS + 1))
 }
 

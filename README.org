@@ -59,6 +59,41 @@ emacsclient -e '(mcp-process-jsonrpc "{\"jsonrpc\":\"2.0\",\"method\":\"mcp.serv
 
 The response is returned as stdout from the emacsclient process.
 
+*** Stdio Adapter Script
+
+For easier integration with tools that expect stdio communication, we provide =emacs-mcp-stdio.sh=:
+
+#+begin_src shell
+echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | ./emacs-mcp-stdio.sh
+#+end_src
+
+*Script Options:*
+
+| Option              | Description                                            | Default      |
+|---------------------+--------------------------------------------------------+--------------|
+| --init-function=NAME | Emacs function to call for MCP initialization           | mcp-start    |
+| --stop-function=NAME | Emacs function to call when the script exits            | mcp-stop     |
+| --socket=PATH       | Emacs server socket to connect to                      | (none)       |
+
+*Examples:*
+
+- Basic usage:
+  #+begin_src shell
+  cat request.json | ./emacs-mcp-stdio.sh
+  #+end_src
+
+- Using a specific Emacs server:
+  #+begin_src shell
+  echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | \
+    ./emacs-mcp-stdio.sh --socket="my-emacs-server"
+  #+end_src
+
+- Using custom initialization:
+  #+begin_src shell
+  echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | \
+    ./emacs-mcp-stdio.sh --init-function=my-custom-mcp-setup --stop-function=my-custom-mcp-teardown
+  #+end_src
+
 ** Implementation Details
 
 *** Server Architecture

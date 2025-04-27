@@ -51,7 +51,9 @@
 
 ** Transport Layer
 - [X] HTTP server setup using =simple-httpd=
-- [X] Stdio transport implementation 
+- [X] Stdio transport implementation
+  - [X] Core mcp-process-jsonrpc function
+  - [X] emacs-mcp-stdio.sh adapter script
 - [X] Request/response handling
 - [X] Error handling for transport-level issues
 ** JSON-RPC Message Handling
@@ -88,7 +90,16 @@
 - [X] Tool registry data structure
 - [ ] Resource registry data structure
 - [ ] Prompt registry data structure
-- [ ] Async process management for stdio transport
+- [X] Stdio transport adapter script (emacs-mcp-stdio.sh)
+  - [X] Handle JSON-RPC requests over stdin/stdout
+  - [X] Support configurable socket, init and stop functions
+  - [X] Add testing script (emacs-mcp-stdio-test.sh)
+  - [X] Integrate with check.sh quality workflow
+  - [ ] Ensure script accessibility for external clients
+    - [ ] Add installation function to place script in user's PATH
+    - [ ] Update documentation with installation instructions
+    - [ ] Consider environment variable for script location discovery
+    - [ ] Include script in proper location in package layout
 - [ ] Server synchronization with MCP clients
 - [ ] Initialize method implementation
   - [ ] Define `mcp--handle-initialize` function for the handshake process
