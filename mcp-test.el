@@ -595,5 +595,36 @@ Verifies that result has a content array with a proper text item."
 
     (mcp-stop)))
 
+(ert-deftest mcp-test-server-restart-preserves-tools ()
+  "Test that server restart preserves registered tools."
+  ;; Register a tool
+  (mcp-start)
+  (mcp-register-tool "persistent-tool" "Test persistence across restarts"
+                     #'mcp-test--tool-handler)
+
+  (unwind-protect
+      (progn
+        ;; Stop the server
+        (mcp-stop)
+
+        ;; Start server again
+        (mcp-start)
+
+        ;; Tool should be accessible via API
+        (let* ((list-request (json-encode
+                              `(("jsonrpc" . "2.0")
+                                ("method" . "tools/list")
+                                ("id" . 1000))))
+               (list-response (mcp-process-jsonrpc list-request))
+               (list-obj (json-read-from-string list-response))
+               (tools (alist-get 'tools (alist-get 'result list-obj))))
+          (should (= 1 (length tools)))
+          (should (string= "persistent-tool"
+                           (alist-get 'name (aref tools 0))))))
+
+    ;; Cleanup
+    (mcp-unregister-tool "persistent-tool")
+    (when mcp--running (mcp-stop))))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
