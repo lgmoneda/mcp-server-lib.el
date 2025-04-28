@@ -26,6 +26,10 @@ with code in this repository.
 **If anything prevents following these steps, STOP and ask for guidance.**
 
 **Task Focus: Never switch tasks mid-development.**
+- When troubleshooting, explore multiple approaches methodically
+- Document alternative approaches considered before choosing a direction
+- If multiple solutions exist, discuss trade-offs with the user before proceeding
+- Focus on a single solution after deciding on an approach
 **If you discover additional work needed, ask for permission to file a todo note.**
 
 **Commands: Do not modify the commands in this file.**
@@ -41,6 +45,9 @@ Before writing any code:
 - Understand the feature requirements and specifications
 - Review related code and documentation (e.g., `TODO.org`)
 - Ask questions to clarify any ambiguities
+- When troubleshooting existing failures, first fully understand the failing test
+- Use debugging tools to isolate the exact cause before implementing a solution
+- Consider multiple approaches, but document your reasoning before implementing
 
 ### Step 2: Test-Driven Development
 
@@ -79,6 +86,10 @@ Before writing any code:
 - **Error Handling**: Use `condition-case` for handling errors in user-facing functions
 - **Line Length**: Keep lines under 80 columns when possible
 - **Comments**: Do not add obvious comments that merely restate the code
+  - Avoid: `# Get the response` above `response = get_response()`
+  - Prefer: Comments that explain "why" not "what" when the code isn't self-explanatory
+  - Use comments to explain complex algorithms, non-obvious side effects, or historical context
+  - Descriptive variable and function names often eliminate the need for comments
 
 ## Project Roadmap
 
