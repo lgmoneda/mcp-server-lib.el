@@ -94,30 +94,43 @@ while read -r line; do
 	# Log the incoming request
 	mcp_debug_log "REQUEST" "$line"
 
-	# Escape quotes for elisp (replace " with \")
-	escaped_line=${line//\"/\\\"}
+	# Base64 encode the raw JSON to avoid emacsclient transport issues
+	# with a specific combination of length, UTF-8 characters, and quoting
+	# that occurs in Test 5 with the Lithuanian letter 'ą'
+	base64_input=$(echo -n "$line" | base64)
+	mcp_debug_log "BASE64-INPUT" "$base64_input"
 
-	# Get response from emacsclient
+	# Construct elisp expression that:
+	# 1. Decodes the Base64 input to get the raw JSON
+	# 2. Processes with mcp-process-jsonrpc
+	# 3. Base64 encodes the response
+	elisp_expr="(base64-encode-string (mcp-process-jsonrpc (base64-decode-string \"$base64_input\")))"
+
+	# Get response from emacsclient - capture stderr for debugging
+	stderr_file="/tmp/mcp-stderr.$$"
 	if [ -n "$SOCKET" ]; then
-		response=$(emacsclient "${SOCKET_OPTIONS[@]}" -e "(mcp-process-jsonrpc \"$escaped_line\")")
+		base64_response=$(emacsclient "${SOCKET_OPTIONS[@]}" -e "$elisp_expr" 2>"$stderr_file")
 	else
-		response=$(emacsclient -e "(mcp-process-jsonrpc \"$escaped_line\")")
+		base64_response=$(emacsclient -e "$elisp_expr" 2>"$stderr_file")
 	fi
 
-	# Log the raw response from emacsclient
-	mcp_debug_log "RAW-RESPONSE" "$response"
+	# Check for stderr output
+	if [ -s "$stderr_file" ]; then
+		mcp_debug_log "EMACSCLIENT-STDERR" "$(cat "$stderr_file")"
+	fi
+	rm -f "$stderr_file"
 
-	# Write the response to a temp file
+	mcp_debug_log "BASE64-RESPONSE" "$base64_response"
+
+	# Write the Base64 response to a temp file and process it
 	temp_file="/tmp/mcp-response.$$"
-	echo "$response" >"$temp_file"
+	echo "$base64_response" >"$temp_file"
 
-	# Use Emacs to properly unquote the response with a single eval command
+	# Extract the actual Base64 string from Elisp response and decode it in Emacs
 	formatted_response=$(emacs -Q --batch --eval "(progn 
             (insert-file-contents \"$temp_file\") 
             (when (> (buffer-size) 0)
-              (princ (car (read-from-string (buffer-string))))))")
-
-	# Log the response
+              (princ (base64-decode-string (car (read-from-string (buffer-string)))))))")
 	mcp_debug_log "RESPONSE" "$formatted_response"
 
 	# Output the response
