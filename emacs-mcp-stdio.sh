@@ -64,9 +64,29 @@ mcp_debug_log "INFO" "Starting MCP with init function: $INIT_FUNCTION, socket: $
 
 # Initialize MCP
 if [ -n "$SOCKET" ]; then
-	emacsclient "${SOCKET_OPTIONS[@]}" -e "($INIT_FUNCTION)" >/dev/null
+	# Construct full command for logging
+	INIT_CMD="emacsclient ${SOCKET_OPTIONS[*]} -e \"($INIT_FUNCTION)\""
+	mcp_debug_log "INIT-CALL" "$INIT_CMD"
+
+	# Execute the command and capture output and return code
+	INIT_OUTPUT=$(eval "$INIT_CMD" 2>&1)
+	INIT_RC=$?
+
+	# Log results
+	mcp_debug_log "INIT-RC" "$INIT_RC"
+	mcp_debug_log "INIT-OUTPUT" "$INIT_OUTPUT"
 else
-	emacsclient -e "($INIT_FUNCTION)" >/dev/null
+	# Construct full command for logging
+	INIT_CMD="emacsclient -e \"($INIT_FUNCTION)\""
+	mcp_debug_log "INIT-CALL" "$INIT_CMD"
+
+	# Execute the command and capture output and return code
+	INIT_OUTPUT=$(eval "$INIT_CMD" 2>&1)
+	INIT_RC=$?
+
+	# Log results
+	mcp_debug_log "INIT-RC" "$INIT_RC"
+	mcp_debug_log "INIT-OUTPUT" "$INIT_OUTPUT"
 fi
 
 # Process input and print response
@@ -111,7 +131,27 @@ mcp_debug_log "INFO" "Stopping MCP with function: $STOP_FUNCTION"
 
 # Stop MCP when done
 if [ -n "$SOCKET" ]; then
-	emacsclient "${SOCKET_OPTIONS[@]}" -e "($STOP_FUNCTION)" >/dev/null
+	# Construct full command for logging
+	STOP_CMD="emacsclient ${SOCKET_OPTIONS[*]} -e \"($STOP_FUNCTION)\""
+	mcp_debug_log "STOP-CALL" "$STOP_CMD"
+
+	# Execute the command and capture output and return code
+	STOP_OUTPUT=$(eval "$STOP_CMD" 2>&1)
+	STOP_RC=$?
+
+	# Log results
+	mcp_debug_log "STOP-RC" "$STOP_RC"
+	mcp_debug_log "STOP-OUTPUT" "$STOP_OUTPUT"
 else
-	emacsclient -e "($STOP_FUNCTION)" >/dev/null
+	# Construct full command for logging
+	STOP_CMD="emacsclient -e \"($STOP_FUNCTION)\""
+	mcp_debug_log "STOP-CALL" "$STOP_CMD"
+
+	# Execute the command and capture output and return code
+	STOP_OUTPUT=$(eval "$STOP_CMD" 2>&1)
+	STOP_RC=$?
+
+	# Log results
+	mcp_debug_log "STOP-RC" "$STOP_RC"
+	mcp_debug_log "STOP-OUTPUT" "$STOP_OUTPUT"
 fi

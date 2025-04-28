@@ -101,6 +101,42 @@ if ! grep -q "MCP-RESPONSE" "$DEBUG_LOG_FILE"; then
 	exit 1
 fi
 
+# Verify log contains INIT-CALL entry with the command line
+if ! grep -q "MCP-INIT-CALL: emacsclient.*-e.*$INIT_FUNCTION" "$DEBUG_LOG_FILE"; then
+	echo "FAIL: Debug log doesn't contain the init function call command"
+	exit 1
+fi
+
+# Verify log contains INIT-RC entry with return code
+if ! grep -q "MCP-INIT-RC: 0" "$DEBUG_LOG_FILE"; then
+	echo "FAIL: Debug log doesn't contain the init function return code"
+	exit 1
+fi
+
+# Verify log contains INIT-OUTPUT entry
+if ! grep -q "MCP-INIT-OUTPUT:" "$DEBUG_LOG_FILE"; then
+	echo "FAIL: Debug log doesn't contain the init function output"
+	exit 1
+fi
+
+# Verify log contains STOP-CALL entry with the command line
+if ! grep -q "MCP-STOP-CALL: emacsclient.*-e.*$STOP_FUNCTION" "$DEBUG_LOG_FILE"; then
+	echo "FAIL: Debug log doesn't contain the stop function call command"
+	exit 1
+fi
+
+# Verify log contains STOP-RC entry with return code
+if ! grep -q "MCP-STOP-RC: 0" "$DEBUG_LOG_FILE"; then
+	echo "FAIL: Debug log doesn't contain the stop function return code"
+	exit 1
+fi
+
+# Verify log contains STOP-OUTPUT entry
+if ! grep -q "MCP-STOP-OUTPUT:" "$DEBUG_LOG_FILE"; then
+	echo "FAIL: Debug log doesn't contain the stop function output"
+	exit 1
+fi
+
 # Verify if timestamps are present
 if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$DEBUG_LOG_FILE"; then
 	echo "FAIL: Debug log doesn't contain timestamps"
