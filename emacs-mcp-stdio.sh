@@ -6,6 +6,31 @@ INIT_FUNCTION="mcp-start"
 STOP_FUNCTION="mcp-stop"
 SOCKET=""
 
+# Debug logging setup
+if [ -n "$EMACS_MCP_DEBUG_LOG" ]; then
+	# Verify log file is writable
+	if ! touch "$EMACS_MCP_DEBUG_LOG" 2>/dev/null; then
+		echo "Error: Cannot write to debug log file: $EMACS_MCP_DEBUG_LOG" >&2
+		exit 1
+	fi
+
+	# Helper function for debug logging
+	mcp_debug_log() {
+		local direction="$1"
+		local message="$2"
+		local timestamp
+		timestamp=$(date "+%Y-%m-%d %H:%M:%S")
+		echo "[$timestamp] MCP-${direction}: ${message}" >>"$EMACS_MCP_DEBUG_LOG"
+	}
+
+	mcp_debug_log "INFO" "Debug logging enabled"
+else
+	# No-op function when debug logging is disabled
+	mcp_debug_log() {
+		:
+	}
+fi
+
 # Parse command line arguments
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -35,6 +60,8 @@ if [ -n "$SOCKET" ]; then
 	SOCKET_OPTIONS=("-s" "$SOCKET")
 fi
 
+mcp_debug_log "INFO" "Starting MCP with init function: $INIT_FUNCTION, socket: $SOCKET"
+
 # Initialize MCP
 if [ -n "$SOCKET" ]; then
 	emacsclient "${SOCKET_OPTIONS[@]}" -e "($INIT_FUNCTION)" >/dev/null
@@ -44,6 +71,9 @@ fi
 
 # Process input and print response
 while read -r line; do
+	# Log the incoming request
+	mcp_debug_log "REQUEST" "$line"
+
 	# Escape quotes for elisp (replace " with \")
 	escaped_line=${line//\"/\\\"}
 
@@ -59,14 +89,22 @@ while read -r line; do
 	echo "$response" >"$temp_file"
 
 	# Use Emacs to properly unquote the response with a single eval command
-	emacs -Q --batch --eval "(progn 
+	formatted_response=$(emacs -Q --batch --eval "(progn 
             (insert-file-contents \"$temp_file\") 
             (when (> (buffer-size) 0)
-              (princ (car (read-from-string (buffer-string))))))"
+              (princ (car (read-from-string (buffer-string))))))")
+
+	# Log the response
+	mcp_debug_log "RESPONSE" "$formatted_response"
+
+	# Output the response
+	echo "$formatted_response"
 
 	# Clean up temp file
 	rm -f "$temp_file"
 done
+
+mcp_debug_log "INFO" "Stopping MCP with function: $STOP_FUNCTION"
 
 # Stop MCP when done
 if [ -n "$SOCKET" ]; then

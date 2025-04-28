@@ -75,6 +75,14 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | ./emacs-mcp-stdio.sh
 | --stop-function=NAME | Emacs function to call when the script exits            | mcp-stop     |
 | --socket=PATH       | Emacs server socket to connect to                      | (none)       |
 
+*Environment Variables:*
+
+| Variable            | Description                                            | Default      |
+|---------------------+--------------------------------------------------------+--------------|
+| EMACS_MCP_DEBUG_LOG | Path to a log file for debug logging                   | (none)       |
+
+When =EMACS_MCP_DEBUG_LOG= is set to a valid file path, the script will log all requests and responses with timestamps for debugging purposes. If the path is invalid or not writable, the script will exit with an error.
+
 *Examples:*
 
 - Basic usage:
