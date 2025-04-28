@@ -89,9 +89,15 @@ if ! grep -q "MCP-REQUEST.*$TEST_REQUEST" "$DEBUG_LOG_FILE"; then
 	exit 1
 fi
 
-# Verify log contains response
+# Verify log contains raw response from emacsclient
+if ! grep -q "MCP-RAW-RESPONSE" "$DEBUG_LOG_FILE"; then
+	echo "FAIL: Debug log doesn't contain the raw response from emacsclient"
+	exit 1
+fi
+
+# Verify log contains formatted response
 if ! grep -q "MCP-RESPONSE" "$DEBUG_LOG_FILE"; then
-	echo "FAIL: Debug log doesn't contain the response"
+	echo "FAIL: Debug log doesn't contain the formatted response"
 	exit 1
 fi
 

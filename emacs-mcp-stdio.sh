@@ -84,6 +84,9 @@ while read -r line; do
 		response=$(emacsclient -e "(mcp-process-jsonrpc \"$escaped_line\")")
 	fi
 
+	# Log the raw response from emacsclient
+	mcp_debug_log "RAW-RESPONSE" "$response"
+
 	# Write the response to a temp file
 	temp_file="/tmp/mcp-response.$$"
 	echo "$response" >"$temp_file"
