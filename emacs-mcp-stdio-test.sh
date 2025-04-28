@@ -157,5 +157,35 @@ else
 	echo "PASS: Script correctly exits with error when log path is invalid"
 fi
 
+# Test case 4: Special character escaping test
+echo "Test case 4: Special character escaping test"
+
+# Register a test tool that returns a string with special characters
+emacsclient -s "$TEST_SERVER_NAME" -e "
+(progn
+  (defun mcp-test-quote-string ()
+    \"Return a test string with a double quote and newline.\"
+    \"\\\"\n\")
+
+  (mcp-register-tool 
+    \"test-quote-string\" 
+    \"Returns a test string with special characters\" 
+    #'mcp-test-quote-string)
+)
+" >/dev/null
+# Create a test request for the tool
+TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
+
+# Execute the request
+echo "$TEST_REQUEST" | ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt
+
+# Verify the response contains a properly unescaped double quote and newline
+if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
+	echo "FAIL: Final response doesn't have properly unescaped quote and newline"
+	exit 1
+else
+	echo "PASS"
+fi
+
 echo "All tests PASSED!"
 exit 0
