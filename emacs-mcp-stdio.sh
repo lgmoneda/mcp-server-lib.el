@@ -29,15 +29,15 @@ while [ $# -gt 0 ]; do
 	esac
 done
 
-# Set socket argument if provided
-SOCKET_ARG=""
+# Set socket arguments if provided
+SOCKET_OPTIONS=()
 if [ -n "$SOCKET" ]; then
-	SOCKET_ARG="-s $SOCKET"
+	SOCKET_OPTIONS=("-s" "$SOCKET")
 fi
 
 # Initialize MCP
-if [ -n "$SOCKET_ARG" ]; then
-	emacsclient "$SOCKET_ARG" -e "($INIT_FUNCTION)" >/dev/null
+if [ -n "$SOCKET" ]; then
+	emacsclient "${SOCKET_OPTIONS[@]}" -e "($INIT_FUNCTION)" >/dev/null
 else
 	emacsclient -e "($INIT_FUNCTION)" >/dev/null
 fi
@@ -48,8 +48,8 @@ while read -r line; do
 	escaped_line=${line//\"/\\\"}
 
 	# Get response from emacsclient
-	if [ -n "$SOCKET_ARG" ]; then
-		response=$(emacsclient "$SOCKET_ARG" -e "(mcp-process-jsonrpc \"$escaped_line\")")
+	if [ -n "$SOCKET" ]; then
+		response=$(emacsclient "${SOCKET_OPTIONS[@]}" -e "(mcp-process-jsonrpc \"$escaped_line\")")
 	else
 		response=$(emacsclient -e "(mcp-process-jsonrpc \"$escaped_line\")")
 	fi
@@ -62,19 +62,15 @@ while read -r line; do
 	emacs -Q --batch --eval "(progn 
             (insert-file-contents \"$temp_file\") 
             (when (> (buffer-size) 0)
-              (let ((content (buffer-string)))
-                (if (and (> (length content) 2)
-                         (string-match \"\\\"\\(.+\\)\\\"\" content))
-                    (princ (match-string 1 content))
-                  (princ content)))))"
+              (princ (car (read-from-string (buffer-string))))))"
 
 	# Clean up temp file
 	rm -f "$temp_file"
 done
 
 # Stop MCP when done
-if [ -n "$SOCKET_ARG" ]; then
-	emacsclient "$SOCKET_ARG" -e "($STOP_FUNCTION)" >/dev/null
+if [ -n "$SOCKET" ]; then
+	emacsclient "${SOCKET_OPTIONS[@]}" -e "($STOP_FUNCTION)" >/dev/null
 else
 	emacsclient -e "($STOP_FUNCTION)" >/dev/null
 fi
