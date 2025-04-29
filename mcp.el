@@ -354,6 +354,88 @@ Returns a JSON-RPC error response string for internal errors."
 
 ;;; JSON-RPC Handling
 
+(defun mcp--dispatch-jsonrpc-method (id method params)
+  "Dispatch a JSON-RPC request to the appropriate handler.
+ID is the JSON-RPC request ID to use in response.
+METHOD is the JSON-RPC method name to dispatch.
+PARAMS is the JSON-RPC params object from the request.
+Returns a JSON-RPC response string for the request."
+  (cond
+   ;; Initialize handshake
+   ((equal method "initialize")
+    (mcp--handle-initialize id params))
+   ;; Initialized notification
+   ((equal method "initialized")
+    (mcp--handle-initialized)
+    (mcp--jsonrpc-response id nil))
+   ;; Notifications/initialized format
+   ((equal method "notifications/initialized")
+    (mcp--handle-initialized)
+    "")
+   ;; Notifications/cancelled format
+   ((equal method "notifications/cancelled")
+    "")
+   ;; List available tools
+   ((equal method "tools/list")
+    (let ((tool-list (vector)))
+      (maphash (lambda (id tool)
+                 (let ((tool-description (plist-get tool :description))
+                       (tool-schema (or (plist-get tool :schema)
+                                        '((type . "object")))))
+                   (setq tool-list
+                         (vconcat tool-list
+                                  (vector
+                                   `((name . ,id)
+                                     (description . ,tool-description)
+                                     (inputSchema . ,tool-schema)))))))
+               mcp--tools)
+      (mcp--jsonrpc-response id `((tools . ,tool-list)))))
+   ;; List available prompts
+   ((equal method "prompts/list")
+    (mcp--jsonrpc-response id `((prompts . ,(vector)))))
+   ;; Tool invocation
+   ((equal method "tools/call")
+    (let* ((tool-name (alist-get 'name params))
+           (tool (gethash tool-name mcp--tools))
+           (tool-args (alist-get 'arguments params)))
+      (if tool
+          (let ((handler (plist-get tool :handler))
+                (context (list :id id)))
+            (condition-case err
+                (let* ((result
+                        ;; Pass first arg value for single-string-arg tools
+                        ;; when arguments are present
+                        (if (and tool-args (not (equal tool-args '())))
+                            (let ((first-arg-value (cdr (car tool-args))))
+                              (funcall handler first-arg-value))
+                          (funcall handler)))
+                       ;; Wrap the handler result in the MCP format
+                       (formatted-result
+                        `((content . ,(vector
+                                       `((type . "text")
+                                         (text . ,result))))
+                          (isError . :json-false))))
+                  (mcp-respond-with-result context formatted-result))
+              ;; Handle tool-specific errors thrown with mcp-tool-throw
+              (mcp-tool-error
+               (let ((formatted-error
+                      `((content . ,(vector
+                                     `((type . "text")
+                                       (text . ,(cadr err)))))
+                        (isError . t))))
+                 (mcp-respond-with-result context formatted-error)))
+              ;; Keep existing handling for all other errors
+              (error
+               (mcp--jsonrpc-error
+                id mcp--error-internal
+                (format "Internal error executing tool: %s"
+                        (error-message-string err))))))
+        (mcp--jsonrpc-error id mcp--error-invalid-request
+                            (format "Tool not found: %s" tool-name)))))
+   ;; Method not found
+   (t (mcp--jsonrpc-error id mcp--error-method-not-found
+                          (format "Method not found: %s" method)))))
+
 (defun mcp--handle-jsonrpc-request-internal (request)
   "Handle a JSON-RPC REQUEST object for the global MCP server.
 REQUEST is a parsed JSON object (alist).
@@ -369,81 +451,7 @@ Returns a JSON-RPC response string."
          id mcp--error-invalid-request "Invalid Request: Not JSON-RPC 2.0")
 
       ;; Only process further if it's a valid 2.0 request
-      (cond
-       ;; Initialize handshake
-       ((equal method "initialize")
-        (mcp--handle-initialize id params))
-       ;; Initialized notification
-       ((equal method "initialized")
-        (mcp--handle-initialized)
-        (mcp--jsonrpc-response id nil))
-       ;; Notifications/initialized format
-       ((equal method "notifications/initialized")
-        (mcp--handle-initialized)
-        "")
-       ;; Notifications/cancelled format
-       ((equal method "notifications/cancelled")
-        "")
-       ;; List available tools
-       ((equal method "tools/list")
-        (let ((tool-list (vector)))
-          (maphash (lambda (id tool)
-                     (let ((tool-description (plist-get tool :description))
-                           (tool-schema (or (plist-get tool :schema)
-                                            '((type . "object")))))
-                       (setq tool-list
-                             (vconcat tool-list
-                                      (vector
-                                       `((name . ,id)
-                                         (description . ,tool-description)
-                                         (inputSchema . ,tool-schema)))))))
-                   mcp--tools)
-          (mcp--jsonrpc-response id `((tools . ,tool-list)))))
-       ;; List available prompts
-       ((equal method "prompts/list")
-        (mcp--jsonrpc-response id `((prompts . ,(vector)))))
-       ;; Tool invocation
-       ((equal method "tools/call")
-        (let* ((tool-name (alist-get 'name params))
-               (tool (gethash tool-name mcp--tools))
-               (tool-args (alist-get 'arguments params)))
-          (if tool
-              (let ((handler (plist-get tool :handler))
-                    (context (list :id id)))
-                (condition-case err
-                    (let* ((result
-                            ;; Pass first arg value for single-string-arg tools
-                            ;; when arguments are present
-                            (if (and tool-args (not (equal tool-args '())))
-                                (let ((first-arg-value (cdr (car tool-args))))
-                                  (funcall handler first-arg-value))
-                              (funcall handler)))
-                           ;; Wrap the handler result in the MCP format
-                           (formatted-result
-                            `((content . ,(vector
-                                           `((type . "text")
-                                             (text . ,result))))
-                              (isError . :json-false))))
-                      (mcp-respond-with-result context formatted-result))
-                  ;; Handle tool-specific errors thrown with mcp-tool-throw
-                  (mcp-tool-error
-                   (let ((formatted-error
-                          `((content . ,(vector
-                                         `((type . "text")
-                                           (text . ,(cadr err)))))
-                            (isError . t))))
-                     (mcp-respond-with-result context formatted-error)))
-                  ;; Keep existing handling for all other errors
-                  (error
-                   (mcp--jsonrpc-error
-                    id mcp--error-internal
-                    (format "Internal error executing tool: %s"
-                            (error-message-string err))))))
-            (mcp--jsonrpc-error id mcp--error-invalid-request
-                                (format "Tool not found: %s" tool-name)))))
-       ;; Method not found
-       (t (mcp--jsonrpc-error id mcp--error-method-not-found
-                              (format "Method not found: %s" method)))))))
+      (mcp--dispatch-jsonrpc-method id method params))))
 
 (defun mcp--jsonrpc-response (id result)
   "Create a JSON-RPC response with ID and RESULT."
