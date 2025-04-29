@@ -59,6 +59,8 @@ MCP Parameters:
 (mcp-register-tool "get-weather" "Get weather information" #'my-weather-handler)
 #+end_src
 
+Note: Do not include the "MCP Parameters:" section if your tool handler doesn't take any arguments.
+
 *** Stdio Transport
 
 The main entry point for MCP communication via stdio is =mcp-process-jsonrpc=:
