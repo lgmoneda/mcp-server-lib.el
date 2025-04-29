@@ -253,6 +253,16 @@ Example:
 (defvar mcp--prompts (make-hash-table :test 'equal)
   "Hash table of registered MCP prompts.")
 
+;; Standard error codes as defined by the MCP
+(defconst mcp--error-invalid-request -32600
+  "Error code for Invalid Request.")
+
+(defconst mcp--error-method-not-found -32601
+  "Error code for Method Not Found.")
+
+(defconst mcp--error-internal -32603
+  "Error code for Internal Error.")
+
 ;; Define custom error type for tool errors
 (define-error 'mcp-tool-error "MCP tool error" 'user-error)
 
@@ -319,7 +329,7 @@ Returns a JSON-RPC error response string for internal errors."
   (json-encode
    `((jsonrpc . "2.0")
      (id . nil)
-     (error . ((code . -32603)
+     (error . ((code . ,mcp--error-internal)
                (message . ,(format "Internal error: %s"
                                    (error-message-string err))))))))
 
@@ -334,7 +344,8 @@ Returns a JSON-RPC response string."
          (method (alist-get 'method request))
          (params (alist-get 'params request)))
     (unless (equal jsonrpc "2.0")
-      (mcp--jsonrpc-error id -32600 "Invalid Request: Not JSON-RPC 2.0"))
+      (mcp--jsonrpc-error
+       id mcp--error-invalid-request "Invalid Request: Not JSON-RPC 2.0"))
 
     (cond
      ;; Initialize handshake
@@ -401,13 +412,13 @@ Returns a JSON-RPC response string."
                    (mcp-respond-with-result context formatted-error)))
                 ;; Keep existing handling for all other errors
                 (error
-                 (mcp--jsonrpc-error id -32603
+                 (mcp--jsonrpc-error id mcp--error-internal
                                      (format "Internal error executing tool: %s"
                                              (error-message-string err))))))
-          (mcp--jsonrpc-error id -32601
+          (mcp--jsonrpc-error id mcp--error-invalid-request
                               (format "Tool not found: %s" tool-name)))))
      ;; Method not found
-     (t (mcp--jsonrpc-error id -32601
+     (t (mcp--jsonrpc-error id mcp--error-method-not-found
                             (format "Method not found: %s" method))))))
 
 (defun mcp--jsonrpc-response (id result)
