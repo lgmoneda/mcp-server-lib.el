@@ -737,5 +737,28 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
    -32600
    "Invalid Request: Missing required 'method' field"))
 
+(ert-deftest mcp-test-tools-list-with-extra-key ()
+  "Test that tools/list request with an extra, unexpected key works correctly.
+Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Create a tools/list request with an extra key
+        (let* ((request-with-extra
+                (json-encode
+                 `(("jsonrpc" . "2.0")
+                   ("method" . "tools/list")
+                   ("id" . 43)
+                   ("extra_key" . "unexpected value"))))
+               (response (mcp-process-jsonrpc request-with-extra))
+               (response-obj (json-read-from-string response))
+               (result (alist-get 'result response-obj)))
+          ;; Should be processed normally, not rejected as error
+          (should (null (alist-get 'error response-obj)))
+          (should result)
+          (should (alist-get 'tools result))
+          (should (arrayp (alist-get 'tools result)))))
+    (mcp-stop)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
