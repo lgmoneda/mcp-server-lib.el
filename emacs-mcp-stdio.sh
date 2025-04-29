@@ -100,11 +100,9 @@ while read -r line; do
 	base64_input=$(echo -n "$line" | base64)
 	mcp_debug_log "BASE64-INPUT" "$base64_input"
 
-	# Construct elisp expression that:
-	# 1. Decodes the Base64 input to get the raw JSON
-	# 2. Processes with mcp-process-jsonrpc
-	# 3. Base64 encodes the response
-	elisp_expr="(base64-encode-string (mcp-process-jsonrpc (base64-decode-string \"$base64_input\")))"
+	# Process JSON-RPC request and return the result with proper UTF-8 encoding
+	# Encode the response to base64 to avoid any character encoding issues
+	elisp_expr="(base64-encode-string (encode-coding-string (mcp-process-jsonrpc (base64-decode-string \"$base64_input\")) 'utf-8 t) t)"
 
 	# Get response from emacsclient - capture stderr for debugging
 	stderr_file="/tmp/mcp-stderr.$$"
@@ -126,11 +124,17 @@ while read -r line; do
 	temp_file="/tmp/mcp-response.$$"
 	echo "$base64_response" >"$temp_file"
 
-	# Extract the actual Base64 string from Elisp response and decode it in Emacs
-	formatted_response=$(emacs -Q --batch --eval "(progn 
-            (insert-file-contents \"$temp_file\") 
-            (when (> (buffer-size) 0)
-              (princ (base64-decode-string (car (read-from-string (buffer-string)))))))")
+	# Handle the base64 response - first strip quotes if present
+	if [[ "$base64_response" == \"* && "$base64_response" == *\" ]]; then
+		# Remove the surrounding quotes
+		base64_response="${base64_response:1:${#base64_response}-2}"
+		# Unescape any quotes inside
+		base64_response="${base64_response//\\\"/\"}"
+	fi
+	
+	# Decode the base64 content
+	formatted_response=$(echo -n "$base64_response" | base64 -d)
+	
 	mcp_debug_log "RESPONSE" "$formatted_response"
 
 	# Output the response

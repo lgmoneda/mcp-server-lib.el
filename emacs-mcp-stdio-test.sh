@@ -162,13 +162,24 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 
 TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
 
+# Run test 5 (multibyte character test)
+debug_log_file="/tmp/test5-debug-$$.log"
 echo "$TEST_REQUEST" |
-	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt
+	EMACS_MCP_DEBUG_LOG="$debug_log_file" ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt 2>/dev/null
 
-if grep -q "\*ERROR\*" stdio-response.txt; then
-	echo "ISSUE DETECTED: Response contains ERROR markers"
+# Check for valid content (should have multibyte character)
+# and absence of unwanted output (unknown message errors)
+if grep -q "oooooą pp qqqqq" stdio-response.txt; then
+	# Check for absence of the error message that base64 encoding is supposed to prevent
+	if grep -q "\*ERROR\*: Unknown message" stdio-response.txt; then
+		echo "ISSUE DETECTED: Base64 encoding failed to prevent unknown message errors"
+		exit 1
+	else
+		echo "PASS: Response contains the multibyte character correctly and no unwanted messages"
+	fi
 else
-	echo "PASS: No ERROR markers found in response"
+	echo "ISSUE DETECTED: Response doesn't contain expected content with multibyte character"
+	exit 1
 fi
 
 echo "All tests completed."
