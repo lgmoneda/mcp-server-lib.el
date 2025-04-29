@@ -340,7 +340,10 @@ Example:
           (setq response (mcp--handle-jsonrpc-request-internal json-object))
         (error
          (setq response (mcp--handle-error err)))))
-    (mcp--log-json-rpc "out" response)
+
+    ;; Only log and return responses when they exist (not for notifications)
+    (when response
+      (mcp--log-json-rpc "out" response))
     response))
 
 (defun mcp--handle-error (err)
@@ -367,10 +370,10 @@ Returns a JSON-RPC response string for the request."
    ;; Notifications/initialized format
    ((equal method "notifications/initialized")
     (mcp--handle-initialized)
-    "")
+    nil)
    ;; Notifications/cancelled format
    ((equal method "notifications/cancelled")
-    "")
+    nil)
    ;; List available tools
    ((equal method "tools/list")
     (let ((tool-list (vector)))

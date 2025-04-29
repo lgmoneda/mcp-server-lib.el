@@ -145,38 +145,30 @@
 
 (ert-deftest mcp-test-notifications-initialized-format ()
   "Test the MCP notifications/initialized format handling."
-  ;; Start the MCP server using the singleton API
   (mcp-start)
   (unwind-protect
       (progn
-        ;; Test notifications/initialized format
         (let* ((notifications-initialized
                 (json-encode
                  `(("jsonrpc" . "2.0")
                    ("method" . "notifications/initialized"))))
                (response (mcp-process-jsonrpc notifications-initialized)))
-          ;; For true notifications, the server should return an empty string
-          ;; or something that indicates no response is needed
-          (should (string= "" response))))
-    ;; Cleanup - always stop server
+          ;; Notifications are one-way, should return nil
+          (should (null response))))
     (mcp-stop)))
 
 (ert-deftest mcp-test-notifications-cancelled-format ()
   "Test the MCP notifications/cancelled format handling."
-  ;; Start the MCP server using the singleton API
   (mcp-start)
   (unwind-protect
       (progn
-        ;; Test notifications/cancelled format
         (let* ((notifications-cancelled
                 (json-encode
                  `(("jsonrpc" . "2.0")
                    ("method" . "notifications/cancelled"))))
                (response (mcp-process-jsonrpc notifications-cancelled)))
-          ;; For true notifications, the server should return an empty string
-          ;; or something that indicates no response is needed
-          (should (string= "" response))))
-    ;; Cleanup - always stop server
+          ;; Notifications are one-way, should return nil
+          (should (null response))))
     (mcp-stop)))
 
 (ert-deftest mcp-test-tools-list-zero ()
