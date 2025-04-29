@@ -707,30 +707,50 @@ Verifies that result has a content array with a proper text item."
     ;; Cleanup - always stop server
     (mcp-stop)))
 
-(ert-deftest mcp-test-invalid-jsonrpc ()
-  "Test that valid JSON that is not JSON-RPC returns an invalid request error."
-  ;; Start the MCP server
+(defun mcp-test--verify-jsonrpc-error
+    (request-object expected-code expected-message)
+  "Test that JSON-RPC REQUEST-OBJECT is rejected with expected error.
+EXPECTED-CODE is the expected error code.
+EXPECTED-MESSAGE is a regex pattern to match against the error message."
   (mcp-start)
   (unwind-protect
       (progn
-        ;; Send a valid JSON object that lacks JSON-RPC fields
-        (let* ((valid-json-not-jsonrpc (json-encode
-                                        `(("name" . "Test Object")
-                                          ("value" . 42))))
-               (response (mcp-process-jsonrpc valid-json-not-jsonrpc))
+        (let* ((request (json-encode request-object))
+               (response (mcp-process-jsonrpc request))
                (response-obj (json-read-from-string response))
                (error-obj (alist-get 'error response-obj)))
-          ;; Verify it's a proper error response
           (should error-obj)
           (should (alist-get 'code error-obj))
-          ;; Check it has the correct error code for invalid request (-32600)
-          (should (= (alist-get 'code error-obj) -32600))
-          ;; Check it has an error message
+          (should (= (alist-get 'code error-obj) expected-code))
           (should (alist-get 'message error-obj))
-          (should (string-match "Invalid Request: Not JSON-RPC 2.0"
+          (should (string-match expected-message
                                 (alist-get 'message error-obj)))))
-    ;; Cleanup - always stop server
     (mcp-stop)))
+
+(ert-deftest mcp-test-invalid-jsonrpc ()
+  "Test that valid JSON that is not JSON-RPC returns an invalid request error."
+  (mcp-test--verify-jsonrpc-error
+   '(("name" . "Test Object")
+     ("value" . 42))
+   -32600
+   "Invalid Request: Not JSON-RPC 2.0"))
+
+(defun mcp-test--test-invalid-jsonrpc-version (version)
+  "Test that JSON-RPC request with VERSION is rejected properly."
+  (mcp-test--verify-jsonrpc-error
+   `(("jsonrpc" . ,version)
+     ("method" . "tools/list")
+     ("id" . 42))
+   -32600
+   "Invalid Request: Not JSON-RPC 2.0"))
+
+(ert-deftest mcp-test-invalid-jsonrpc-older-version ()
+  "Test that JSON-RPC with older version (1.1) is rejected properly."
+  (mcp-test--test-invalid-jsonrpc-version "1.1"))
+
+(ert-deftest mcp-test-invalid-jsonrpc-non-standard-version ()
+  "Test that JSON-RPC with non-standard version string is rejected properly."
+  (mcp-test--test-invalid-jsonrpc-version "non-standard"))
 
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
