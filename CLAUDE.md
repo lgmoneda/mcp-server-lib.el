@@ -94,8 +94,6 @@ Before writing any code:
 
 1. **Verify failure**: Run tests to confirm they fail as expected
 
-- Use `emacs -Q -batch -l mcp.el -l mcp-test.el \
-  --eval '(ert-run-tests-batch-and-exit "test-name")'` for specific tests
 - Note the exact failure message for comparison later
 
 1. **Implement**: Write the minimal code needed to make tests pass
