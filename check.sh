@@ -5,6 +5,33 @@
 # Track if any errors occurred
 ERRORS=0
 
+echo "Checking Elisp syntax via byte compilation..."
+emacs -Q --batch \
+	--eval "(setq byte-compile-warnings nil)" \
+	--eval "(add-to-list 'load-path \".\")" \
+	--eval "(dolist (file '(\"mcp.el\" \"mcp-test.el\"))
+      (message \"Checking syntax of %s...\" file)
+      (byte-compile-file file))" || {
+	echo "Elisp byte compilation check failed"
+	ERRORS=$((ERRORS + 1))
+}
+
+# Only run indentation if there are no errors so far
+if [ $ERRORS -eq 0 ]; then
+	echo "Running Emacs indentation on Elisp files..."
+	emacs -Q --batch \
+		--eval "(dolist (file '(\"mcp.el\" \"mcp-test.el\"))
+          (find-file file)
+          (indent-region (point-min) (point-max))
+          (save-buffer)
+          (message \"Indented %s\" file))" || {
+		echo "Elisp indentation failed"
+		ERRORS=$((ERRORS + 1))
+	}
+else
+	echo "Skipping indentation due to syntax errors"
+fi
+
 echo "Running elisp-lint on Emacs Lisp files..."
 emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
                                       (locate-user-emacs-file \"elpa/package-lint-0.26\")
