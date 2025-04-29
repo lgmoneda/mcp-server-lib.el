@@ -128,11 +128,59 @@ Example:
 
 ;;; Tools
 
+(defun mcp--extract-param-descriptions (func)
+  "Extract parameter descriptions from FUNC's docstring.
+The docstring should contain an \"MCP Parameters:\" section at the end,
+with each parameter described as \"parameter-name - description\".
+Returns an alist mapping parameter names to their descriptions.
+Signals an error if a parameter is described multiple times,
+doesn't match function arguments, or if any parameter is not documented."
+  (let ((docstring (documentation func))
+        (arglist (help-function-arglist func))
+        (descriptions nil))
+    (when docstring
+      (when (string-match
+             "MCP Parameters:[\n\r]+\\(\\(?:[ \t]+[^ \t\n\r].*[\n\r]*\\)*\\)"
+             docstring)
+        (let ((params-text (match-string 1 docstring))
+              (param-regex
+               "[ \t]+\\([^ \t\n\r]+\\)[ \t]*-[ \t]*\\(.*\\)[\n\r]*"))
+          (with-temp-buffer
+            (insert params-text)
+            (goto-char (point-min))
+            (while (re-search-forward param-regex nil t)
+              (let ((param-name (match-string 1))
+                    (param-desc (match-string 2)))
+                ;; Check for duplicate parameter names
+                (when (assoc param-name descriptions)
+                  (error "Duplicate parameter '%s' in MCP Parameters"
+                         param-name))
+                ;; Check parameter name matches function arguments
+                (unless (and (= 1 (length arglist))
+                             (symbolp (car arglist))
+                             (string= param-name (symbol-name (car arglist))))
+                  (error "Parameter '%s' in MCP Parameters not in function args"
+                         param-name))
+                ;; Add to descriptions
+                (push (cons param-name (string-trim param-desc))
+                      descriptions))))))
+      ;; Check that all function parameters have descriptions
+      (when (and (= 1 (length arglist))
+                 (symbolp (car arglist))
+                 (not (memq (car arglist) '(&optional &rest))))
+        (let ((arg-name (symbol-name (car arglist))))
+          (unless (assoc arg-name descriptions)
+            (error "Function parameter '%s' missing from MCP Parameters"
+                   arg-name)))))
+    descriptions))
+
 (defun mcp--generate-schema-from-function (func)
   "Generate JSON schema by analyzing FUNC's signature.
 Returns a schema object suitable for tool registration.
-Supports functions with zero or one argument only."
-  (let ((arglist (help-function-arglist func)))
+Supports functions with zero or one argument only.
+Extracts parameter descriptions from the docstring if available."
+  (let ((arglist (help-function-arglist func))
+        (param-descriptions (mcp--extract-param-descriptions func)))
     (cond
      ;; No arguments case
      ((null arglist)
@@ -142,9 +190,17 @@ Supports functions with zero or one argument only."
      ((and (= 1 (length arglist))
            (symbolp (car arglist))
            (not (memq (car arglist) '(&optional &rest))))
-      (let ((arg-name (symbol-name (car arglist))))
+      (let* ((arg-name (symbol-name (car arglist)))
+             (description (cdr (assoc arg-name param-descriptions)))
+             ;; Build property schema with type
+             (property-schema `((type . "string")))
+             ;; Add description if provided
+             (property-schema
+              (if description
+                  (cons `(description . ,description) property-schema)
+                property-schema)))
         `((type . "object")
-          (properties . ((,arg-name . ((type . "string")))))
+          (properties . ((,arg-name . ,property-schema)))
           (required . [,arg-name]))))
 
      ;; Everything else is unsupported

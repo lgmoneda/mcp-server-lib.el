@@ -39,6 +39,26 @@ This library enables Emacs users and developers to create MCP servers that can p
 (mcp-stop)
 #+end_src
 
+*** Tool Parameter Documentation
+
+When registering tools with MCP, you can provide parameter descriptions that will be included in the JSON Schema.
+
+**** Documenting Parameters
+
+Add an "MCP Parameters:" section to your handler function's docstring. This should be at the end of the docstring with each parameter in the format `parameter-name - description`:
+
+#+begin_src elisp
+(defun my-weather-handler (location)
+  "Get weather information for a LOCATION.
+
+MCP Parameters:
+  location - city, address, or coordinates"
+  ;; Function implementation...
+  )
+
+(mcp-register-tool "get-weather" "Get weather information" #'my-weather-handler)
+#+end_src
+
 *** Stdio Transport
 
 The main entry point for MCP communication via stdio is =mcp-process-jsonrpc=:

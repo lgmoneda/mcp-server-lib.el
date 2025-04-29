@@ -88,7 +88,7 @@
 ** Core Implementation
 - [X] Server instance representation (plist)
 - [X] Tool registry data structure
-  - [ ] Support parameter descriptions for JSON Schema generation
+  - [X] Support parameter descriptions for JSON Schema generation
   - [ ] Add JSON Schema type annotations for parameters
 - [ ] Resource registry data structure
 - [ ] Prompt registry data structure

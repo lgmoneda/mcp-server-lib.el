@@ -312,7 +312,8 @@
             (let ((schema (alist-get 'inputSchema tool)))
               (should schema)
               (should (equal "object" (alist-get 'type schema)))
-              (should-not (alist-get 'required schema))))))
+              (should-not (alist-get 'required schema))
+              (should-not (alist-get 'properties schema))))))
     (mcp-stop)
     (mcp-unregister-tool "test-tool")))
 
@@ -374,6 +375,30 @@
   "Test that `mcp-unregister-tool' works when no tools are registered."
   (should-not (mcp-unregister-tool "any-tool")))
 
+(ert-deftest mcp-test-duplicate-param-description-error ()
+  "Test that duplicate parameter descriptions cause an error."
+  (should-error
+   (mcp-register-tool "duplicate-param-tool"
+                      "Tool with duplicate parameter"
+                      #'mcp-test--duplicate-param-handler)
+   :type 'error))
+
+(ert-deftest mcp-test-mismatched-param-error ()
+  "Test that parameter names must match function arguments."
+  (should-error
+   (mcp-register-tool "mismatched-param-tool"
+                      "Tool with mismatched parameter"
+                      #'mcp-test--mismatched-param-handler)
+   :type 'error))
+
+(ert-deftest mcp-test-missing-param-error ()
+  "Test that all function parameters must be documented."
+  (should-error
+   (mcp-register-tool "missing-param-tool"
+                      "Tool with missing parameter docs"
+                      #'mcp-test--missing-param-handler)
+   :type 'error))
+
 ;;; Prompts Tests
 
 (defun mcp-test--prompts-list-request (id)
@@ -414,8 +439,35 @@
 
 (defun mcp-test--string-arg-tool-handler (input-string)
   "Test tool handler that accepts a string argument.
-INPUT-STRING is the string argument passed to the tool."
+INPUT-STRING is the string argument passed to the tool.
+
+MCP Parameters:
+  input-string - test parameter for string input"
   (concat "Echo: " input-string))
+
+(defun mcp-test--duplicate-param-handler (input-string)
+  "Test handler with duplicate parameter.
+INPUT-STRING is the string argument.
+
+MCP Parameters:
+  input-string - first description
+  input-string - second description"
+  (concat "Test: " input-string))
+
+(defun mcp-test--mismatched-param-handler (input-string)
+  "Test handler with mismatched parameter name.
+INPUT-STRING is the string argument.
+
+MCP Parameters:
+  wrong-param-name - description for non-existent parameter"
+  (concat "Test: " input-string))
+
+(defun mcp-test--missing-param-handler (input-string)
+  "Test handler with missing parameter documentation.
+INPUT-STRING is the string argument.
+
+MCP Parameters:"
+  (concat "Test: " input-string))
 
 (defun mcp-test--tools-call-request (id tool-name &optional args)
   "Create a tools/call JSON-RPC request with ID for TOOL-NAME.
@@ -500,11 +552,11 @@ Verifies that result has a content array with a proper text item."
     (mcp-unregister-tool "empty-string-tool")))
 
 (ert-deftest mcp-test-schema-for-one-arg-handler ()
-  "Test that schema for one-arg handler shows required parameter."
+  "Test schema includes parameter descriptions."
   (mcp-start)
   (unwind-protect
       (progn
-        ;; Register a tool with a handler that requires one argument
+        ;; Register a tool with a handler with parameter description
         (mcp-register-tool
          "requires-arg" "A tool that requires an argument"
          #'mcp-test--string-arg-tool-handler)
@@ -520,12 +572,18 @@ Verifies that result has a content array with a proper text item."
                (tool (aref tool-list 0))
                (schema (alist-get 'inputSchema tool)))
 
-          ;; Verify complete schema structure
-          (should (equal
-                   `((type . "object")
-                     (properties . ((input-string . ((type . "string")))))
-                     (required . ["input-string"]))
-                   schema))))
+          ;; Verify schema base structure
+          (should (equal "object" (alist-get 'type schema)))
+          (should (alist-get 'properties schema))
+          (should (equal ["input-string"] (alist-get 'required schema)))
+
+          ;; Verify parameter includes description
+          (let ((param-schema (alist-get 'input-string
+                                         (alist-get 'properties schema))))
+            (should param-schema)
+            (should (equal "string" (alist-get 'type param-schema)))
+            (should (equal "test parameter for string input"
+                           (alist-get 'description param-schema))))))
     (mcp-stop)
     (mcp-unregister-tool "requires-arg")))
 
