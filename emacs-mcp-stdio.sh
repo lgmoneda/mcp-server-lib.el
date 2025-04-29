@@ -131,10 +131,10 @@ while read -r line; do
 		# Unescape any quotes inside
 		base64_response="${base64_response//\\\"/\"}"
 	fi
-	
+
 	# Decode the base64 content
 	formatted_response=$(echo -n "$base64_response" | base64 -d)
-	
+
 	mcp_debug_log "RESPONSE" "$formatted_response"
 
 	# Output the response

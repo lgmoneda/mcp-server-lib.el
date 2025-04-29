@@ -25,12 +25,36 @@ with code in this repository.
 **EXTREMELY IMPORTANT: Strictly follow this workflow for all changes.**
 **If anything prevents following these steps, STOP and ask for guidance.**
 
+**Workflow Steps Summary:**
+
+1. Understand requirements from `TODO.org` and existing code
+1. Write tests first, run check.sh to establish baseline
+1. Implement solution, running check.sh after each significant change
+1. When finished, update documentation and mark items as complete in `TODO.org`
+1. Verify all tests pass with check.sh before committing
+
+**Key Rules:**
+
+- **ALWAYS run ./check.sh before and after making changes**
+- **NEVER skip running ./check.sh, even for "small" changes**
+- **Fix all linting issues before proceeding to the next step**
+- **Follow TDD: Write tests first, then implement the feature**
+
 **Task Focus: Never switch tasks mid-development.**
 
 - When troubleshooting, explore multiple approaches methodically
 - Document alternative approaches considered before choosing a direction
 - If multiple solutions exist, discuss trade-offs with the user before proceeding
 - Focus on a single solution after deciding on an approach
+- When implementing new validations, consider all edge cases
+- Updates to user-facing documentation (README.org) should happen alongside
+  code changes
+
+**Error Handling and Validation:**
+
+- Make error messages clear, specific, and actionable
+- Consider all validation cases: missing inputs, invalid inputs, edge cases
+- Validate early and provide meaningful errors instead of silently failing
 
 **If you discover additional work needed, ask for permission to file a todo note.**
 
@@ -58,21 +82,44 @@ Before writing any code:
 - Test only public interfaces, not implementation details
 - Do not depend on internals of the tested component
 - If you see no alternative to testing internals, ask for guidance
+- Consider both positive and negative test cases (error conditions)
+- When adding new features, update existing tests if necessary
 
-1. **Run linters**: Run check.sh
+1. **Run linters with check.sh**
 
+- **CRUCIAL: Always run ./check.sh BEFORE making any code changes**
+- This establishes a baseline of expected failures before implementation
 - Note: Some errors (e.g., undefined symbols) are expected at this stage
 - Fix style and formatting issues only
 
 1. **Verify failure**: Run tests to confirm they fail as expected
+
+- Use `emacs -Q -batch -l mcp.el -l mcp-test.el \
+  --eval '(ert-run-tests-batch-and-exit "test-name")'` for specific tests
+- Note the exact failure message for comparison later
+
 1. **Implement**: Write the minimal code needed to make tests pass
-1. **Verify success**: Run tests to confirm implementation works
+
+- Implement one feature at a time
+- Always think about edge cases and validation
+- When adding new validations, make error messages clear and actionable
+
+1. **Verify success with check.sh**:
+
+- **ALWAYS use `./check.sh` to verify the implementation**
+- Never skip this step after making changes
+- Always run all tests, not just the new ones
+
 1. **Run all quality checks**:
 
-- Run `./check.sh` to verify all quality checks pass
+- Run `./check.sh` again to verify all quality checks pass
 - It includes elisp-lint, tests, and documentation linting
+- Fix any style, formatting, or doc issues before proceeding
 
 1. **Refactor**: Clean up code while maintaining passing tests
+
+- Run `./check.sh` after each refactoring step
+- Consider readability and maintainability
 
 ## Style Guide
 
@@ -88,11 +135,27 @@ Before writing any code:
 - **Error Handling**: Use `condition-case` for handling errors in user-facing functions
 - **Line Length**: Keep lines under 80 columns when possible
 - **Comments**: Do not add obvious comments that merely restate the code
-  - Avoid: `# Get the response` above `response = get_response()`
-  - Prefer: Comments that explain "why" not "what" when the code isn't self-explanatory
-  - Use comments to explain complex algorithms, non-obvious side effects,
-    or historical context
-  - Descriptive variable and function names often eliminate the need for comments
+- Avoid: `# Get the response` above `response = get_response()`
+- Prefer: Comments that explain "why" not "what" when the code isn't self-explanatory
+- Use comments to explain complex algorithms, non-obvious side effects,
+  or historical context
+- Descriptive variable and function names often eliminate the need for comments
+
+## Documentation Guidelines
+
+### `README.org` Documentation
+
+- Add user-facing documentation to `README.org` when implementing new features
+- Include:
+  - Brief description of the feature
+  - Example code showing how to use it
+  - Any important notes or caveats
+
+### Tests as Documentation
+
+- Write test cases that demonstrate both normal usage and edge cases
+- Test cases serve as documentation of expected behavior
+- Include comments in tests explaining non-obvious test scenarios
 
 ## Project Roadmap
 
