@@ -729,5 +729,13 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
    -32600
    "Invalid Request: Missing required 'id' field"))
 
+(ert-deftest mcp-test-invalid-jsonrpc-missing-method ()
+  "Test that JSON-RPC request lacking the \"method\" key is rejected properly."
+  (mcp-test--verify-jsonrpc-error
+   '(("jsonrpc" . "2.0")
+     ("id" . 42))
+   -32600
+   "Invalid Request: Missing required 'method' field"))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

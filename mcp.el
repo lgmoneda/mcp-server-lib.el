@@ -459,6 +459,11 @@ Returns a JSON-RPC response string."
       (mcp--jsonrpc-error
        nil mcp--error-invalid-request
        "Invalid Request: Missing required 'id' field"))
+     ;; Check if method is missing
+     ((not method)
+      (mcp--jsonrpc-error
+       id mcp--error-invalid-request
+       "Invalid Request: Missing required 'method' field"))
 
      ;; Process valid request
      (t (mcp--dispatch-jsonrpc-method id method params)))))
