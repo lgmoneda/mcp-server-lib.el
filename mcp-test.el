@@ -684,5 +684,28 @@ Verifies that result has a content array with a proper text item."
     (mcp-unregister-tool "persistent-tool")
     (when mcp--running (mcp-stop))))
 
+(ert-deftest mcp-test-parse-error ()
+  "Test that invalid JSON input to `mcp-process-jsonrpc` returns a parse error."
+  ;; Start the MCP server
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Send an invalid JSON string
+        (let* ((invalid-json "This is not valid JSON")
+               (response (mcp-process-jsonrpc invalid-json))
+               (response-obj (json-read-from-string response))
+               (error-obj (alist-get 'error response-obj)))
+          ;; Verify it's a proper error response
+          (should error-obj)
+          (should (alist-get 'code error-obj))
+          ;; Check it has the correct error code for parse error (-32700)
+          (should (= (alist-get 'code error-obj) -32700))
+          ;; Check it has an error message
+          (should (alist-get 'message error-obj))
+          (should (string-match "Parse error"
+                                (alist-get 'message error-obj)))))
+    ;; Cleanup - always stop server
+    (mcp-stop)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

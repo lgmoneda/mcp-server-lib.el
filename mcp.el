@@ -254,6 +254,9 @@ Example:
   "Hash table of registered MCP prompts.")
 
 ;; Standard error codes as defined by the MCP
+(defconst mcp--error-parse -32700
+  "Error code for Parse Error.")
+
 (defconst mcp--error-invalid-request -32600
   "Error code for Invalid Request.")
 
@@ -316,10 +319,29 @@ Example:
     (error "No active MCP server, start server with `mcp-start` first"))
 
   (mcp--log-json-rpc "in" json-string)
-  (let ((response (condition-case err
-                      (mcp--handle-jsonrpc-request-internal json-string)
-                    (error
-                     (mcp--handle-error err)))))
+
+  ;; Step 1: Try to parse the JSON, handle parsing errors
+  (let ((json-object nil)
+        (response nil))
+    ;; Attempt to parse the JSON
+    (condition-case json-err
+        (setq json-object (json-read-from-string json-string))
+      (json-error
+       ;; If JSON parsing fails, create a parse error response
+       (setq response
+             (json-encode
+              `((jsonrpc . "2.0")
+                (id . nil)
+                (error . ((code . ,mcp--error-parse)
+                          (message .
+                           ,(format "Parse error: %s"
+                                   (error-message-string json-err))))))))))
+    ;; Step 2: Process the request if JSON parsing succeeded
+    (unless response
+      (condition-case err
+          (setq response (mcp--handle-jsonrpc-request-internal json-object))
+        (error
+         (setq response (mcp--handle-error err)))))
     (mcp--log-json-rpc "out" response)
     response))
 
@@ -335,11 +357,11 @@ Returns a JSON-RPC error response string for internal errors."
 
 ;;; JSON-RPC Handling
 
-(defun mcp--handle-jsonrpc-request-internal (request-body)
-  "Handle a JSON-RPC REQUEST-BODY for the global MCP server.
+(defun mcp--handle-jsonrpc-request-internal (request)
+  "Handle a JSON-RPC REQUEST object for the global MCP server.
+REQUEST is a parsed JSON object (alist).
 Returns a JSON-RPC response string."
-  (let* ((request (json-read-from-string request-body))
-         (jsonrpc (alist-get 'jsonrpc request))
+  (let* ((jsonrpc (alist-get 'jsonrpc request))
          (id (alist-get 'id request))
          (method (alist-get 'method request))
          (params (alist-get 'params request)))
