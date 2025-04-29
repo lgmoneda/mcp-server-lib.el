@@ -69,6 +69,12 @@ prettier --check .github/workflows/*.yml || {
 	ERRORS=$((ERRORS + 1))
 }
 
+echo "Checking Markdown formatting..."
+prettier --check ./*.md || {
+	echo "prettier check for Markdown failed"
+	ERRORS=$((ERRORS + 1))
+}
+
 echo "Checking terminology..."
 textlint --rule terminology ./*.md || {
 	echo "textlint check failed"
