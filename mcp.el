@@ -329,13 +329,11 @@ Example:
       (json-error
        ;; If JSON parsing fails, create a parse error response
        (setq response
-             (json-encode
-              `((jsonrpc . "2.0")
-                (id . nil)
-                (error . ((code . ,mcp--error-parse)
-                          (message .
-                           ,(format "Parse error: %s"
-                                   (error-message-string json-err))))))))))
+             (mcp--jsonrpc-error
+              nil
+              mcp--error-parse
+              (format "Parse error: %s"
+                      (error-message-string json-err))))))
     ;; Step 2: Process the request if JSON parsing succeeded
     (unless response
       (condition-case err
@@ -348,12 +346,11 @@ Example:
 (defun mcp--handle-error (err)
   "Handle error ERR in MCP process by logging and creating an error response.
 Returns a JSON-RPC error response string for internal errors."
-  (json-encode
-   `((jsonrpc . "2.0")
-     (id . nil)
-     (error . ((code . ,mcp--error-internal)
-               (message . ,(format "Internal error: %s"
-                                   (error-message-string err))))))))
+  (mcp--jsonrpc-error
+   nil
+   mcp--error-internal
+   (format "Internal error: %s"
+           (error-message-string err))))
 
 ;;; JSON-RPC Handling
 
