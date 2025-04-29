@@ -707,5 +707,30 @@ Verifies that result has a content array with a proper text item."
     ;; Cleanup - always stop server
     (mcp-stop)))
 
+(ert-deftest mcp-test-invalid-jsonrpc ()
+  "Test that valid JSON that is not JSON-RPC returns an invalid request error."
+  ;; Start the MCP server
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Send a valid JSON object that lacks JSON-RPC fields
+        (let* ((valid-json-not-jsonrpc (json-encode
+                                        `(("name" . "Test Object")
+                                          ("value" . 42))))
+               (response (mcp-process-jsonrpc valid-json-not-jsonrpc))
+               (response-obj (json-read-from-string response))
+               (error-obj (alist-get 'error response-obj)))
+          ;; Verify it's a proper error response
+          (should error-obj)
+          (should (alist-get 'code error-obj))
+          ;; Check it has the correct error code for invalid request (-32600)
+          (should (= (alist-get 'code error-obj) -32600))
+          ;; Check it has an error message
+          (should (alist-get 'message error-obj))
+          (should (string-match "Invalid Request: Not JSON-RPC 2.0"
+                                (alist-get 'message error-obj)))))
+    ;; Cleanup - always stop server
+    (mcp-stop)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
