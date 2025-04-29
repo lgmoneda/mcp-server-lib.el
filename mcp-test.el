@@ -142,35 +142,6 @@
     ;; Cleanup - always stop server
     (mcp-stop)))
 
-(ert-deftest mcp-test-initialized-notification ()
-  "Test the MCP initialized notification handling."
-  ;; Start the MCP server using the singleton API
-  (mcp-start)
-  (unwind-protect
-      (progn
-        ;; First send an initialize request
-        (let ((initialize-request
-               (json-encode
-                `(("jsonrpc" . "2.0")
-                  ("method" . "initialize")
-                  ("id" . 4)
-                  ("params" .
-                   (("protocolVersion" . "2024-11-05")
-                    ("capabilities" . (("tools" . t)))))))))
-          (mcp-process-jsonrpc initialize-request))
-        ;; Test notification (no response expected for notifications)
-        (let* ((initialized-notification
-                (json-encode
-                 `(("jsonrpc" . "2.0")
-                   ("method" . "initialized")
-                   ("params" . (("clientName" . "Test Client"))))))
-               (notification-response
-                (mcp-process-jsonrpc initialized-notification)))
-          ;; For notifications, a valid empty response is expected
-          (should (string= "{\"jsonrpc\":\"2.0\",\"id\":null,\"result\":null}"
-                           notification-response))))
-    ;; Cleanup - always stop server
-    (mcp-stop)))
 
 (ert-deftest mcp-test-notifications-initialized-format ()
   "Test the MCP notifications/initialized format handling."
@@ -182,8 +153,7 @@
         (let* ((notifications-initialized
                 (json-encode
                  `(("jsonrpc" . "2.0")
-                   ("method" . "notifications/initialized")
-                   ("id" . null))))
+                   ("method" . "notifications/initialized"))))
                (response (mcp-process-jsonrpc notifications-initialized)))
           ;; For true notifications, the server should return an empty string
           ;; or something that indicates no response is needed
@@ -201,8 +171,7 @@
         (let* ((notifications-cancelled
                 (json-encode
                  `(("jsonrpc" . "2.0")
-                   ("method" . "notifications/cancelled")
-                   ("id" . null))))
+                   ("method" . "notifications/cancelled"))))
                (response (mcp-process-jsonrpc notifications-cancelled)))
           ;; For true notifications, the server should return an empty string
           ;; or something that indicates no response is needed
@@ -751,6 +720,14 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
 (ert-deftest mcp-test-invalid-jsonrpc-non-standard-version ()
   "Test that JSON-RPC with non-standard version string is rejected properly."
   (mcp-test--test-invalid-jsonrpc-version "non-standard"))
+
+(ert-deftest mcp-test-invalid-jsonrpc-missing-id ()
+  "Test that JSON-RPC request lacking the \"id\" key is rejected properly."
+  (mcp-test--verify-jsonrpc-error
+   '(("jsonrpc" . "2.0")
+     ("method" . "tools/list"))
+   -32600
+   "Invalid Request: Missing required 'id' field"))
 
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

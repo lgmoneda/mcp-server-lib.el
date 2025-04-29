@@ -364,10 +364,6 @@ Returns a JSON-RPC response string for the request."
    ;; Initialize handshake
    ((equal method "initialize")
     (mcp--handle-initialize id params))
-   ;; Initialized notification
-   ((equal method "initialized")
-    (mcp--handle-initialized)
-    (mcp--jsonrpc-response id nil))
    ;; Notifications/initialized format
    ((equal method "notifications/initialized")
     (mcp--handle-initialized)
@@ -443,15 +439,29 @@ Returns a JSON-RPC response string."
   (let* ((jsonrpc (alist-get 'jsonrpc request))
          (id (alist-get 'id request))
          (method (alist-get 'method request))
-         (params (alist-get 'params request)))
+         (params (alist-get 'params request))
+         (is-notification
+          (and method (string-prefix-p "notifications/" method))))
     ;; Check for JSON-RPC 2.0 compliance first
-    (if (not (equal jsonrpc "2.0"))
-        ;; Return the error immediately for non-2.0 requests
-        (mcp--jsonrpc-error
-         id mcp--error-invalid-request "Invalid Request: Not JSON-RPC 2.0")
+    (cond
+     ;; Return error for non-2.0 requests
+     ((not (equal jsonrpc "2.0"))
+      (mcp--jsonrpc-error
+       id mcp--error-invalid-request "Invalid Request: Not JSON-RPC 2.0"))
 
-      ;; Only process further if it's a valid 2.0 request
-      (mcp--dispatch-jsonrpc-method id method params))))
+     ;; Check if id is present for notifications/* methods
+     ((and id is-notification)
+      (mcp--jsonrpc-error
+       nil mcp--error-invalid-request
+       "Invalid Request: Notifications must not include 'id' field"))
+     ;; Check if id is missing
+     ((and (not id) (not is-notification))
+      (mcp--jsonrpc-error
+       nil mcp--error-invalid-request
+       "Invalid Request: Missing required 'id' field"))
+
+     ;; Process valid request
+     (t (mcp--dispatch-jsonrpc-method id method params)))))
 
 (defun mcp--jsonrpc-response (id result)
   "Create a JSON-RPC response with ID and RESULT."
