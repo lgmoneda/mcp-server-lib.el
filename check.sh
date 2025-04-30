@@ -19,14 +19,18 @@ emacs -Q --batch \
 
 # Only run indentation if there are no errors so far
 if [ $ERRORS -eq 0 ]; then
-	echo "Running Emacs indentation on Elisp files..."
-	emacs -Q --batch \
-		--eval "(dolist (file '(\"mcp.el\" \"mcp-test.el\"))
-          (find-file file)
-          (indent-region (point-min) (point-max))
-          (save-buffer)
-          (message \"Indented %s\" file))" || {
-		echo "Elisp indentation failed"
+	echo "Running elisp-autofmt on Elisp files..."
+	emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-autofmt-20250421.1112\")
+	                                      (expand-file-name \".\"))))
+	                     (dolist (dir pkg-dirs)
+	                       (add-to-list 'load-path dir))
+	                     (require 'elisp-autofmt)
+	                     (dolist (file '(\"mcp.el\" \"mcp-test.el\"))
+	                       (message \"Formatting %s...\" file)
+	                       (find-file file)
+	                       (elisp-autofmt-buffer-to-file)
+	                       (message \"Formatted %s\" file)))" || {
+		echo "elisp-autofmt failed"
 		ERRORS=$((ERRORS + 1))
 	}
 else
