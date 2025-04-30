@@ -160,8 +160,9 @@ doesn't match function arguments, or if any parameter is not documented."
                              (symbolp (car arglist))
                              (string= param-name (symbol-name (car arglist))))
                   (error
-                   "Parameter '%s' in MCP Parameters not in function args"
-                   param-name))
+                   "Parameter '%s' in MCP Parameters not in function args %S"
+                   param-name
+                   arglist))
                 ;; Add to descriptions
                 (push
                  (cons param-name (string-trim param-desc)) descriptions))))))
@@ -172,7 +173,8 @@ doesn't match function arguments, or if any parameter is not documented."
         (let ((arg-name (symbol-name (car arglist))))
           (unless (assoc arg-name descriptions)
             (error
-             "Function parameter '%s' missing from MCP Parameters" arg-name)))))
+             "Function parameter '%s' missing from MCP Parameters section"
+             arg-name)))))
     descriptions))
 
 (defun mcp--generate-schema-from-function (func)
