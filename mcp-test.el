@@ -40,10 +40,7 @@
 
 (defun mcp-test--tools-list-request (id)
   "Create a tools/list JSON-RPC request with ID."
-  (json-encode
-   `(("jsonrpc" . "2.0")
-     ("method" . "tools/list")
-     ("id" . ,id))))
+  (json-encode `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . ,id))))
 
 (defun mcp-test--verify-tool-list-response (response expected-tools)
   "Check if RESPONSE from tools/list matches EXPECTED-TOOLS.
@@ -76,29 +73,29 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                (let ((annotations (alist-get 'annotations found-tool)))
                  (should annotations)
                  (dolist (annot prop-value)
-                   (should (equal (cdr annot)
-                                  (alist-get (car annot) annotations))))))
+                   (should
+                    (equal (cdr annot) (alist-get (car annot) annotations))))))
               ;; Regular property check
-              (_ (should (equal prop-value
-                                (alist-get prop-name found-tool)))))))))))
+              (_
+               (should
+                (equal prop-value (alist-get prop-name found-tool)))))))))))
 
 (ert-deftest mcp-test-tool-registration-in-capabilities ()
   "Test registered tool appears in server capabilities."
-  (mcp-register-tool #'mcp-test--tool-handler
-                     :id "test-tool"
-                     :description "A tool for testing")
+  (mcp-register-tool
+   #'mcp-test--tool-handler
+   :id "test-tool"
+   :description "A tool for testing")
   (mcp-start)
   (unwind-protect
       (progn
         (let* ((initialize-request
                 (json-encode
                  `(("jsonrpc" . "2.0")
-                   ("method" . "initialize")
-                   ("id" . 1)
+                   ("method" . "initialize") ("id" . 1)
                    ("params" .
                     (("protocolVersion" . "2024-11-05")
-                     ("capabilities" .
-                      (("tools" . t))))))))
+                     ("capabilities" . (("tools" . t))))))))
                (initialize-response (mcp-process-jsonrpc initialize-request))
                (response-obj (json-read-from-string initialize-response)))
 
@@ -125,13 +122,10 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
         ;; Test listing tools
         (let* ((list-request
                 (json-encode
-                 `(("jsonrpc" . "2.0")
-                   ("method" . "tools/list")
-                   ("id" . 1))))
+                 `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . 1))))
                (list-response (mcp-process-jsonrpc list-request))
                (list-result
-                (alist-get 'result
-                           (json-read-from-string list-response))))
+                (alist-get 'result (json-read-from-string list-response))))
           (should (arrayp (alist-get 'tools list-result)))))
 
     ;; Cleanup - always stop server
@@ -147,8 +141,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
         (let* ((initialize-request
                 (json-encode
                  `(("jsonrpc" . "2.0")
-                   ("method" . "initialize")
-                   ("id" . 3)
+                   ("method" . "initialize") ("id" . 3)
                    ("params" .
                     (("protocolVersion" . "2024-11-05")
                      ("capabilities" .
@@ -157,12 +150,13 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                        ("prompts" . nil))))))))
                (initialize-response (mcp-process-jsonrpc initialize-request))
                (initialize-result
-                (alist-get 'result
-                           (json-read-from-string initialize-response))))
+                (alist-get
+                 'result (json-read-from-string initialize-response))))
           ;; Verify the server responded with its protocol version
           (should (stringp (alist-get 'protocolVersion initialize-result)))
-          (should (string= "2024-11-05"
-                           (alist-get 'protocolVersion initialize-result)))
+          (should
+           (string=
+            "2024-11-05" (alist-get 'protocolVersion initialize-result)))
           ;; Verify server capabilities
           (should (alist-get 'capabilities initialize-result))
 
@@ -174,9 +168,8 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
             (should (equal nil (alist-get 'prompts capabilities))))
           ;; Verify server info
           (should (alist-get 'serverInfo initialize-result))
-          (let ((server-name (alist-get 'name
-                                        (alist-get 'serverInfo
-                                                   initialize-result))))
+          (let ((server-name
+                 (alist-get 'name (alist-get 'serverInfo initialize-result))))
             (should (string= mcp--name server-name)))))
     ;; Cleanup - always stop server
     (mcp-stop)))
@@ -203,8 +196,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
       (progn
         (let* ((notifications-cancelled
                 (json-encode
-                 `(("jsonrpc" . "2.0")
-                   ("method" . "notifications/cancelled"))))
+                 `(("jsonrpc" . "2.0") ("method" . "notifications/cancelled"))))
                (response (mcp-process-jsonrpc notifications-cancelled)))
           ;; Notifications are one-way, should return nil
           (should (null response))))
@@ -233,11 +225,13 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool #'mcp-test--failing-tool-handler
-                           :id "failing-tool"
-                           :description "A tool that always fails")
-        (let* ((response (mcp-process-jsonrpc
-                          (mcp-test--tools-call-request 11 "failing-tool")))
+        (mcp-register-tool
+         #'mcp-test--failing-tool-handler
+         :id "failing-tool"
+         :description "A tool that always fails")
+        (let* ((response
+                (mcp-process-jsonrpc
+                 (mcp-test--tools-call-request 11 "failing-tool")))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj)))
           ;; Check for proper MCP format
@@ -250,8 +244,9 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
             (should (alist-get 'type content-item))
             (should (string= "text" (alist-get 'type content-item)))
             (should (alist-get 'text content-item))
-            (should (string= "This tool intentionally fails"
-                             (alist-get 'text content-item))))
+            (should
+             (string=
+              "This tool intentionally fails" (alist-get 'text content-item))))
           ;; Check isError field is true
           (should (alist-get 'isError result))
           (should (eq t (alist-get 'isError result)))))
@@ -267,12 +262,13 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool #'mcp-test--generic-error-handler
-                           :id "generic-error-tool"
-                           :description "A tool that throws a generic error")
-        (let* ((response (mcp-process-jsonrpc
-                          (mcp-test--tools-call-request
-                           12 "generic-error-tool")))
+        (mcp-register-tool
+         #'mcp-test--generic-error-handler
+         :id "generic-error-tool"
+         :description "A tool that throws a generic error")
+        (let* ((response
+                (mcp-process-jsonrpc
+                 (mcp-test--tools-call-request 12 "generic-error-tool")))
                (response-obj (json-read-from-string response))
                ;; Should have error field at the top level of the response
                (error-obj (alist-get 'error response-obj)))
@@ -281,8 +277,9 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
           (should (alist-get 'code error-obj))
           (should (= -32603 (alist-get 'code error-obj)))
           (should (alist-get 'message error-obj))
-          (should (string-match "Internal error executing tool"
-                                (alist-get 'message error-obj)))))
+          (should
+           (string-match
+            "Internal error executing tool" (alist-get 'message error-obj)))))
     (mcp-stop)
     (mcp-unregister-tool "generic-error-tool")))
 
@@ -292,36 +289,65 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (unwind-protect
       (progn
         ;; Register zero-arg handler tool
-        (mcp-register-tool #'mcp-test--tool-handler
-                           :id "test-tool"
-                           :description "A tool for testing")
+        (mcp-register-tool
+         #'mcp-test--tool-handler
+         :id "test-tool"
+         :description "A tool for testing")
 
         (let ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 6))))
           (mcp-test--verify-tool-list-response
            response
-           '(("test-tool" . ((description . "A tool for testing")
-                             (inputSchema . ((type . "object")))))))))
+           '(("test-tool" .
+              ((description . "A tool for testing")
+               (inputSchema . ((type . "object")))))))))
     (mcp-stop)
     (mcp-unregister-tool "test-tool")))
+
+(ert-deftest mcp-test-tools-list-with-title ()
+  "Test that tools/list includess title in response."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Register tool with title annotation
+        (mcp-register-tool
+         #'mcp-test--tool-handler
+         :id "tool-with-title"
+         :description "A tool for testing titles"
+         :title "Friendly Tool Name")
+
+        (let ((response
+               (mcp-process-jsonrpc (mcp-test--tools-list-request 14))))
+          (mcp-test--verify-tool-list-response
+           response
+           '(("tool-with-title" .
+              ((description . "A tool for testing titles")
+               (annotations . ((title . "Friendly Tool Name")))
+               (inputSchema . ((type . "object")))))))))
+    (mcp-stop)
+    (mcp-unregister-tool "tool-with-title")))
 
 (ert-deftest mcp-test-tools-list-two ()
   "Test the `tools/list` method returns multiple tools with correct fields."
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool #'mcp-test--tool-handler
-                           :id "test-tool-1"
-                           :description "First tool for testing")
-        (mcp-register-tool #'mcp-test--tool-handler
-                           :id "test-tool-2"
-                           :description "Second tool for testing")
+        (mcp-register-tool
+         #'mcp-test--tool-handler
+         :id "test-tool-1"
+         :description "First tool for testing")
+        (mcp-register-tool
+         #'mcp-test--tool-handler
+         :id "test-tool-2"
+         :description "Second tool for testing")
         (let ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 7))))
           (mcp-test--verify-tool-list-response
            response
-           '(("test-tool-1" . ((description . "First tool for testing")
-                               (inputSchema . ((type . "object")))))
-             ("test-tool-2" . ((description . "Second tool for testing")
-                               (inputSchema . ((type . "object")))))))))
+           '(("test-tool-1" .
+              ((description . "First tool for testing")
+               (inputSchema . ((type . "object")))))
+             ("test-tool-2" .
+              ((description . "Second tool for testing")
+               (inputSchema . ((type . "object")))))))))
     (mcp-stop)
     (mcp-unregister-tool "test-tool-1")
     (mcp-unregister-tool "test-tool-2")))
@@ -329,9 +355,10 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-unregister-tool ()
   "Test that `mcp-unregister-tool' removes a tool correctly."
   (let ((tools-before (hash-table-count mcp--tools)))
-    (mcp-register-tool #'mcp-test--tool-handler
-                       :id "test-unregister"
-                       :description "Tool for unregister test")
+    (mcp-register-tool
+     #'mcp-test--tool-handler
+     :id "test-unregister"
+     :description "Tool for unregister test")
     (should (= (1+ tools-before) (hash-table-count mcp--tools)))
     (should (gethash "test-unregister" mcp--tools))
     (should (mcp-unregister-tool "test-unregister"))
@@ -340,32 +367,34 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 
 (ert-deftest mcp-test-unregister-nonexistent-tool ()
   "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
-  (mcp-register-tool #'mcp-test--tool-handler
-                     :id "test-other"
-                     :description "Other test tool")
+  (mcp-register-tool
+   #'mcp-test--tool-handler
+   :id "test-other"
+   :description "Other test tool")
   (should-not (mcp-unregister-tool "nonexistent-tool"))
   (mcp-unregister-tool "test-other"))
 
 (ert-deftest mcp-test-missing-id-error ()
   "Test that tool registration with missing :id produces an error."
   (should-error
-   (mcp-register-tool #'mcp-test--tool-handler
-                      :description "Test tool without ID")
+   (mcp-register-tool
+    #'mcp-test--tool-handler
+    :description "Test tool without ID")
    :type 'error))
 
 (ert-deftest mcp-test-missing-description-error ()
   "Test that tool registration with missing :description produces an error."
   (should-error
-   (mcp-register-tool #'mcp-test--tool-handler
-                      :id "test-tool-no-desc")
+   (mcp-register-tool #'mcp-test--tool-handler :id "test-tool-no-desc")
    :type 'error))
 
 (ert-deftest mcp-test-missing-handler-error ()
   "Test that tool registration with non-function handler produces an error."
   (should-error
-   (mcp-register-tool "not-a-function"
-                      :id "test-tool-bad-handler"
-                      :description "Test tool with invalid handler")
+   (mcp-register-tool
+    "not-a-function"
+    :id "test-tool-bad-handler"
+    :description "Test tool with invalid handler")
    :type 'error))
 
 (ert-deftest mcp-test-unregister-when-no-tools ()
@@ -375,43 +404,43 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-duplicate-param-description-error ()
   "Test that duplicate parameter descriptions cause an error."
   (should-error
-   (mcp-register-tool #'mcp-test--duplicate-param-handler
-                      :id "duplicate-param-tool"
-                      :description "Tool with duplicate parameter")
+   (mcp-register-tool
+    #'mcp-test--duplicate-param-handler
+    :id "duplicate-param-tool"
+    :description "Tool with duplicate parameter")
    :type 'error))
 
 (ert-deftest mcp-test-mismatched-param-error ()
   "Test that parameter names must match function arguments."
   (should-error
-   (mcp-register-tool #'mcp-test--mismatched-param-handler
-                      :id "mismatched-param-tool"
-                      :description "Tool with mismatched parameter")
+   (mcp-register-tool
+    #'mcp-test--mismatched-param-handler
+    :id "mismatched-param-tool"
+    :description "Tool with mismatched parameter")
    :type 'error))
 
 (ert-deftest mcp-test-missing-param-error ()
   "Test that all function parameters must be documented."
   (should-error
-   (mcp-register-tool #'mcp-test--missing-param-handler
-                      :id "missing-param-tool"
-                      :description "Tool with missing parameter docs")
+   (mcp-register-tool
+    #'mcp-test--missing-param-handler
+    :id "missing-param-tool"
+    :description "Tool with missing parameter docs")
    :type 'error))
 
 ;;; Prompts Tests
 
 (defun mcp-test--prompts-list-request (id)
   "Create a prompt list JSON-RPC request with ID."
-  (json-encode
-   `(("jsonrpc" . "2.0")
-     ("method" . "prompts/list")
-     ("id" . ,id))))
+  (json-encode `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . ,id))))
 
 (ert-deftest mcp-test-prompts-list-zero ()
   "Test the `prompts/list` method returns empty array with no prompts."
   (mcp-start)
   (unwind-protect
       (progn
-        (let* ((response (mcp-process-jsonrpc
-                          (mcp-test--prompts-list-request 8)))
+        (let* ((response
+                (mcp-process-jsonrpc (mcp-test--prompts-list-request 8)))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj)))
           (should result)
@@ -422,8 +451,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 
 ;;; Tool Call Tests
 
-(defconst mcp-test--string-list-result
-  "item1 item2 item3"
+(defconst mcp-test--string-list-result "item1 item2 item3"
   "Test data for string list tool.")
 
 (defun mcp-test--string-list-tool-handler ()
@@ -473,8 +501,7 @@ Optional ARGS is an association list of tool arguments."
    `(("jsonrpc" . "2.0")
      ("method" . "tools/call")
      ("id" . ,id)
-     ("params" . (("name" . ,tool-name)
-                  ("arguments" . ,(or args '())))))))
+     ("params" . (("name" . ,tool-name) ("arguments" . ,(or args '())))))))
 
 (defun mcp-test--check-mcp-content-format (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT.
@@ -503,8 +530,9 @@ Verifies that result has a content array with a proper text item."
          #'mcp-test--string-list-tool-handler
          :id "string-list-tool"
          :description "A tool that returns a string with items")
-        (let* ((response (mcp-process-jsonrpc
-                          (mcp-test--tools-call-request 9 "string-list-tool")))
+        (let* ((response
+                (mcp-process-jsonrpc
+                 (mcp-test--tools-call-request 9 "string-list-tool")))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj)))
           (should result)
@@ -521,15 +549,15 @@ Verifies that result has a content array with a proper text item."
         ;; Clear any previously registered tools to ensure only this tool exists
         (clrhash mcp--tools)
 
-        (mcp-register-tool #'mcp-test--empty-array-tool-handler
-                           :id "empty-string-tool"
-                           :description "A tool that returns an empty string")
+        (mcp-register-tool
+         #'mcp-test--empty-array-tool-handler
+         :id "empty-string-tool"
+         :description "A tool that returns an empty string")
 
         ;; First check the schema for this zero-arg handler
-        (let* ((list-req (json-encode
-                          `(("jsonrpc" . "2.0")
-                            ("method" . "tools/list")
-                            ("id" . 100))))
+        (let* ((list-req
+                (json-encode
+                 `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . 100))))
                (list-response (mcp-process-jsonrpc list-req))
                (list-obj (json-read-from-string list-response))
                (tools (alist-get 'tools (alist-get 'result list-obj)))
@@ -555,15 +583,15 @@ Verifies that result has a content array with a proper text item."
   (unwind-protect
       (progn
         ;; Register a tool with a handler with parameter description
-        (mcp-register-tool #'mcp-test--string-arg-tool-handler
-                           :id "requires-arg"
-                           :description "A tool that requires an argument")
+        (mcp-register-tool
+         #'mcp-test--string-arg-tool-handler
+         :id "requires-arg"
+         :description "A tool that requires an argument")
 
         ;; Get schema via tools/list
-        (let* ((list-req (json-encode
-                          `(("jsonrpc" . "2.0")
-                            ("method" . "tools/list")
-                            ("id" . 42))))
+        (let* ((list-req
+                (json-encode
+                 `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . 42))))
                (list-response (mcp-process-jsonrpc list-req))
                (list-obj (json-read-from-string list-response))
                (tool-list (alist-get 'tools (alist-get 'result list-obj)))
@@ -576,12 +604,14 @@ Verifies that result has a content array with a proper text item."
           (should (equal ["input-string"] (alist-get 'required schema)))
 
           ;; Verify parameter includes description
-          (let ((param-schema (alist-get 'input-string
-                                         (alist-get 'properties schema))))
+          (let ((param-schema
+                 (alist-get 'input-string (alist-get 'properties schema))))
             (should param-schema)
             (should (equal "string" (alist-get 'type param-schema)))
-            (should (equal "test parameter for string input"
-                           (alist-get 'description param-schema))))))
+            (should
+             (equal
+              "test parameter for string input"
+              (alist-get 'description param-schema))))))
     (mcp-stop)
     (mcp-unregister-tool "requires-arg")))
 
@@ -590,9 +620,10 @@ Verifies that result has a content array with a proper text item."
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool #'mcp-test--string-arg-tool-handler
-                           :id "string-arg-tool"
-                           :description "A tool that echoes a string argument")
+        (mcp-register-tool
+         #'mcp-test--string-arg-tool-handler
+         :id "string-arg-tool"
+         :description "A tool that echoes a string argument")
         (let* ((test-input "Hello, world!")
                (args `(("input" . ,test-input)))
                (req (mcp-test--tools-call-request 13 "string-arg-tool" args))
@@ -601,8 +632,7 @@ Verifies that result has a content array with a proper text item."
                (result (alist-get 'result response-obj)))
           (should result)
           (mcp-test--check-mcp-content-format
-           result
-           (concat "Echo: " test-input))))
+           result (concat "Echo: " test-input))))
     (mcp-stop)
     (mcp-unregister-tool "string-arg-tool")))
 
@@ -629,9 +659,14 @@ Verifies that result has a content array with a proper text item."
             ;; Check buffer contents exactly - compare with expected content
             (with-current-buffer log-buffer
               (let ((content (buffer-string))
-                    (expected-content (concat
-                                       "-> (request) [" request "]\n"
-                                       "<- (response) [" response "]\n")))
+                    (expected-content
+                     (concat
+                      "-> (request) ["
+                      request
+                      "]\n"
+                      "<- (response) ["
+                      response
+                      "]\n")))
                 (should (equal expected-content content)))))))
 
     ;; Clean up
@@ -655,9 +690,10 @@ Verifies that result has a content array with a proper text item."
   "Test that server restart preserves registered tools."
   ;; Register a tool
   (mcp-start)
-  (mcp-register-tool #'mcp-test--tool-handler
-                     :id "persistent-tool"
-                     :description "Test persistence across restarts")
+  (mcp-register-tool
+   #'mcp-test--tool-handler
+   :id "persistent-tool"
+   :description "Test persistence across restarts")
 
   (unwind-protect
       (progn
@@ -668,20 +704,22 @@ Verifies that result has a content array with a proper text item."
         (mcp-start)
 
         ;; Tool should be accessible via API
-        (let* ((list-request (json-encode
-                              `(("jsonrpc" . "2.0")
-                                ("method" . "tools/list")
-                                ("id" . 1000))))
+        (let* ((list-request
+                (json-encode
+                 `(("jsonrpc" . "2.0")
+                   ("method" . "tools/list")
+                   ("id" . 1000))))
                (list-response (mcp-process-jsonrpc list-request))
                (list-obj (json-read-from-string list-response))
                (tools (alist-get 'tools (alist-get 'result list-obj))))
           (should (= 1 (length tools)))
-          (should (string= "persistent-tool"
-                           (alist-get 'name (aref tools 0))))))
+          (should
+           (string= "persistent-tool" (alist-get 'name (aref tools 0))))))
 
     ;; Cleanup
     (mcp-unregister-tool "persistent-tool")
-    (when mcp--running (mcp-stop))))
+    (when mcp--running
+      (mcp-stop))))
 
 (ert-deftest mcp-test-parse-error ()
   "Test that invalid JSON input to `mcp-process-jsonrpc` returns a parse error."
@@ -701,8 +739,7 @@ Verifies that result has a content array with a proper text item."
           (should (= (alist-get 'code error-obj) -32700))
           ;; Check it has an error message
           (should (alist-get 'message error-obj))
-          (should (string-match "Parse error"
-                                (alist-get 'message error-obj)))))
+          (should (string-match "Parse error" (alist-get 'message error-obj)))))
     ;; Cleanup - always stop server
     (mcp-stop)))
 
@@ -722,15 +759,14 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
           (should (alist-get 'code error-obj))
           (should (= (alist-get 'code error-obj) expected-code))
           (should (alist-get 'message error-obj))
-          (should (string-match expected-message
-                                (alist-get 'message error-obj)))))
+          (should
+           (string-match expected-message (alist-get 'message error-obj)))))
     (mcp-stop)))
 
 (ert-deftest mcp-test-invalid-jsonrpc ()
   "Test that valid JSON that is not JSON-RPC returns an invalid request error."
   (mcp-test--verify-jsonrpc-error
-   '(("name" . "Test Object")
-     ("value" . 42))
+   '(("name" . "Test Object") ("value" . 42))
    -32600
    "Invalid Request: Not JSON-RPC 2.0"))
 
@@ -740,8 +776,7 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
    `(("jsonrpc" . ,version)
      ("method" . "tools/list")
      ("id" . 42))
-   -32600
-   "Invalid Request: Not JSON-RPC 2.0"))
+   -32600 "Invalid Request: Not JSON-RPC 2.0"))
 
 (ert-deftest mcp-test-invalid-jsonrpc-older-version ()
   "Test that JSON-RPC with older version (1.1) is rejected properly."
@@ -754,16 +789,14 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
 (ert-deftest mcp-test-invalid-jsonrpc-missing-id ()
   "Test that JSON-RPC request lacking the \"id\" key is rejected properly."
   (mcp-test--verify-jsonrpc-error
-   '(("jsonrpc" . "2.0")
-     ("method" . "tools/list"))
+   '(("jsonrpc" . "2.0") ("method" . "tools/list"))
    -32600
    "Invalid Request: Missing required 'id' field"))
 
 (ert-deftest mcp-test-invalid-jsonrpc-missing-method ()
   "Test that JSON-RPC request lacking the \"method\" key is rejected properly."
   (mcp-test--verify-jsonrpc-error
-   '(("jsonrpc" . "2.0")
-     ("id" . 42))
+   '(("jsonrpc" . "2.0") ("id" . 42))
    -32600
    "Invalid Request: Missing required 'method' field"))
 

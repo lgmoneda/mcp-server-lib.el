@@ -35,7 +35,8 @@ This library enables Emacs users and developers to create MCP servers that can p
 ;; Register a tool
 (mcp-register-tool #'tool-handler-function
   :id "tool-name"
-  :description "Tool description")
+  :description "Tool description"
+  :title "User-friendly Tool Name")
 
 ;; Stop the MCP server
 (mcp-stop)
@@ -44,6 +45,23 @@ This library enables Emacs users and developers to create MCP servers that can p
 *** Tool Parameter Documentation
 
 When registering tools with MCP, you can provide parameter descriptions that will be included in the JSON Schema.
+
+**** Optional Tool Properties
+
+When registering tools, you can provide optional properties:
+
+| Property      | Description                            | Example                  |
+|--------------+----------------------------------------+--------------------------|
+| :title       | User-friendly display name for the tool | "Get Weather Forecast"   |
+
+Example with optional title:
+
+#+begin_src elisp
+(mcp-register-tool #'my-weather-handler
+  :id "get-weather"
+  :title "Weather Forecast"
+  :description "Get weather information")
+#+end_src
 
 **** Documenting Parameters
 

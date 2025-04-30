@@ -153,25 +153,26 @@ doesn't match function arguments, or if any parameter is not documented."
                     (param-desc (match-string 2)))
                 ;; Check for duplicate parameter names
                 (when (assoc param-name descriptions)
-                  (error "Duplicate parameter '%s' in MCP Parameters"
-                         param-name))
+                  (error
+                   "Duplicate parameter '%s' in MCP Parameters" param-name))
                 ;; Check parameter name matches function arguments
                 (unless (and (= 1 (length arglist))
                              (symbolp (car arglist))
                              (string= param-name (symbol-name (car arglist))))
-                  (error "Parameter '%s' in MCP Parameters not in function args"
-                         param-name))
+                  (error
+                   "Parameter '%s' in MCP Parameters not in function args"
+                   param-name))
                 ;; Add to descriptions
-                (push (cons param-name (string-trim param-desc))
-                      descriptions))))))
+                (push
+                 (cons param-name (string-trim param-desc)) descriptions))))))
       ;; Check that all function parameters have descriptions
       (when (and (= 1 (length arglist))
                  (symbolp (car arglist))
                  (not (memq (car arglist) '(&optional &rest))))
         (let ((arg-name (symbol-name (car arglist))))
           (unless (assoc arg-name descriptions)
-            (error "Function parameter '%s' missing from MCP Parameters"
-                   arg-name)))))
+            (error
+             "Function parameter '%s' missing from MCP Parameters" arg-name)))))
     descriptions))
 
 (defun mcp--generate-schema-from-function (func)
@@ -218,6 +219,9 @@ Required properties:
   :id              String identifier for the tool (e.g., \"list-files\")
   :description     String describing what the tool does
 
+Optional properties:
+  :title           User-friendly display name for the tool
+
 The HANDLER function's signature determines its input schema.
 Currently only no-argument and single-argument handlers are supported.
 
@@ -227,9 +231,16 @@ to return information to the client.
 Example:
   (mcp-register-tool #\\='my-org-files-handler
     :id \"org-list-files\"
+    :description \"Lists all available Org mode files for task management\")
+
+With title:
+  (mcp-register-tool #\\='my-org-files-handler
+    :id \"org-list-files\"
+    :title \"List Org Files\"
     :description \"Lists all available Org mode files for task management\")"
   (let* ((id (plist-get properties :id))
-         (description (plist-get properties :description)))
+         (description (plist-get properties :description))
+         (title (plist-get properties :title)))
     ;; Error checking for required properties
     (unless (functionp handler)
       (error "Tool registration requires handler function"))
@@ -239,10 +250,15 @@ Example:
       (error "Tool registration requires :description property"))
     ;; Generate schema from handler function
     (let* ((schema (mcp--generate-schema-from-function handler))
-           (tool (list :id id
-                       :description description
-                       :handler handler
-                       :schema schema)))
+           (tool
+            (list
+             :id id
+             :description description
+             :handler handler
+             :schema schema)))
+      ;; Add optional title if provided
+      (when title
+        (setq tool (plist-put tool :title title)))
       ;; Register the tool
       (puthash id tool mcp--tools)
       tool)))
@@ -297,18 +313,23 @@ Arguments:
 DIRECTION should be \"in\" for incoming, \"out\" for outgoing."
   (when mcp-log-io
     (let ((buffer (get-buffer-create "*mcp-log*"))
-          (direction-prefix (if (string= direction "in") "->" "<-"))
-          (direction-name (if (string= direction "in")
-                              "(request)"
-                            "(response)")))
+          (direction-prefix
+           (if (string= direction "in")
+               "->"
+             "<-"))
+          (direction-name
+           (if (string= direction "in")
+               "(request)"
+             "(response)")))
       (with-current-buffer buffer
         (goto-char (point-max))
         (let ((inhibit-read-only t))
           (view-mode 1)
-          (insert (format "%s %s [%s]\n"
-                          direction-prefix
-                          direction-name
-                          json-message)))))))
+          (insert
+           (format "%s %s [%s]\n"
+                   direction-prefix
+                   direction-name
+                   json-message)))))))
 
 ;;; Transport Layer
 
@@ -343,16 +364,13 @@ Example:
        ;; If JSON parsing fails, create a parse error response
        (setq response
              (mcp--jsonrpc-error
-              nil
-              mcp--error-parse
-              (format "Parse error: %s"
-                      (error-message-string json-err))))))
+              nil mcp--error-parse
+              (format "Parse error: %s" (error-message-string json-err))))))
     ;; Step 2: Process the request if JSON parsing succeeded
     (unless response
       (condition-case err
           (setq response (mcp--handle-jsonrpc-request-internal json-object))
-        (error
-         (setq response (mcp--handle-error err)))))
+        (error (setq response (mcp--handle-error err)))))
 
     ;; Only log and return responses when they exist (not for notifications)
     (when response
@@ -365,8 +383,7 @@ Returns a JSON-RPC error response string for internal errors."
   (mcp--jsonrpc-error
    nil
    mcp--error-internal
-   (format "Internal error: %s"
-           (error-message-string err))))
+   (format "Internal error: %s" (error-message-string err))))
 
 ;;; JSON-RPC Handling
 
@@ -390,17 +407,22 @@ Returns a JSON-RPC response string for the request."
    ;; List available tools
    ((equal method "tools/list")
     (let ((tool-list (vector)))
-      (maphash (lambda (id tool)
-                 (let ((tool-description (plist-get tool :description))
-                       (tool-schema (or (plist-get tool :schema)
-                                        '((type . "object")))))
-                   (setq tool-list
-                         (vconcat tool-list
-                                  (vector
-                                   `((name . ,id)
-                                     (description . ,tool-description)
-                                     (inputSchema . ,tool-schema)))))))
-               mcp--tools)
+      (maphash
+       (lambda (id tool)
+         (let* ((tool-description (plist-get tool :description))
+                (tool-title (plist-get tool :title))
+                (tool-schema (or (plist-get tool :schema) '((type . "object"))))
+                (tool-entry
+                 `((name . ,id)
+                   (description . ,tool-description)
+                   (inputSchema . ,tool-schema))))
+           ;; Add title in annotations if present
+           (when tool-title
+             (setq tool-entry
+                   (append
+                    tool-entry `((annotations . ((title . ,tool-title)))))))
+           (setq tool-list (vconcat tool-list (vector tool-entry)))))
+       mcp--tools)
       (mcp--jsonrpc-response id `((tools . ,tool-list)))))
    ;; List available prompts
    ((equal method "prompts/list")
@@ -423,17 +445,17 @@ Returns a JSON-RPC response string for the request."
                           (funcall handler)))
                        ;; Wrap the handler result in the MCP format
                        (formatted-result
-                        `((content . ,(vector
-                                       `((type . "text")
-                                         (text . ,result))))
+                        `((content
+                           .
+                           ,(vector `((type . "text") (text . ,result))))
                           (isError . :json-false))))
                   (mcp-respond-with-result context formatted-result))
               ;; Handle tool-specific errors thrown with mcp-tool-throw
               (mcp-tool-error
                (let ((formatted-error
-                      `((content . ,(vector
-                                     `((type . "text")
-                                       (text . ,(cadr err)))))
+                      `((content
+                         .
+                         ,(vector `((type . "text") (text . ,(cadr err)))))
                         (isError . t))))
                  (mcp-respond-with-result context formatted-error)))
               ;; Keep existing handling for all other errors
@@ -442,11 +464,14 @@ Returns a JSON-RPC response string for the request."
                 id mcp--error-internal
                 (format "Internal error executing tool: %s"
                         (error-message-string err))))))
-        (mcp--jsonrpc-error id mcp--error-invalid-request
-                            (format "Tool not found: %s" tool-name)))))
+        (mcp--jsonrpc-error
+         id
+         mcp--error-invalid-request
+         (format "Tool not found: %s" tool-name)))))
    ;; Method not found
-   (t (mcp--jsonrpc-error id mcp--error-method-not-found
-                          (format "Method not found: %s" method)))))
+   (t
+    (mcp--jsonrpc-error
+     id mcp--error-method-not-found (format "Method not found: %s" method)))))
 
 (defun mcp--handle-jsonrpc-request-internal (request)
   "Handle a JSON-RPC REQUEST object for the global MCP server.
@@ -468,34 +493,36 @@ Returns a JSON-RPC response string."
      ;; Check if id is present for notifications/* methods
      ((and id is-notification)
       (mcp--jsonrpc-error
-       nil mcp--error-invalid-request
+       nil
+       mcp--error-invalid-request
        "Invalid Request: Notifications must not include 'id' field"))
      ;; Check if id is missing
      ((and (not id) (not is-notification))
       (mcp--jsonrpc-error
-       nil mcp--error-invalid-request
+       nil
+       mcp--error-invalid-request
        "Invalid Request: Missing required 'id' field"))
      ;; Check if method is missing
      ((not method)
       (mcp--jsonrpc-error
-       id mcp--error-invalid-request
+       id
+       mcp--error-invalid-request
        "Invalid Request: Missing required 'method' field"))
 
      ;; Process valid request
-     (t (mcp--dispatch-jsonrpc-method id method params)))))
+     (t
+      (mcp--dispatch-jsonrpc-method id method params)))))
 
 (defun mcp--jsonrpc-response (id result)
   "Create a JSON-RPC response with ID and RESULT."
-  (json-encode `((jsonrpc . "2.0")
-                 (id . ,id)
-                 (result . ,result))))
+  (json-encode `((jsonrpc . "2.0") (id . ,id) (result . ,result))))
 
 (defun mcp--jsonrpc-error (id code message)
   "Create a JSON-RPC error response with ID, error CODE and MESSAGE."
-  (json-encode `((jsonrpc . "2.0")
-                 (id . ,id)
-                 (error . ((code . ,code)
-                           (message . ,message))))))
+  (json-encode
+   `((jsonrpc . "2.0")
+     (id . ,id)
+     (error . ((code . ,code) (message . ,message))))))
 
 ;;; MCP Protocol Methods
 
@@ -512,19 +539,21 @@ version and capabilities between the client and server."
 
     ;; Determine if we need to include tools capabilities
     ;; Include listChanged:true when tools are registered
-    (let ((tools-capability (if (> (hash-table-count mcp--tools) 0)
-                                '((listChanged . t))
-                              (make-hash-table))))
+    (let ((tools-capability
+           (if (> (hash-table-count mcp--tools) 0)
+               '((listChanged . t))
+             (make-hash-table))))
       ;; Respond with server capabilities
       (mcp--jsonrpc-response
        id
        `((protocolVersion . ,mcp--protocol-version)
-         (serverInfo . ((name . ,mcp--name)
-                        (version . ,mcp--protocol-version)))
+         (serverInfo . ((name . ,mcp--name) (version . ,mcp--protocol-version)))
          ;; Format server capabilities according to MCP spec
-         (capabilities . ((tools . ,tools-capability)
-                          (resources . ,(make-hash-table))
-                          (prompts . ,(make-hash-table)))))))))
+         (capabilities
+          .
+          ((tools . ,tools-capability)
+           (resources . ,(make-hash-table))
+           (prompts . ,(make-hash-table)))))))))
 
 (defun mcp--handle-initialized ()
   "Handle initialized notification from client.
