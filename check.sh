@@ -11,7 +11,8 @@ emacs -Q --batch \
 	--eval "(add-to-list 'load-path \".\")" \
 	--eval "(dolist (file '(\"mcp.el\" \"mcp-test.el\"))
       (message \"Checking syntax of %s...\" file)
-      (byte-compile-file file))" || {
+      (if (not (byte-compile-file file))
+          (kill-emacs 1)))" || {
 	echo "Elisp byte compilation check failed"
 	ERRORS=$((ERRORS + 1))
 }
