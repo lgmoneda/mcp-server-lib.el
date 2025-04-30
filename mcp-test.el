@@ -43,7 +43,7 @@
   (json-encode `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . ,id))))
 
 (defun mcp-test--verify-tool-list-response (response expected-tools)
-  "Check if RESPONSE from tools/list matches EXPECTED-TOOLS.
+  "Verify RESPONSE from tools/list against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (let* ((response-obj (json-read-from-string response))
          (result (alist-get 'result response-obj))
