@@ -56,17 +56,19 @@ When registering tools with MCP, you can provide parameter descriptions that wil
 
 When registering tools, you can provide optional properties:
 
-| Property      | Description                            | Example                  |
-|--------------+----------------------------------------+--------------------------|
-| :title       | User-friendly display name for the tool | "Get Weather Forecast"   |
+| Property      | Description                                        | Example                  |
+|--------------+--------------------------------------------------+--------------------------|
+| :title       | User-friendly display name for the tool           | "Get Weather Forecast"   |
+| :read-only   | If true, indicates tool doesn't modify environment | t or nil                 |
 
-Example with optional title:
+Example with optional properties:
 
 #+begin_src elisp
 (mcp-register-tool #'my-weather-handler
   :id "get-weather"
+  :description "Get weather information"
   :title "Weather Forecast"
-  :description "Get weather information")
+  :read-only t)
 #+end_src
 
 **** Documenting Parameters

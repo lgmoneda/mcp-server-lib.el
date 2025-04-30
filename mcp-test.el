@@ -304,7 +304,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     (mcp-unregister-tool "test-tool")))
 
 (ert-deftest mcp-test-tools-list-with-title ()
-  "Test that tools/list includess title in response."
+  "Test that tools/list includes title in response."
   (mcp-start)
   (unwind-protect
       (progn
@@ -879,6 +879,77 @@ from a function loaded from bytecode rather than interpreted elisp."
   "Test that `mcp-start' and `mcp-stop' are interactive commands."
   (should (commandp #'mcp-start))
   (should (commandp #'mcp-stop)))
+
+(ert-deftest mcp-test-tools-list-with-read-only-hint ()
+  "Test that tools/list includes readOnlyHint=true in response."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Register tool with readOnlyHint annotation set to true
+        (mcp-register-tool
+         #'mcp-test--tool-handler
+         :id "read-only-tool"
+         :description "A tool that doesn't modify its environment"
+         :read-only t)
+
+        (let ((response
+               (mcp-process-jsonrpc (mcp-test--tools-list-request 15))))
+          (mcp-test--verify-tool-list-response
+           response
+           '(("read-only-tool" .
+              ((description . "A tool that doesn't modify its environment")
+               (annotations . ((readOnlyHint . t)))
+               (inputSchema . ((type . "object")))))))))
+    (mcp-stop)
+    (mcp-unregister-tool "read-only-tool")))
+
+(ert-deftest mcp-test-tools-list-with-read-only-hint-false ()
+  "Test that tools/list includes readOnlyHint=false in response."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Register tool with readOnlyHint annotation set to false
+        (mcp-register-tool
+         #'mcp-test--tool-handler
+         :id "non-read-only-tool"
+         :description "Tool that modifies its environment"
+         :read-only nil)
+
+        (let ((response
+               (mcp-process-jsonrpc (mcp-test--tools-list-request 16))))
+          (mcp-test--verify-tool-list-response
+           response
+           '(("non-read-only-tool" .
+              ((description . "Tool that modifies its environment")
+               (annotations . ((readOnlyHint . :json-false)))
+               (inputSchema . ((type . "object")))))))))
+    (mcp-stop)
+    (mcp-unregister-tool "non-read-only-tool")))
+
+(ert-deftest mcp-test-tools-list-with-multiple-annotations ()
+  "Test that tools/list handles multiple annotations in response."
+  (mcp-start)
+  (unwind-protect
+      (progn
+        ;; Register tool with multiple annotations
+        (mcp-register-tool
+         #'mcp-test--tool-handler
+         :id "multi-annotated-tool"
+         :description "A tool with multiple annotations"
+         :title "Friendly Multi-Tool"
+         :read-only t)
+
+        (let ((response
+               (mcp-process-jsonrpc (mcp-test--tools-list-request 17))))
+          (mcp-test--verify-tool-list-response
+           response
+           '(("multi-annotated-tool" .
+              ((description . "A tool with multiple annotations")
+               (annotations
+                . ((title . "Friendly Multi-Tool") (readOnlyHint . t)))
+               (inputSchema . ((type . "object")))))))))
+    (mcp-stop)
+    (mcp-unregister-tool "multi-annotated-tool")))
 
 (provide 'mcp-test)
 ;;; mcp-test.el ends here

@@ -226,6 +226,7 @@ Required properties:
 
 Optional properties:
   :title           User-friendly display name for the tool
+  :read-only       If true, indicates tool doesn't modify its environment
 
 The HANDLER function's signature determines its input schema.
 Currently only no-argument and single-argument handlers are supported.
@@ -238,14 +239,16 @@ Example:
     :id \"org-list-files\"
     :description \"Lists all available Org mode files for task management\")
 
-With title:
+With optional properties:
   (mcp-register-tool #\\='my-org-files-handler
     :id \"org-list-files\"
+    :description \"Lists all available Org mode files for task management\"
     :title \"List Org Files\"
-    :description \"Lists all available Org mode files for task management\")"
+    :read-only t)"
   (let* ((id (plist-get properties :id))
          (description (plist-get properties :description))
-         (title (plist-get properties :title)))
+         (title (plist-get properties :title))
+         (read-only (plist-get properties :read-only)))
     ;; Error checking for required properties
     (unless (functionp handler)
       (error "Tool registration requires handler function"))
@@ -261,9 +264,12 @@ With title:
              :description description
              :handler handler
              :schema schema)))
-      ;; Add optional title if provided
+      ;; Add optional properties if provided
       (when title
         (setq tool (plist-put tool :title title)))
+      ;; Always include :read-only if it was specified, even if nil
+      (when (plist-member properties :read-only)
+        (setq tool (plist-put tool :read-only read-only)))
       ;; Register the tool
       (puthash id tool mcp--tools)
       tool)))
@@ -416,16 +422,27 @@ Returns a JSON-RPC response string for the request."
        (lambda (id tool)
          (let* ((tool-description (plist-get tool :description))
                 (tool-title (plist-get tool :title))
+                (tool-read-only (plist-get tool :read-only))
                 (tool-schema (or (plist-get tool :schema) '((type . "object"))))
                 (tool-entry
                  `((name . ,id)
                    (description . ,tool-description)
-                   (inputSchema . ,tool-schema))))
-           ;; Add title in annotations if present
+                   (inputSchema . ,tool-schema)))
+                (annotations nil))
+           ;; Collect annotations if present
            (when tool-title
+             (push (cons 'title tool-title) annotations))
+           ;; Add readOnlyHint when :read-only is explicitly provided (both t and nil)
+           (when (plist-member tool :read-only)
+             (let ((annot-value
+                    (if tool-read-only
+                        t
+                      :json-false)))
+               (push (cons 'readOnlyHint annot-value) annotations)))
+           ;; Add annotations to tool entry if any exist
+           (when annotations
              (setq tool-entry
-                   (append
-                    tool-entry `((annotations . ((title . ,tool-title)))))))
+                   (append tool-entry `((annotations . ,annotations)))))
            (setq tool-list (vconcat tool-list (vector tool-entry)))))
        mcp--tools)
       (mcp--jsonrpc-response id `((tools . ,tool-list)))))
