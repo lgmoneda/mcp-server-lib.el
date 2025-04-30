@@ -128,10 +128,9 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
     \"Return a test string with a double quote and newline.\"
     \"\\\"\n\")
 
-  (mcp-register-tool 
-    \"test-quote-string\" 
-    \"Returns a test string with special characters\" 
-    #'mcp-test-quote-string)
+  (mcp-register-tool #'mcp-test-quote-string
+    :id \"test-quote-string\" 
+    :description \"Returns a test string with special characters\")
 )
 " >/dev/null
 TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
@@ -153,10 +152,9 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
     \"Return the exact original payload that caused the issue.\"
     \"** aaa bbbbbbbbb ccccccc ddd eeeee ffffff                                :@ggggggggg:\\n   https://hhhhhh.iii/jjjjjjjjjjj/kkkkkkkkk/llllll/387\\n   mmmmmmmmm nnn oooooą pp qqqqq\\n** rr s tt uuuu++ vvvvvv wwww xxxx                                       :@yyyyyyyyy:\\n:zzzzzzz:\\n- aaaaa \\\"bbbb\\\"       cccc \\\"dddd\\\"       [1234-56-78 eee 90:12]\\n- fffff \\\"gggg\\\"       hhhh \\\"iiii\\\"       [1234-56-78 jjj 90:12]\\n- kkkkk \\\"llll\\\"       mmmm              [3456-78-90 nnn 12:34]\\n- nnnnn \\\"oooo\\\"       pppp              [5678-90-12 qqq 34:56]\\nrrrrr: [7890-12-34 sss 56:78]--[9012-34-56 ttt 78:90] =>  1:23\\n:uuu:\\nvvvvvv wwwwww xxxxxx yyyyyyyy zzz ~aaa::bbbbb~\\n\")
 
-  (mcp-register-tool 
-    \"test-original-payload\" 
-    \"Returns the exact original payload that caused the issue\" 
-    #'mcp-test-original-payload)
+  (mcp-register-tool #'mcp-test-original-payload
+    :id \"test-original-payload\" 
+    :description \"Returns the exact original payload that caused the issue\")
 )
 " >/dev/null
 

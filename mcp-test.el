@@ -45,9 +45,48 @@
      ("method" . "tools/list")
      ("id" . ,id))))
 
+(defun mcp-test--verify-tool-list-response (response expected-tools)
+  "Check if RESPONSE from tools/list matches EXPECTED-TOOLS.
+EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
+  (let* ((response-obj (json-read-from-string response))
+         (result (alist-get 'result response-obj))
+         (tools (alist-get 'tools result)))
+    (should result)
+    (should tools)
+    (should (arrayp tools))
+    (should (= (length expected-tools) (length tools)))
+    ;; Check each expected tool
+    (dolist (expected expected-tools)
+      (let* ((expected-name (car expected))
+             (expected-props (cdr expected))
+             (found-tool nil))
+        ;; Find the tool by name
+        (dotimes (i (length tools))
+          (let ((tool (aref tools i)))
+            (when (string= expected-name (alist-get 'name tool))
+              (setq found-tool tool))))
+        (should found-tool)
+        ;; Check expected properties
+        (dolist (prop expected-props)
+          (let ((prop-name (car prop))
+                (prop-value (cdr prop)))
+            (pcase prop-name
+              ;; Special handling for nested annotations
+              ('annotations
+               (let ((annotations (alist-get 'annotations found-tool)))
+                 (should annotations)
+                 (dolist (annot prop-value)
+                   (should (equal (cdr annot)
+                                  (alist-get (car annot) annotations))))))
+              ;; Regular property check
+              (_ (should (equal prop-value
+                                (alist-get prop-name found-tool)))))))))))
+
 (ert-deftest mcp-test-tool-registration-in-capabilities ()
   "Test registered tool appears in server capabilities."
-  (mcp-register-tool "test-tool" "A tool for testing" #'mcp-test--tool-handler)
+  (mcp-register-tool #'mcp-test--tool-handler
+                     :id "test-tool"
+                     :description "A tool for testing")
   (mcp-start)
   (unwind-protect
       (progn
@@ -194,9 +233,9 @@
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool
-         "failing-tool" "A tool that always fails"
-         #'mcp-test--failing-tool-handler)
+        (mcp-register-tool #'mcp-test--failing-tool-handler
+                           :id "failing-tool"
+                           :description "A tool that always fails")
         (let* ((response (mcp-process-jsonrpc
                           (mcp-test--tools-call-request 11 "failing-tool")))
                (response-obj (json-read-from-string response))
@@ -228,9 +267,9 @@
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool
-         "generic-error-tool" "A tool that throws a generic error"
-         #'mcp-test--generic-error-handler)
+        (mcp-register-tool #'mcp-test--generic-error-handler
+                           :id "generic-error-tool"
+                           :description "A tool that throws a generic error")
         (let* ((response (mcp-process-jsonrpc
                           (mcp-test--tools-call-request
                            12 "generic-error-tool")))
@@ -253,28 +292,15 @@
   (unwind-protect
       (progn
         ;; Register zero-arg handler tool
-        (mcp-register-tool
-         "test-tool" "A tool for testing" #'mcp-test--tool-handler)
+        (mcp-register-tool #'mcp-test--tool-handler
+                           :id "test-tool"
+                           :description "A tool for testing")
 
-        (let* ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 6)))
-               (response-obj (json-read-from-string response))
-               (result (alist-get 'result response-obj))
-               (tools (alist-get 'tools result)))
-          (should result)
-          (should tools)
-          (should (arrayp tools))
-          (should (= 1 (length tools)))
-          (let ((tool (aref tools 0)))
-            (should (string= "test-tool" (alist-get 'name tool)))
-            (should (string= "A tool for testing"
-                             (alist-get 'description tool)))
-
-            ;; Check schema derived from zero-arg function
-            (let ((schema (alist-get 'inputSchema tool)))
-              (should schema)
-              (should (equal "object" (alist-get 'type schema)))
-              (should-not (alist-get 'required schema))
-              (should-not (alist-get 'properties schema))))))
+        (let ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 6))))
+          (mcp-test--verify-tool-list-response
+           response
+           '(("test-tool" . ((description . "A tool for testing")
+                             (inputSchema . ((type . "object")))))))))
     (mcp-stop)
     (mcp-unregister-tool "test-tool")))
 
@@ -283,34 +309,19 @@
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool "test-tool-1" "First tool for testing"
-                           #'mcp-test--tool-handler)
-        (mcp-register-tool "test-tool-2" "Second tool for testing"
-                           #'mcp-test--tool-handler)
-        (let* ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 7)))
-               (response-obj (json-read-from-string response))
-               (result (alist-get 'result response-obj))
-               (tools (alist-get 'tools result)))
-          (should result)
-          (should tools)
-          (should (arrayp tools))
-          (should (= 2 (length tools)))
-          (let ((found-tool-1 nil)
-                (found-tool-2 nil))
-            (dotimes (i 2)
-              (let ((tool (aref tools i)))
-                (when (string= "test-tool-1" (alist-get 'name tool))
-                  (setq found-tool-1 tool))
-                (when (string= "test-tool-2" (alist-get 'name tool))
-                  (setq found-tool-2 tool))))
-            (should found-tool-1)
-            (should found-tool-2)
-            (should (string= "First tool for testing"
-                             (alist-get 'description found-tool-1)))
-            (should (string= "Second tool for testing"
-                             (alist-get 'description found-tool-2)))
-            (should (alist-get 'inputSchema found-tool-1 nil t))
-            (should (alist-get 'inputSchema found-tool-2 nil t)))))
+        (mcp-register-tool #'mcp-test--tool-handler
+                           :id "test-tool-1"
+                           :description "First tool for testing")
+        (mcp-register-tool #'mcp-test--tool-handler
+                           :id "test-tool-2"
+                           :description "Second tool for testing")
+        (let ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 7))))
+          (mcp-test--verify-tool-list-response
+           response
+           '(("test-tool-1" . ((description . "First tool for testing")
+                               (inputSchema . ((type . "object")))))
+             ("test-tool-2" . ((description . "Second tool for testing")
+                               (inputSchema . ((type . "object")))))))))
     (mcp-stop)
     (mcp-unregister-tool "test-tool-1")
     (mcp-unregister-tool "test-tool-2")))
@@ -318,8 +329,9 @@
 (ert-deftest mcp-test-unregister-tool ()
   "Test that `mcp-unregister-tool' removes a tool correctly."
   (let ((tools-before (hash-table-count mcp--tools)))
-    (mcp-register-tool "test-unregister" "Tool for unregister test"
-                       #'mcp-test--tool-handler)
+    (mcp-register-tool #'mcp-test--tool-handler
+                       :id "test-unregister"
+                       :description "Tool for unregister test")
     (should (= (1+ tools-before) (hash-table-count mcp--tools)))
     (should (gethash "test-unregister" mcp--tools))
     (should (mcp-unregister-tool "test-unregister"))
@@ -328,9 +340,33 @@
 
 (ert-deftest mcp-test-unregister-nonexistent-tool ()
   "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
-  (mcp-register-tool "test-other" "Other test tool" #'mcp-test--tool-handler)
+  (mcp-register-tool #'mcp-test--tool-handler
+                     :id "test-other"
+                     :description "Other test tool")
   (should-not (mcp-unregister-tool "nonexistent-tool"))
   (mcp-unregister-tool "test-other"))
+
+(ert-deftest mcp-test-missing-id-error ()
+  "Test that tool registration with missing :id produces an error."
+  (should-error
+   (mcp-register-tool #'mcp-test--tool-handler
+                      :description "Test tool without ID")
+   :type 'error))
+
+(ert-deftest mcp-test-missing-description-error ()
+  "Test that tool registration with missing :description produces an error."
+  (should-error
+   (mcp-register-tool #'mcp-test--tool-handler
+                      :id "test-tool-no-desc")
+   :type 'error))
+
+(ert-deftest mcp-test-missing-handler-error ()
+  "Test that tool registration with non-function handler produces an error."
+  (should-error
+   (mcp-register-tool "not-a-function"
+                      :id "test-tool-bad-handler"
+                      :description "Test tool with invalid handler")
+   :type 'error))
 
 (ert-deftest mcp-test-unregister-when-no-tools ()
   "Test that `mcp-unregister-tool' works when no tools are registered."
@@ -339,25 +375,25 @@
 (ert-deftest mcp-test-duplicate-param-description-error ()
   "Test that duplicate parameter descriptions cause an error."
   (should-error
-   (mcp-register-tool "duplicate-param-tool"
-                      "Tool with duplicate parameter"
-                      #'mcp-test--duplicate-param-handler)
+   (mcp-register-tool #'mcp-test--duplicate-param-handler
+                      :id "duplicate-param-tool"
+                      :description "Tool with duplicate parameter")
    :type 'error))
 
 (ert-deftest mcp-test-mismatched-param-error ()
   "Test that parameter names must match function arguments."
   (should-error
-   (mcp-register-tool "mismatched-param-tool"
-                      "Tool with mismatched parameter"
-                      #'mcp-test--mismatched-param-handler)
+   (mcp-register-tool #'mcp-test--mismatched-param-handler
+                      :id "mismatched-param-tool"
+                      :description "Tool with mismatched parameter")
    :type 'error))
 
 (ert-deftest mcp-test-missing-param-error ()
   "Test that all function parameters must be documented."
   (should-error
-   (mcp-register-tool "missing-param-tool"
-                      "Tool with missing parameter docs"
-                      #'mcp-test--missing-param-handler)
+   (mcp-register-tool #'mcp-test--missing-param-handler
+                      :id "missing-param-tool"
+                      :description "Tool with missing parameter docs")
    :type 'error))
 
 ;;; Prompts Tests
@@ -464,8 +500,9 @@ Verifies that result has a content array with a proper text item."
   (unwind-protect
       (progn
         (mcp-register-tool
-         "string-list-tool" "A tool that returns a string with items"
-         #'mcp-test--string-list-tool-handler)
+         #'mcp-test--string-list-tool-handler
+         :id "string-list-tool"
+         :description "A tool that returns a string with items")
         (let* ((response (mcp-process-jsonrpc
                           (mcp-test--tools-call-request 9 "string-list-tool")))
                (response-obj (json-read-from-string response))
@@ -484,9 +521,9 @@ Verifies that result has a content array with a proper text item."
         ;; Clear any previously registered tools to ensure only this tool exists
         (clrhash mcp--tools)
 
-        (mcp-register-tool
-         "empty-string-tool" "A tool that returns an empty string"
-         #'mcp-test--empty-array-tool-handler)
+        (mcp-register-tool #'mcp-test--empty-array-tool-handler
+                           :id "empty-string-tool"
+                           :description "A tool that returns an empty string")
 
         ;; First check the schema for this zero-arg handler
         (let* ((list-req (json-encode
@@ -518,9 +555,9 @@ Verifies that result has a content array with a proper text item."
   (unwind-protect
       (progn
         ;; Register a tool with a handler with parameter description
-        (mcp-register-tool
-         "requires-arg" "A tool that requires an argument"
-         #'mcp-test--string-arg-tool-handler)
+        (mcp-register-tool #'mcp-test--string-arg-tool-handler
+                           :id "requires-arg"
+                           :description "A tool that requires an argument")
 
         ;; Get schema via tools/list
         (let* ((list-req (json-encode
@@ -553,9 +590,9 @@ Verifies that result has a content array with a proper text item."
   (mcp-start)
   (unwind-protect
       (progn
-        (mcp-register-tool
-         "string-arg-tool" "A tool that echoes a string argument"
-         #'mcp-test--string-arg-tool-handler)
+        (mcp-register-tool #'mcp-test--string-arg-tool-handler
+                           :id "string-arg-tool"
+                           :description "A tool that echoes a string argument")
         (let* ((test-input "Hello, world!")
                (args `(("input" . ,test-input)))
                (req (mcp-test--tools-call-request 13 "string-arg-tool" args))
@@ -618,8 +655,9 @@ Verifies that result has a content array with a proper text item."
   "Test that server restart preserves registered tools."
   ;; Register a tool
   (mcp-start)
-  (mcp-register-tool "persistent-tool" "Test persistence across restarts"
-                     #'mcp-test--tool-handler)
+  (mcp-register-tool #'mcp-test--tool-handler
+                     :id "persistent-tool"
+                     :description "Test persistence across restarts")
 
   (unwind-protect
       (progn

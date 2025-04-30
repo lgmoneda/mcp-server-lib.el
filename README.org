@@ -33,7 +33,9 @@ This library enables Emacs users and developers to create MCP servers that can p
 (mcp-start)
 
 ;; Register a tool
-(mcp-register-tool "tool-name" "Tool description" #'tool-handler-function)
+(mcp-register-tool #'tool-handler-function
+  :id "tool-name"
+  :description "Tool description")
 
 ;; Stop the MCP server
 (mcp-stop)
@@ -56,7 +58,9 @@ MCP Parameters:
   ;; Function implementation...
   )
 
-(mcp-register-tool "get-weather" "Get weather information" #'my-weather-handler)
+(mcp-register-tool #'my-weather-handler
+  :id "get-weather"
+  :description "Get weather information")
 #+end_src
 
 Note: Do not include the "MCP Parameters:" section if your tool handler doesn't take any arguments.
@@ -135,7 +139,9 @@ mcp.el uses a singleton server pattern:
 (mcp-start)
 
 ;; Register tools with the global server
-(mcp-register-tool "my-tool" "Tool description" #'my-handler-function)
+(mcp-register-tool #'my-handler-function
+  :id "my-tool"
+  :description "Tool description")
 
 ;; Stop the server when done
 (mcp-stop)

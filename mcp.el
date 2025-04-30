@@ -207,32 +207,45 @@ Extracts parameter descriptions from the docstring if available."
      (t
       (error "Only functions with zero or one argument are supported")))))
 
-(defun mcp-register-tool (tool-id tool-description handler)
+(defun mcp-register-tool (handler &rest properties)
   "Register a tool with the MCP server.
 
 Arguments:
-  TOOL-ID          String identifier for the tool (e.g., \"list-files\")
-  TOOL-DESCRIPTION String describing what the tool does
   HANDLER          Function to handle tool invocations
+  PROPERTIES       Property list with tool attributes
+
+Required properties:
+  :id              String identifier for the tool (e.g., \"list-files\")
+  :description     String describing what the tool does
 
 The HANDLER function's signature determines its input schema.
-Currently only no-argument handlers are supported.
+Currently only no-argument and single-argument handlers are supported.
 
 The handler should call (mcp-respond-with-result request-context result-data)
 to return information to the client.
 
 Example:
-  (mcp-register-tool
-    \"org-list-files\"
-    \"Lists all available Org mode files for task management\"
-    #\\='my-org-files-handler)"
-  (let* ((schema (mcp--generate-schema-from-function handler))
-         (tool (list :id tool-id
-                     :description tool-description
-                     :handler handler
-                     :schema schema)))
-    (puthash tool-id tool mcp--tools)
-    tool))
+  (mcp-register-tool #\\='my-org-files-handler
+    :id \"org-list-files\"
+    :description \"Lists all available Org mode files for task management\")"
+  (let* ((id (plist-get properties :id))
+         (description (plist-get properties :description)))
+    ;; Error checking for required properties
+    (unless (functionp handler)
+      (error "Tool registration requires handler function"))
+    (unless id
+      (error "Tool registration requires :id property"))
+    (unless description
+      (error "Tool registration requires :description property"))
+    ;; Generate schema from handler function
+    (let* ((schema (mcp--generate-schema-from-function handler))
+           (tool (list :id id
+                       :description description
+                       :handler handler
+                       :schema schema)))
+      ;; Register the tool
+      (puthash id tool mcp--tools)
+      tool)))
 
 (defun mcp-unregister-tool (tool-id)
   "Unregister a tool with ID TOOL-ID from the MCP server.
