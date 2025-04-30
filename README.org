@@ -42,6 +42,12 @@ This library enables Emacs users and developers to create MCP servers that can p
 (mcp-stop)
 #+end_src
 
+*** Tool Handlers
+
+Tool handler functions should:
+- Return an Elisp string for successful execution
+- Call `mcp-tool-throw` for error returns
+
 *** Tool Parameter Documentation
 
 When registering tools with MCP, you can provide parameter descriptions that will be included in the JSON Schema.
