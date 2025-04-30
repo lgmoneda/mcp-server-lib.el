@@ -432,7 +432,8 @@ Returns a JSON-RPC response string for the request."
            ;; Collect annotations if present
            (when tool-title
              (push (cons 'title tool-title) annotations))
-           ;; Add readOnlyHint when :read-only is explicitly provided (both t and nil)
+           ;; Add readOnlyHint when :read-only is explicitly provided (both t
+           ;; and nil)
            (when (plist-member tool :read-only)
              (let ((annot-value
                     (if tool-read-only
