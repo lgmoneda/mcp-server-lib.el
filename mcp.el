@@ -128,16 +128,15 @@ Example:
 
 ;;; Tools
 
-(defun mcp--extract-param-descriptions (func)
-  "Extract parameter descriptions from FUNC's docstring.
+(defun mcp--extract-param-descriptions (docstring arglist)
+  "Extract parameter descriptions from DOCSTRING based on ARGLIST.
 The docstring should contain an \"MCP Parameters:\" section at the end,
 with each parameter described as \"parameter-name - description\".
+ARGLIST should be the function's argument list.
 Returns an alist mapping parameter names to their descriptions.
 Signals an error if a parameter is described multiple times,
 doesn't match function arguments, or if any parameter is not documented."
-  (let ((docstring (documentation func))
-        (arglist (help-function-arglist func t))
-        (descriptions nil))
+  (let ((descriptions nil))
     (when docstring
       (when (string-match
              "MCP Parameters:[\n\r]+\\(\\(?:[ \t]+[^ \t\n\r].*[\n\r]*\\)*\\)"
@@ -182,8 +181,10 @@ doesn't match function arguments, or if any parameter is not documented."
 Returns a schema object suitable for tool registration.
 Supports functions with zero or one argument only.
 Extracts parameter descriptions from the docstring if available."
-  (let ((arglist (help-function-arglist func t))
-        (param-descriptions (mcp--extract-param-descriptions func)))
+  (let* ((arglist (help-function-arglist func t))
+         (docstring (documentation func))
+         (param-descriptions
+          (mcp--extract-param-descriptions docstring arglist)))
     (cond
      ;; No arguments case
      ((null arglist)
