@@ -103,6 +103,7 @@ handlers that have been registered with `mcp-register-tool'.
 
 Example:
   (mcp-start)"
+  (interactive)
   (when mcp--running
     (error "MCP server is already running, stop it first with `mcp-stop`"))
 
@@ -117,6 +118,7 @@ Stops the server and performs necessary cleanup.
 
 Example:
   (mcp-stop)"
+  (interactive)
   (unless mcp--running
     (error "MCP server is not running"))
 

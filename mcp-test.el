@@ -875,5 +875,10 @@ from a function loaded from bytecode rather than interpreted elisp."
       (when (file-exists-p bytecode-file)
         (delete-file bytecode-file)))))
 
+(ert-deftest mcp-test-interactive-commands ()
+  "Test that `mcp-start' and `mcp-stop' are interactive commands."
+  (should (commandp #'mcp-start))
+  (should (commandp #'mcp-stop)))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
