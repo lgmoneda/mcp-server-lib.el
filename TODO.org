@@ -143,7 +143,7 @@
 - [X] Add markdown linting for documentation files
 - [ ] Simplify Emacs test running in CI:
   - Update GitHub workflow elisp-test.yml to use simpler test command
-  - Use consistent test command in CI and CLAUDE.md: emacs -Q -batch -l mcp.el -l mcp-test.el --eval "(ert-run-tests-batch-and-exit)"
+  - Use consistent test command in CI and CLAUDE.md: emacs -Q --batch -l mcp.el -l mcp-test.el --eval "(ert-run-tests-batch-and-exit)"
 
 ** Documentation
 - [ ] Complete package documentation (similar to Python SDK's documentation)

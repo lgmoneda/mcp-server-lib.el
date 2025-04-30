@@ -14,7 +14,7 @@ with code in this repository.
 - Run single test:
 
   ```shell
-  emacs -Q -batch -l mcp.el -l mcp-test.el \
+  emacs -Q --batch -l mcp.el -l mcp-test.el \
         --eval "(ert-run-tests-batch-and-exit \"test-name\")"
   ```
 

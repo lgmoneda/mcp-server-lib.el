@@ -52,7 +52,7 @@ emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-
 }
 
 echo "Running all tests..."
-emacs -Q -batch -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)' || {
+emacs -Q --batch -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)' || {
 	echo "ERT tests failed"
 	ERRORS=$((ERRORS + 1))
 }
