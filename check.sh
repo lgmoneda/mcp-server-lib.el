@@ -9,7 +9,7 @@ echo "Checking Elisp syntax via byte compilation..."
 emacs -Q --batch \
 	--eval "(setq byte-compile-warnings nil)" \
 	--eval "(add-to-list 'load-path \".\")" \
-	--eval "(dolist (file '(\"mcp.el\" \"mcp-test.el\"))
+	--eval "(dolist (file '(\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\"))
       (message \"Checking syntax of %s...\" file)
       (if (not (byte-compile-file file))
           (kill-emacs 1)))" || {
@@ -20,12 +20,12 @@ emacs -Q --batch \
 # Only run indentation if there are no errors so far
 if [ $ERRORS -eq 0 ]; then
 	echo "Running elisp-autofmt on Elisp files..."
-	emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-autofmt-20250421.1112\")
+	emacs -Q --batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-autofmt-20250421.1112\")
 	                                      (expand-file-name \".\"))))
 	                     (dolist (dir pkg-dirs)
 	                       (add-to-list 'load-path dir))
 	                     (require 'elisp-autofmt)
-	                     (dolist (file '(\"mcp.el\" \"mcp-test.el\"))
+	                     (dolist (file '(\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\"))
 	                       (message \"Formatting %s...\" file)
 	                       (find-file file)
 	                       (elisp-autofmt-buffer-to-file)
@@ -38,7 +38,7 @@ else
 fi
 
 echo "Running elisp-lint on Emacs Lisp files..."
-emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
+emacs -Q --batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
                                       (locate-user-emacs-file \"elpa/package-lint-0.26\")
                                       (locate-user-emacs-file \"elpa/dash-20250312.1307\")
                                       (expand-file-name \".\"))))
@@ -46,7 +46,8 @@ emacs -batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-
                        (add-to-list 'load-path dir))
                      (require 'elisp-lint)
                      (elisp-lint-file \"mcp.el\")
-                     (elisp-lint-file \"mcp-test.el\"))" || {
+                     (elisp-lint-file \"mcp-test.el\")
+                     (elisp-lint-file \"mcp-test-bytecode-handler.el\"))" || {
 	echo "elisp-lint failed"
 	ERRORS=$((ERRORS + 1))
 }

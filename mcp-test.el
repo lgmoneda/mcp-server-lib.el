@@ -841,7 +841,7 @@ from a function loaded from bytecode rather than interpreted elisp."
           ;; Suppress byte-compiler warning about unknown function
           (with-no-warnings
             (mcp-register-tool
-             #'mcp-test--bytecode-handler
+             #'mcp-test-bytecode-handler--handler
              :id "bytecode-handler"
              :description "A tool with a handler loaded from bytecode"))
 
