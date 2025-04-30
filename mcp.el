@@ -136,7 +136,7 @@ Returns an alist mapping parameter names to their descriptions.
 Signals an error if a parameter is described multiple times,
 doesn't match function arguments, or if any parameter is not documented."
   (let ((docstring (documentation func))
-        (arglist (help-function-arglist func))
+        (arglist (help-function-arglist func t))
         (descriptions nil))
     (when docstring
       (when (string-match
@@ -182,7 +182,7 @@ doesn't match function arguments, or if any parameter is not documented."
 Returns a schema object suitable for tool registration.
 Supports functions with zero or one argument only.
 Extracts parameter descriptions from the docstring if available."
-  (let ((arglist (help-function-arglist func))
+  (let ((arglist (help-function-arglist func t))
         (param-descriptions (mcp--extract-param-descriptions func)))
     (cond
      ;; No arguments case

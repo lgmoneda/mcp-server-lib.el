@@ -823,5 +823,57 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
           (should (arrayp (alist-get 'tools result)))))
     (mcp-stop)))
 
+(ert-deftest mcp-test-schema-for-bytecode-handler ()
+  "Test schema generation for a handler loaded as bytecode.
+This test verifies that MCP can correctly extract parameter information
+from a function loaded from bytecode rather than interpreted elisp."
+  (let* ((source-file (expand-file-name "mcp-test-bytecode-handler.el"))
+         (bytecode-file (expand-file-name "mcp-test-bytecode-handler.elc")))
+    (should (file-exists-p source-file))
+    (byte-compile-file source-file)
+
+    (let ((load-prefer-newer nil))
+      (load bytecode-file nil t))
+
+    (mcp-start)
+    (unwind-protect
+        (progn
+          ;; Suppress byte-compiler warning about unknown function
+          (with-no-warnings
+            (mcp-register-tool
+             #'mcp-test--bytecode-handler
+             :id "bytecode-handler"
+             :description "A tool with a handler loaded from bytecode"))
+
+          (let* ((list-req
+                  (json-encode
+                   `(("jsonrpc" . "2.0")
+                     ("method" . "tools/list")
+                     ("id" . 123))))
+                 (list-response (mcp-process-jsonrpc list-req))
+                 (list-obj (json-read-from-string list-response))
+                 (tool-list (alist-get 'tools (alist-get 'result list-obj)))
+                 (tool (aref tool-list 0))
+                 (schema (alist-get 'inputSchema tool)))
+
+            (should (equal "object" (alist-get 'type schema)))
+            (should (alist-get 'properties schema))
+            (should (equal ["input-string"] (alist-get 'required schema)))
+
+            (let ((param-schema
+                   (alist-get 'input-string (alist-get 'properties schema))))
+              (should param-schema)
+              (should (equal "string" (alist-get 'type param-schema)))
+              (should
+               (equal
+                "Input string parameter for bytecode testing"
+                (alist-get 'description param-schema))))))
+
+      (mcp-stop)
+      (mcp-unregister-tool "bytecode-handler")
+
+      (when (file-exists-p bytecode-file)
+        (delete-file bytecode-file)))))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
