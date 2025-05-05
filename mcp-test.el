@@ -114,23 +114,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
         (should (eq t (alist-get 'listChanged tools-capability))))))
   (mcp-unregister-tool "test-tool"))
 
-;;; Transport Tests
-
-(ert-deftest mcp-test-stdio-transport ()
-  "Test the stdio transport using `mcp-process-jsonrpc`."
-  (mcp-test-with-server
-    ;; Test listing tools
-    (let* ((list-request
-            (json-encode
-             `(("jsonrpc" . "2.0")
-               ("method" . "tools/list")
-               ("id" . 1))))
-           (list-response (mcp-process-jsonrpc list-request))
-           (list-result
-            (alist-get
-             'result (json-read-from-string list-response))))
-      (should (arrayp (alist-get 'tools list-result))))))
-
 (ert-deftest mcp-test-initialize ()
   "Test the MCP initialize request handling."
   (mcp-test-with-server
@@ -163,7 +146,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
              (alist-get
               'name (alist-get 'serverInfo initialize-result))))
         (should (string= mcp--name server-name))))))
-
 
 (ert-deftest mcp-test-notifications-initialized-format ()
   "Test the MCP notifications/initialized format handling."

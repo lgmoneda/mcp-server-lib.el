@@ -156,7 +156,9 @@ Returns a JSON-RPC formatted response string, or nil for notifications."
      ;; Return error for non-2.0 requests
      ((not (equal jsonrpc "2.0"))
       (mcp--jsonrpc-error
-       id mcp--error-invalid-request "Invalid Request: Not JSON-RPC 2.0"))
+       id
+       mcp--error-invalid-request
+       "Invalid Request: Not JSON-RPC 2.0"))
 
      ;; Check if id is present for notifications/* methods
      ((and id is-notification)
@@ -206,7 +208,8 @@ Returns a JSON-RPC response string for the request."
          (let* ((tool-description (plist-get tool :description))
                 (tool-title (plist-get tool :title))
                 (tool-read-only (plist-get tool :read-only))
-                (tool-schema (or (plist-get tool :schema) '((type . "object"))))
+                (tool-schema
+                 (or (plist-get tool :schema) '((type . "object"))))
                 (tool-entry
                  `((name . ,id)
                    (description . ,tool-description)
@@ -226,7 +229,8 @@ Returns a JSON-RPC response string for the request."
            ;; Add annotations to tool entry if any exist
            (when annotations
              (setq tool-entry
-                   (append tool-entry `((annotations . ,annotations)))))
+                   (append
+                    tool-entry `((annotations . ,annotations)))))
            (setq tool-list (vconcat tool-list (vector tool-entry)))))
        mcp--tools)
       (mcp--jsonrpc-response id `((tools . ,tool-list)))))
@@ -242,26 +246,30 @@ Returns a JSON-RPC response string for the request."
           (let ((handler (plist-get tool :handler))
                 (context (list :id id)))
             (condition-case err
-                (let* ((result
-                        ;; Pass first arg value for single-string-arg tools
-                        ;; when arguments are present
-                        (if (and tool-args (not (equal tool-args '())))
-                            (let ((first-arg-value (cdr (car tool-args))))
-                              (funcall handler first-arg-value))
-                          (funcall handler)))
-                       ;; Wrap the handler result in the MCP format
-                       (formatted-result
-                        `((content
-                           .
-                           ,(vector `((type . "text") (text . ,result))))
-                          (isError . :json-false))))
+                (let*
+                    ((result
+                      ;; Pass first arg value for single-string-arg tools
+                      ;; when arguments are present
+                      (if (and tool-args (not (equal tool-args '())))
+                          (let ((first-arg-value
+                                 (cdr (car tool-args))))
+                            (funcall handler first-arg-value))
+                        (funcall handler)))
+                     ;; Wrap the handler result in the MCP format
+                     (formatted-result
+                      `((content
+                         .
+                         ,(vector
+                           `((type . "text") (text . ,result))))
+                        (isError . :json-false))))
                   (mcp--respond-with-result context formatted-result))
               ;; Handle tool-specific errors thrown with mcp-tool-throw
               (mcp-tool-error
                (let ((formatted-error
                       `((content
                          .
-                         ,(vector `((type . "text") (text . ,(cadr err)))))
+                         ,(vector
+                           `((type . "text") (text . ,(cadr err)))))
                         (isError . t))))
                  (mcp--respond-with-result context formatted-error)))
               ;; Keep existing handling for all other errors
@@ -277,7 +285,9 @@ Returns a JSON-RPC response string for the request."
    ;; Method not found
    (t
     (mcp--jsonrpc-error
-     id mcp--error-method-not-found (format "Method not found: %s" method)))))
+     id
+     mcp--error-method-not-found
+     (format "Method not found: %s" method)))))
 
 ;;; Notification handlers
 
@@ -299,7 +309,8 @@ version and capabilities between the client and server."
     (mcp--jsonrpc-response
      id
      `((protocolVersion . ,mcp--protocol-version)
-       (serverInfo . ((name . ,mcp--name) (version . ,mcp--protocol-version)))
+       (serverInfo
+        . ((name . ,mcp--name) (version . ,mcp--protocol-version)))
        ;; Format server capabilities according to MCP spec
        (capabilities
         .
@@ -326,9 +337,10 @@ Signals an error if a parameter is described multiple times,
 doesn't match function arguments, or if any parameter is not documented."
   (let ((descriptions nil))
     (when docstring
-      (when (string-match
-             "MCP Parameters:[\n\r]+\\(\\(?:[ \t]+[^ \t\n\r].*[\n\r]*\\)*\\)"
-             docstring)
+      (when
+          (string-match
+           "MCP Parameters:[\n\r]+\\(\\(?:[ \t]+[^ \t\n\r].*[\n\r]*\\)*\\)"
+           docstring)
         (let ((params-text (match-string 1 docstring))
               (param-regex
                "[ \t]+\\([^ \t\n\r]+\\)[ \t]*-[ \t]*\\(.*\\)[\n\r]*"))
@@ -341,18 +353,20 @@ doesn't match function arguments, or if any parameter is not documented."
                 ;; Check for duplicate parameter names
                 (when (assoc param-name descriptions)
                   (error
-                   "Duplicate parameter '%s' in MCP Parameters" param-name))
+                   "Duplicate parameter '%s' in MCP Parameters"
+                   param-name))
                 ;; Check parameter name matches function arguments
                 (unless (and (= 1 (length arglist))
                              (symbolp (car arglist))
-                             (string= param-name (symbol-name (car arglist))))
+                             (string=
+                              param-name (symbol-name (car arglist))))
                   (error
                    "Parameter '%s' in MCP Parameters not in function args %S"
                    param-name
                    arglist))
                 ;; Add to descriptions
-                (push
-                 (cons param-name (string-trim param-desc)) descriptions))))))
+                (push (cons param-name (string-trim param-desc))
+                      descriptions))))))
       ;; Check that all function parameters have descriptions
       (when (and (= 1 (length arglist))
                  (symbolp (car arglist))
@@ -397,7 +411,8 @@ Extracts parameter descriptions from the docstring if available."
 
      ;; Everything else is unsupported
      (t
-      (error "Only functions with zero or one argument are supported")))))
+      (error
+       "Only functions with zero or one argument are supported")))))
 
 ;;; API - Server
 
@@ -445,7 +460,8 @@ Example:
    \"{\\\"jsonrpc\\\":\\\"2.0\\\",
      \\\"method\\\":\\\"mcp.server.describe\\\",\\\"id\\\":1}\")"
   (unless mcp--running
-    (error "No active MCP server, start server with `mcp-start' first"))
+    (error
+     "No active MCP server, start server with `mcp-start' first"))
 
   (mcp--log-json-rpc "in" json-string)
 
@@ -460,11 +476,13 @@ Example:
        (setq response
              (mcp--jsonrpc-error
               nil mcp--error-parse
-              (format "Parse error: %s" (error-message-string json-err))))))
+              (format "Parse error: %s"
+                      (error-message-string json-err))))))
     ;; Step 2: Process the request if JSON parsing succeeded
     (unless response
       (condition-case err
-          (setq response (mcp--validate-and-dispatch-request json-object))
+          (setq response
+                (mcp--validate-and-dispatch-request json-object))
         (error (setq response (mcp--handle-error err)))))
 
     ;; Only log and return responses when they exist (not for notifications)
@@ -478,7 +496,9 @@ Example:
   "Create a tools/list JSON-RPC request with optional ID.
 If ID is not provided, it defaults to 1."
   (json-encode
-   `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . ,(or id 1)))))
+   `(("jsonrpc" . "2.0")
+     ("method" . "tools/list")
+     ("id" . ,(or id 1)))))
 
 ;;; API - Tools
 
