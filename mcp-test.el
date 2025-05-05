@@ -194,7 +194,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-test-with-server
     (let* ((response
             (mcp-process-jsonrpc
-             (mcp-test--tools-call-request 11 "failing-tool")))
+             (mcp-create-tools-call-request "failing-tool" 11)))
            (response-obj (json-read-from-string response))
            (result (alist-get 'result response-obj)))
       ;; Check for proper MCP format
@@ -229,7 +229,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-test-with-server
     (let* ((response
             (mcp-process-jsonrpc
-             (mcp-test--tools-call-request 12 "generic-error-tool")))
+             (mcp-create-tools-call-request "generic-error-tool" 12)))
            (response-obj (json-read-from-string response))
            ;; Should have error field at the top level of the response
            (error-obj (alist-get 'error response-obj)))
@@ -341,6 +341,55 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     (should (equal "2.0" (alist-get 'jsonrpc parsed)))
     (should (equal "tools/list" (alist-get 'method parsed)))
     (should (equal 1 (alist-get 'id parsed)))))
+
+(ert-deftest mcp-test-create-tools-call-request-with-id-and-args ()
+  "Test `mcp-create-tools-call-request' with specified ID and arguments."
+  (let* ((tool-name "test-tool")
+         (id 42)
+         (args '(("arg1" . "value1") ("arg2" . "value2")))
+         (request (mcp-create-tools-call-request tool-name id args))
+         (parsed (json-read-from-string request))
+         (params (alist-get 'params parsed)))
+    ;; Verify basic JSON-RPC structure
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "tools/call" (alist-get 'method parsed)))
+    (should (equal id (alist-get 'id parsed)))
+    ;; Verify params structure
+    (should params)
+    (should (equal tool-name (alist-get 'name params)))
+    (should (alist-get 'arguments params))
+    (should
+     (equal "value1" (alist-get 'arg1 (alist-get 'arguments params))))
+    (should
+     (equal
+      "value2" (alist-get 'arg2 (alist-get 'arguments params))))))
+
+(ert-deftest mcp-test-create-tools-call-request-default-id ()
+  "Test `mcp-create-tools-call-request' with default ID."
+  (let* ((tool-name "test-tool")
+         (request (mcp-create-tools-call-request tool-name))
+         (parsed (json-read-from-string request))
+         (params (alist-get 'params parsed)))
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "tools/call" (alist-get 'method parsed)))
+    (should (equal 1 (alist-get 'id parsed)))
+    (should params)
+    (should (equal tool-name (alist-get 'name params)))
+    (should (equal '() (alist-get 'arguments params)))))
+
+(ert-deftest mcp-test-create-tools-call-request-with-empty-args ()
+  "Test `mcp-create-tools-call-request' with empty arguments list."
+  (let* ((tool-name "test-tool")
+         (id 43)
+         (request (mcp-create-tools-call-request tool-name id '()))
+         (parsed (json-read-from-string request))
+         (params (alist-get 'params parsed)))
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "tools/call" (alist-get 'method parsed)))
+    (should (equal id (alist-get 'id parsed)))
+    (should params)
+    (should (equal tool-name (alist-get 'name params)))
+    (should (equal '() (alist-get 'arguments params)))))
 
 (ert-deftest mcp-test-missing-id-error ()
   "Test that tool registration with missing :id produces an error."
@@ -472,14 +521,6 @@ INPUT-STRING is the string argument.
 MCP Parameters:"
   (concat "Test: " input-string))
 
-(defun mcp-test--tools-call-request (id tool-name &optional args)
-  "Create a tools/call JSON-RPC request with ID for TOOL-NAME.
-Optional ARGS is an association list of tool arguments."
-  (json-encode
-   `(("jsonrpc" . "2.0")
-     ("method" . "tools/call") ("id" . ,id)
-     ("params" .
-      (("name" . ,tool-name) ("arguments" . ,(or args '())))))))
 
 (defun mcp-test--check-mcp-content-format (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT.
@@ -508,7 +549,7 @@ Verifies that result has a content array with a proper text item."
   (mcp-test-with-server
     (let* ((response
             (mcp-process-jsonrpc
-             (mcp-test--tools-call-request 9 "string-list-tool")))
+             (mcp-create-tools-call-request "string-list-tool" 9)))
            (response-obj (json-read-from-string response))
            (result (alist-get 'result response-obj)))
       (should result)
@@ -539,7 +580,8 @@ Verifies that result has a content array with a proper text item."
       (should (equal '((type . "object")) schema)))
 
     ;; Then test the actual tool execution
-    (let* ((req (mcp-test--tools-call-request 10 "empty-string-tool"))
+    (let* ((req
+            (mcp-create-tools-call-request "empty-string-tool" 10))
            (response (mcp-process-jsonrpc req))
            (response-obj (json-read-from-string response))
            (result (alist-get 'result response-obj)))
@@ -592,7 +634,7 @@ Verifies that result has a content array with a proper text item."
     (let* ((test-input "Hello, world!")
            (args `(("input" . ,test-input)))
            (req
-            (mcp-test--tools-call-request 13 "string-arg-tool" args))
+            (mcp-create-tools-call-request "string-arg-tool" 13 args))
            (response (mcp-process-jsonrpc req))
            (response-obj (json-read-from-string response))
            (result (alist-get 'result response-obj)))

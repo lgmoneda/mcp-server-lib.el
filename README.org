@@ -140,6 +140,22 @@ MCP provides utility functions for creating standard JSON-RPC requests:
 (defun mcp-create-tools-list-request (&optional id)
   "Create a tools/list JSON-RPC request with optional ID.
 If ID is not provided, it defaults to 1.")
+
+(defun mcp-create-tools-call-request (tool-name &optional id args)
+  "Create a tools/call JSON-RPC request for TOOL-NAME with optional ID and ARGS.
+TOOL-NAME is the registered identifier of the tool to call.
+ID is the JSON-RPC request ID, defaults to 1 if not provided.
+ARGS is an association list of arguments to pass to the tool.")
+#+end_src
+
+Example of tool call request with arguments:
+
+#+begin_src elisp
+;; Call a tool with arguments
+(mcp-create-tools-call-request 
+  "get-weather" 
+  42 
+  '(("location" . "New York")))
 #+end_src
 
 This is primarily useful for writing tests in the packages using mcp.el.

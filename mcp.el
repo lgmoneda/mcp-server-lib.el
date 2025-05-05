@@ -500,6 +500,20 @@ If ID is not provided, it defaults to 1."
      ("method" . "tools/list")
      ("id" . ,(or id 1)))))
 
+(defun mcp-create-tools-call-request (tool-name &optional id args)
+  "Create a tools/call JSON-RPC request for TOOL-NAME with optional ID and ARGS.
+TOOL-NAME is the registered identifier of the tool to call.
+ID is the JSON-RPC request ID, defaults to 1 if not provided.
+ARGS is an association list of arguments to pass to the tool.
+
+Example:
+  (mcp-create-tools-call-request \"list-files\" 42 \\='((\"path\" . \"/tmp\")))"
+  (json-encode
+   `(("jsonrpc" . "2.0")
+     ("method" . "tools/call") ("id" . ,(or id 1))
+     ("params" .
+      (("name" . ,tool-name) ("arguments" . ,(or args '())))))))
+
 ;;; API - Tools
 
 (defun mcp-register-tool (handler &rest properties)
