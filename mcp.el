@@ -51,10 +51,10 @@
 (defvar mcp--tools (make-hash-table :test 'equal)
   "Hash table of registered MCP tools.")
 
-(defvar mcp--name "emacs-mcp"
+(defconst mcp--name "emacs-mcp"
   "Name of the MCP server.")
 
-(defvar mcp--protocol-version "2024-11-05"
+(defconst mcp--protocol-version "2024-11-05"
   "Current MCP protocol version supported by this server.
 Uses date-based versioning format to match current MCP practices.")
 
