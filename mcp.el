@@ -46,6 +46,18 @@
 
 ;;; Constants
 
+(defconst mcp--error-parse -32700
+  "Error code for Parse Error.")
+
+(defconst mcp--error-invalid-request -32600
+  "Error code for Invalid Request.")
+
+(defconst mcp--error-method-not-found -32601
+  "Error code for Method Not Found.")
+
+(defconst mcp--error-internal -32603
+  "Error code for Internal Error.")
+
 (defconst mcp--name "emacs-mcp"
   "Name of the MCP server.")
 
@@ -61,10 +73,20 @@ Uses date-based versioning format to match current MCP practices.")
 (defvar mcp--tools (make-hash-table :test 'equal)
   "Hash table of registered MCP tools.")
 
+;;; Core helpers
 
-;;; Core Functions
+(defun mcp--jsonrpc-response (id result)
+  "Create a JSON-RPC response with ID and RESULT."
+  (json-encode `((jsonrpc . "2.0") (id . ,id) (result . ,result))))
 
-(defun mcp-respond-with-result (request-context result-data)
+(defun mcp--jsonrpc-error (id code message)
+  "Create a JSON-RPC error response with ID, error CODE and MESSAGE."
+  (json-encode
+   `((jsonrpc . "2.0")
+     (id . ,id)
+     (error . ((code . ,code) (message . ,message))))))
+
+(defun mcp--respond-with-result (request-context result-data)
   "Send RESULT-DATA as response to the client through REQUEST-CONTEXT.
 
 Arguments:
@@ -76,60 +98,223 @@ The RESULT-DATA will be automatically converted to JSON-compatible format:
   - Symbols are converted to strings
   - Lists are converted to JSON arrays
   - Alists with string keys are converted to JSON objects
-  - Other Elisp types are stringified appropriately
-
-This function should be called exactly once per request handler invocation
-to provide the response data to the client.
-
-Example:
-  (defun my-weather-handler (request-context tool-args)
-    (let ((location (alist-get \\='location tool-args)))
-      (mcp-respond-with-result
-        request-context
-        `((temperature . 72)
-          (conditions . \"sunny\")
-          (location . ,location)))))"
+  - Other Elisp types are stringified appropriately"
   (let ((id (plist-get request-context :id)))
     (mcp--jsonrpc-response id result-data)))
 
-;;; Server
+(defun mcp--log-json-rpc (direction json-message)
+  "Log JSON-RPC message in DIRECTION with JSON-MESSAGE.
+DIRECTION should be \"in\" for incoming, \"out\" for outgoing."
+  (when mcp-log-io
+    (let ((buffer (get-buffer-create "*mcp-log*"))
+          (direction-prefix
+           (if (string= direction "in")
+               "->"
+             "<-"))
+          (direction-name
+           (if (string= direction "in")
+               "(request)"
+             "(response)")))
+      (with-current-buffer buffer
+        (goto-char (point-max))
+        (let ((inhibit-read-only t))
+          (view-mode 1)
+          (insert
+           (format "%s %s [%s]\n"
+                   direction-prefix
+                   direction-name
+                   json-message)))))))
 
-(defun mcp-start ()
-  "Start the MCP server and begin handling client requests.
+(defun mcp--handle-error (err)
+  "Handle error ERR in MCP process by logging and creating an error response.
+Returns a JSON-RPC error response string for internal errors."
+  (mcp--jsonrpc-error
+   nil
+   mcp--error-internal
+   (format "Internal error: %s" (error-message-string err))))
 
-This function starts the MCP server that can process JSON-RPC
-requests via `mcp-process-jsonrpc`.  Once started, the server
-will dispatch incoming requests to the appropriate tool
-handlers that have been registered with `mcp-register-tool'.
+(defun mcp--validate-and-dispatch-request (request)
+  "Process a JSON-RPC REQUEST object and validate JSON-RPC 2.0 compliance.
 
-Example:
-  (mcp-start)"
-  (interactive)
-  (when mcp--running
-    (error "MCP server is already running, stop it first with `mcp-stop`"))
+REQUEST is a parsed JSON object (alist) containing the JSON-RPC request fields.
 
-  ;; Mark server as running
-  (setq mcp--running t)
-  t)
+The function performs JSON-RPC 2.0 validation, checking:
+- Protocol version (must be \"2.0\")
+- ID field presence (required for regular requests, forbidden for notifications)
+- Method field presence (always required)
 
-(defun mcp-stop ()
-  "Stop the MCP server and release all associated resources.
+If validation succeeds, dispatches the request to the appropriate handler.
+Returns a JSON-RPC formatted response string, or nil for notifications."
+  (let* ((jsonrpc (alist-get 'jsonrpc request))
+         (id (alist-get 'id request))
+         (method (alist-get 'method request))
+         (params (alist-get 'params request))
+         (is-notification
+          (and method (string-prefix-p "notifications/" method))))
+    ;; Check for JSON-RPC 2.0 compliance first
+    (cond
+     ;; Return error for non-2.0 requests
+     ((not (equal jsonrpc "2.0"))
+      (mcp--jsonrpc-error
+       id mcp--error-invalid-request "Invalid Request: Not JSON-RPC 2.0"))
 
-Stops the server and performs necessary cleanup.
+     ;; Check if id is present for notifications/* methods
+     ((and id is-notification)
+      (mcp--jsonrpc-error
+       nil
+       mcp--error-invalid-request
+       "Invalid Request: Notifications must not include 'id' field"))
+     ;; Check if id is missing
+     ((and (not id) (not is-notification))
+      (mcp--jsonrpc-error
+       nil
+       mcp--error-invalid-request
+       "Invalid Request: Missing required 'id' field"))
+     ;; Check if method is missing
+     ((not method)
+      (mcp--jsonrpc-error
+       id
+       mcp--error-invalid-request
+       "Invalid Request: Missing required 'method' field"))
 
-Example:
-  (mcp-stop)"
-  (interactive)
-  (unless mcp--running
-    (error "MCP server is not running"))
+     ;; Process valid request
+     (t
+      (mcp--dispatch-jsonrpc-method id method params)))))
 
-  ;; Mark server as not running
-  (setq mcp--running nil)
-  t)
+(defun mcp--dispatch-jsonrpc-method (id method params)
+  "Dispatch a JSON-RPC request to the appropriate handler.
+ID is the JSON-RPC request ID to use in response.
+METHOD is the JSON-RPC method name to dispatch.
+PARAMS is the JSON-RPC params object from the request.
+Returns a JSON-RPC response string for the request."
+  (cond
+   ;; Initialize handshake
+   ((equal method "initialize")
+    (mcp--handle-initialize id))
+   ;; Notifications/initialized format
+   ((equal method "notifications/initialized")
+    (mcp--handle-initialized)
+    nil)
+   ;; Notifications/cancelled format
+   ((equal method "notifications/cancelled")
+    nil)
+   ;; List available tools
+   ((equal method "tools/list")
+    (let ((tool-list (vector)))
+      (maphash
+       (lambda (id tool)
+         (let* ((tool-description (plist-get tool :description))
+                (tool-title (plist-get tool :title))
+                (tool-read-only (plist-get tool :read-only))
+                (tool-schema (or (plist-get tool :schema) '((type . "object"))))
+                (tool-entry
+                 `((name . ,id)
+                   (description . ,tool-description)
+                   (inputSchema . ,tool-schema)))
+                (annotations nil))
+           ;; Collect annotations if present
+           (when tool-title
+             (push (cons 'title tool-title) annotations))
+           ;; Add readOnlyHint when :read-only is explicitly provided (both t
+           ;; and nil)
+           (when (plist-member tool :read-only)
+             (let ((annot-value
+                    (if tool-read-only
+                        t
+                      :json-false)))
+               (push (cons 'readOnlyHint annot-value) annotations)))
+           ;; Add annotations to tool entry if any exist
+           (when annotations
+             (setq tool-entry
+                   (append tool-entry `((annotations . ,annotations)))))
+           (setq tool-list (vconcat tool-list (vector tool-entry)))))
+       mcp--tools)
+      (mcp--jsonrpc-response id `((tools . ,tool-list)))))
+   ;; List available prompts
+   ((equal method "prompts/list")
+    (mcp--jsonrpc-response id `((prompts . ,(vector)))))
+   ;; Tool invocation
+   ((equal method "tools/call")
+    (let* ((tool-name (alist-get 'name params))
+           (tool (gethash tool-name mcp--tools))
+           (tool-args (alist-get 'arguments params)))
+      (if tool
+          (let ((handler (plist-get tool :handler))
+                (context (list :id id)))
+            (condition-case err
+                (let* ((result
+                        ;; Pass first arg value for single-string-arg tools
+                        ;; when arguments are present
+                        (if (and tool-args (not (equal tool-args '())))
+                            (let ((first-arg-value (cdr (car tool-args))))
+                              (funcall handler first-arg-value))
+                          (funcall handler)))
+                       ;; Wrap the handler result in the MCP format
+                       (formatted-result
+                        `((content
+                           .
+                           ,(vector `((type . "text") (text . ,result))))
+                          (isError . :json-false))))
+                  (mcp--respond-with-result context formatted-result))
+              ;; Handle tool-specific errors thrown with mcp-tool-throw
+              (mcp-tool-error
+               (let ((formatted-error
+                      `((content
+                         .
+                         ,(vector `((type . "text") (text . ,(cadr err)))))
+                        (isError . t))))
+                 (mcp--respond-with-result context formatted-error)))
+              ;; Keep existing handling for all other errors
+              (error
+               (mcp--jsonrpc-error
+                id mcp--error-internal
+                (format "Internal error executing tool: %s"
+                        (error-message-string err))))))
+        (mcp--jsonrpc-error
+         id
+         mcp--error-invalid-request
+         (format "Tool not found: %s" tool-name)))))
+   ;; Method not found
+   (t
+    (mcp--jsonrpc-error
+     id mcp--error-method-not-found (format "Method not found: %s" method)))))
 
-;;; Resources
+;;; Notification handlers
 
-;;; Tools
+(defun mcp--handle-initialize (id)
+  "Handle initialize request with ID.
+
+This implements the MCP initialize handshake, which negotiates protocol
+version and capabilities between the client and server."
+  ;; TODO: Add proper protocol version compatibility check
+  ;; For now, accept any protocol version for compatibility
+
+  ;; Determine if we need to include tools capabilities
+  ;; Include listChanged:true when tools are registered
+  (let ((tools-capability
+         (if (> (hash-table-count mcp--tools) 0)
+             '((listChanged . t))
+           (make-hash-table))))
+    ;; Respond with server capabilities
+    (mcp--jsonrpc-response
+     id
+     `((protocolVersion . ,mcp--protocol-version)
+       (serverInfo . ((name . ,mcp--name) (version . ,mcp--protocol-version)))
+       ;; Format server capabilities according to MCP spec
+       (capabilities
+        .
+        ((tools . ,tools-capability)
+         (resources . ,(make-hash-table))
+         (prompts . ,(make-hash-table))))))))
+
+(defun mcp--handle-initialized ()
+  "Handle initialized notification from client.
+
+This is called after successful initialization to complete the handshake.
+The client sends this notification to acknowledge the server's response
+to the initialize request.")
+
+;;; Tool helpers
 
 (defun mcp--extract-param-descriptions (docstring arglist)
   "Extract parameter descriptions from DOCSTRING based on ARGLIST.
@@ -214,6 +399,81 @@ Extracts parameter descriptions from the docstring if available."
      (t
       (error "Only functions with zero or one argument are supported")))))
 
+;;; API - Server
+
+(defun mcp-start ()
+  "Start the MCP server and begin handling client requests.
+
+This function starts the MCP server that can process JSON-RPC
+requests via `mcp-process-jsonrpc'.  Once started, the server
+will dispatch incoming requests to the appropriate tool
+handlers that have been registered with `mcp-register-tool'."
+  (interactive)
+  (when mcp--running
+    (error "MCP server is already running"))
+
+  (setq mcp--running t))
+
+(defun mcp-stop ()
+  "Stop the MCP server from processing client requests.
+
+Sets the server state to stopped, which prevents further processing of
+client requests.  Note that this does not release any resources or unregister
+tools, it simply prevents `mcp-process-jsonrpc' from accepting new requests."
+  (interactive)
+  (unless mcp--running
+    (error "MCP server is not running"))
+
+  ;; Mark server as not running
+  (setq mcp--running nil)
+  t)
+
+;;; API - Transport
+
+(defun mcp-process-jsonrpc (json-string)
+  "Process a JSON-RPC message JSON-STRING and return the response.
+This is the main entry point for stdio transport in MCP.
+
+The function accepts a JSON-RPC 2.0 message string and returns
+a JSON-RPC response string suitable for returning to clients via stdout.
+
+When using the MCP server with emacsclient, invoke this function like:
+emacsclient -e \\='(mcp-process-jsonrpc \"[JSON-RPC message]\")\\='
+
+Example:
+  (mcp-process-jsonrpc
+   \"{\\\"jsonrpc\\\":\\\"2.0\\\",
+     \\\"method\\\":\\\"mcp.server.describe\\\",\\\"id\\\":1}\")"
+  (unless mcp--running
+    (error "No active MCP server, start server with `mcp-start' first"))
+
+  (mcp--log-json-rpc "in" json-string)
+
+  ;; Step 1: Try to parse the JSON, handle parsing errors
+  (let ((json-object nil)
+        (response nil))
+    ;; Attempt to parse the JSON
+    (condition-case json-err
+        (setq json-object (json-read-from-string json-string))
+      (json-error
+       ;; If JSON parsing fails, create a parse error response
+       (setq response
+             (mcp--jsonrpc-error
+              nil mcp--error-parse
+              (format "Parse error: %s" (error-message-string json-err))))))
+    ;; Step 2: Process the request if JSON parsing succeeded
+    (unless response
+      (condition-case err
+          (setq response (mcp--validate-and-dispatch-request json-object))
+        (error (setq response (mcp--handle-error err)))))
+
+    ;; Only log and return responses when they exist (not for notifications)
+    (when response
+      (mcp--log-json-rpc "out" response))
+    response))
+
+;;; API - Tools
+
 (defun mcp-register-tool (handler &rest properties)
   "Register a tool with the MCP server.
 
@@ -231,9 +491,6 @@ Optional properties:
 
 The HANDLER function's signature determines its input schema.
 Currently only no-argument and single-argument handlers are supported.
-
-The handler should call (mcp-respond-with-result request-context result-data)
-to return information to the client.
 
 Example:
   (mcp-register-tool #\\='my-org-files-handler
@@ -289,25 +546,7 @@ Example:
     (remhash tool-id mcp--tools)
     t))
 
-;;; Prompts
-
-(defvar mcp--prompts (make-hash-table :test 'equal)
-  "Hash table of registered MCP prompts.")
-
-;; Standard error codes as defined by the MCP
-(defconst mcp--error-parse -32700
-  "Error code for Parse Error.")
-
-(defconst mcp--error-invalid-request -32600
-  "Error code for Invalid Request.")
-
-(defconst mcp--error-method-not-found -32601
-  "Error code for Method Not Found.")
-
-(defconst mcp--error-internal -32603
-  "Error code for Internal Error.")
-
-;; Define custom error type for tool errors
+;; Custom error type for tool errors
 (define-error 'mcp-tool-error "MCP tool error" 'user-error)
 
 (defun mcp-tool-throw (error-message)
@@ -317,273 +556,6 @@ The error will be properly formatted and sent to the client.
 Arguments:
   ERROR-MESSAGE  String describing the error"
   (signal 'mcp-tool-error (list error-message)))
-
-;;; Logging
-
-(defun mcp--log-json-rpc (direction json-message)
-  "Log JSON-RPC message in DIRECTION with JSON-MESSAGE.
-DIRECTION should be \"in\" for incoming, \"out\" for outgoing."
-  (when mcp-log-io
-    (let ((buffer (get-buffer-create "*mcp-log*"))
-          (direction-prefix
-           (if (string= direction "in")
-               "->"
-             "<-"))
-          (direction-name
-           (if (string= direction "in")
-               "(request)"
-             "(response)")))
-      (with-current-buffer buffer
-        (goto-char (point-max))
-        (let ((inhibit-read-only t))
-          (view-mode 1)
-          (insert
-           (format "%s %s [%s]\n"
-                   direction-prefix
-                   direction-name
-                   json-message)))))))
-
-;;; Transport Layer
-
-;;;; Stdio Transport
-
-(defun mcp-process-jsonrpc (json-string)
-  "Process a JSON-RPC message JSON-STRING and return the response.
-This is the main entry point for stdio transport in MCP.
-
-The function accepts a JSON-RPC 2.0 message string and returns
-a JSON-RPC response string suitable for returning to clients via stdout.
-
-When using the MCP server with emacsclient, invoke this function like:
-emacsclient -e \\='(mcp-process-jsonrpc \"[JSON-RPC message]\")\\='
-
-Example:
-  (mcp-process-jsonrpc
-   \"{\\\"jsonrpc\\\":\\\"2.0\\\",
-     \\\"method\\\":\\\"mcp.server.describe\\\",\\\"id\\\":1}\")"
-  (unless mcp--running
-    (error "No active MCP server, start server with `mcp-start` first"))
-
-  (mcp--log-json-rpc "in" json-string)
-
-  ;; Step 1: Try to parse the JSON, handle parsing errors
-  (let ((json-object nil)
-        (response nil))
-    ;; Attempt to parse the JSON
-    (condition-case json-err
-        (setq json-object (json-read-from-string json-string))
-      (json-error
-       ;; If JSON parsing fails, create a parse error response
-       (setq response
-             (mcp--jsonrpc-error
-              nil mcp--error-parse
-              (format "Parse error: %s" (error-message-string json-err))))))
-    ;; Step 2: Process the request if JSON parsing succeeded
-    (unless response
-      (condition-case err
-          (setq response (mcp--handle-jsonrpc-request-internal json-object))
-        (error (setq response (mcp--handle-error err)))))
-
-    ;; Only log and return responses when they exist (not for notifications)
-    (when response
-      (mcp--log-json-rpc "out" response))
-    response))
-
-(defun mcp--handle-error (err)
-  "Handle error ERR in MCP process by logging and creating an error response.
-Returns a JSON-RPC error response string for internal errors."
-  (mcp--jsonrpc-error
-   nil
-   mcp--error-internal
-   (format "Internal error: %s" (error-message-string err))))
-
-;;; JSON-RPC Handling
-
-(defun mcp--dispatch-jsonrpc-method (id method params)
-  "Dispatch a JSON-RPC request to the appropriate handler.
-ID is the JSON-RPC request ID to use in response.
-METHOD is the JSON-RPC method name to dispatch.
-PARAMS is the JSON-RPC params object from the request.
-Returns a JSON-RPC response string for the request."
-  (cond
-   ;; Initialize handshake
-   ((equal method "initialize")
-    (mcp--handle-initialize id))
-   ;; Notifications/initialized format
-   ((equal method "notifications/initialized")
-    (mcp--handle-initialized)
-    nil)
-   ;; Notifications/cancelled format
-   ((equal method "notifications/cancelled")
-    nil)
-   ;; List available tools
-   ((equal method "tools/list")
-    (let ((tool-list (vector)))
-      (maphash
-       (lambda (id tool)
-         (let* ((tool-description (plist-get tool :description))
-                (tool-title (plist-get tool :title))
-                (tool-read-only (plist-get tool :read-only))
-                (tool-schema (or (plist-get tool :schema) '((type . "object"))))
-                (tool-entry
-                 `((name . ,id)
-                   (description . ,tool-description)
-                   (inputSchema . ,tool-schema)))
-                (annotations nil))
-           ;; Collect annotations if present
-           (when tool-title
-             (push (cons 'title tool-title) annotations))
-           ;; Add readOnlyHint when :read-only is explicitly provided (both t
-           ;; and nil)
-           (when (plist-member tool :read-only)
-             (let ((annot-value
-                    (if tool-read-only
-                        t
-                      :json-false)))
-               (push (cons 'readOnlyHint annot-value) annotations)))
-           ;; Add annotations to tool entry if any exist
-           (when annotations
-             (setq tool-entry
-                   (append tool-entry `((annotations . ,annotations)))))
-           (setq tool-list (vconcat tool-list (vector tool-entry)))))
-       mcp--tools)
-      (mcp--jsonrpc-response id `((tools . ,tool-list)))))
-   ;; List available prompts
-   ((equal method "prompts/list")
-    (mcp--jsonrpc-response id `((prompts . ,(vector)))))
-   ;; Tool invocation
-   ((equal method "tools/call")
-    (let* ((tool-name (alist-get 'name params))
-           (tool (gethash tool-name mcp--tools))
-           (tool-args (alist-get 'arguments params)))
-      (if tool
-          (let ((handler (plist-get tool :handler))
-                (context (list :id id)))
-            (condition-case err
-                (let* ((result
-                        ;; Pass first arg value for single-string-arg tools
-                        ;; when arguments are present
-                        (if (and tool-args (not (equal tool-args '())))
-                            (let ((first-arg-value (cdr (car tool-args))))
-                              (funcall handler first-arg-value))
-                          (funcall handler)))
-                       ;; Wrap the handler result in the MCP format
-                       (formatted-result
-                        `((content
-                           .
-                           ,(vector `((type . "text") (text . ,result))))
-                          (isError . :json-false))))
-                  (mcp-respond-with-result context formatted-result))
-              ;; Handle tool-specific errors thrown with mcp-tool-throw
-              (mcp-tool-error
-               (let ((formatted-error
-                      `((content
-                         .
-                         ,(vector `((type . "text") (text . ,(cadr err)))))
-                        (isError . t))))
-                 (mcp-respond-with-result context formatted-error)))
-              ;; Keep existing handling for all other errors
-              (error
-               (mcp--jsonrpc-error
-                id mcp--error-internal
-                (format "Internal error executing tool: %s"
-                        (error-message-string err))))))
-        (mcp--jsonrpc-error
-         id
-         mcp--error-invalid-request
-         (format "Tool not found: %s" tool-name)))))
-   ;; Method not found
-   (t
-    (mcp--jsonrpc-error
-     id mcp--error-method-not-found (format "Method not found: %s" method)))))
-
-(defun mcp--handle-jsonrpc-request-internal (request)
-  "Handle a JSON-RPC REQUEST object for the global MCP server.
-REQUEST is a parsed JSON object (alist).
-Returns a JSON-RPC response string."
-  (let* ((jsonrpc (alist-get 'jsonrpc request))
-         (id (alist-get 'id request))
-         (method (alist-get 'method request))
-         (params (alist-get 'params request))
-         (is-notification
-          (and method (string-prefix-p "notifications/" method))))
-    ;; Check for JSON-RPC 2.0 compliance first
-    (cond
-     ;; Return error for non-2.0 requests
-     ((not (equal jsonrpc "2.0"))
-      (mcp--jsonrpc-error
-       id mcp--error-invalid-request "Invalid Request: Not JSON-RPC 2.0"))
-
-     ;; Check if id is present for notifications/* methods
-     ((and id is-notification)
-      (mcp--jsonrpc-error
-       nil
-       mcp--error-invalid-request
-       "Invalid Request: Notifications must not include 'id' field"))
-     ;; Check if id is missing
-     ((and (not id) (not is-notification))
-      (mcp--jsonrpc-error
-       nil
-       mcp--error-invalid-request
-       "Invalid Request: Missing required 'id' field"))
-     ;; Check if method is missing
-     ((not method)
-      (mcp--jsonrpc-error
-       id
-       mcp--error-invalid-request
-       "Invalid Request: Missing required 'method' field"))
-
-     ;; Process valid request
-     (t
-      (mcp--dispatch-jsonrpc-method id method params)))))
-
-(defun mcp--jsonrpc-response (id result)
-  "Create a JSON-RPC response with ID and RESULT."
-  (json-encode `((jsonrpc . "2.0") (id . ,id) (result . ,result))))
-
-(defun mcp--jsonrpc-error (id code message)
-  "Create a JSON-RPC error response with ID, error CODE and MESSAGE."
-  (json-encode
-   `((jsonrpc . "2.0")
-     (id . ,id)
-     (error . ((code . ,code) (message . ,message))))))
-
-;;; MCP Protocol Methods
-
-(defun mcp--handle-initialize (id)
-  "Handle initialize request with ID.
-
-This implements the MCP initialize handshake, which negotiates protocol
-version and capabilities between the client and server."
-  ;; TODO: Add proper protocol version compatibility check
-  ;; For now, accept any protocol version for compatibility
-
-  ;; Determine if we need to include tools capabilities
-  ;; Include listChanged:true when tools are registered
-  (let ((tools-capability
-         (if (> (hash-table-count mcp--tools) 0)
-             '((listChanged . t))
-           (make-hash-table))))
-    ;; Respond with server capabilities
-    (mcp--jsonrpc-response
-     id
-     `((protocolVersion . ,mcp--protocol-version)
-       (serverInfo . ((name . ,mcp--name) (version . ,mcp--protocol-version)))
-       ;; Format server capabilities according to MCP spec
-       (capabilities
-        .
-        ((tools . ,tools-capability)
-         (resources . ,(make-hash-table))
-         (prompts . ,(make-hash-table))))))))
-
-(defun mcp--handle-initialized ()
-  "Handle initialized notification from client.
-
-This is called after successful initialization to complete the handshake.
-The client sends this notification to acknowledge the server's response
-to the initialize request."
-  ;; Currently just a placeholder for future functionality
-  nil)
 
 (provide 'mcp)
 ;;; mcp.el ends here
