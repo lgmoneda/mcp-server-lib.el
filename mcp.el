@@ -472,6 +472,14 @@ Example:
       (mcp--log-json-rpc "out" response))
     response))
 
+;;; API - Utilities
+
+(defun mcp-create-tools-list-request (&optional id)
+  "Create a tools/list JSON-RPC request with optional ID.
+If ID is not provided, it defaults to 1."
+  (json-encode
+   `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . ,(or id 1)))))
+
 ;;; API - Tools
 
 (defun mcp-register-tool (handler &rest properties)

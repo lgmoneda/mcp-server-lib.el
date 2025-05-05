@@ -132,6 +132,18 @@ Example with optional properties:
   :read-only t)
 #+end_src
 
+*** Utility Functions
+
+MCP provides utility functions for creating standard JSON-RPC requests:
+
+#+begin_src elisp
+(defun mcp-create-tools-list-request (&optional id)
+  "Create a tools/list JSON-RPC request with optional ID.
+If ID is not provided, it defaults to 1.")
+#+end_src
+
+This is primarily useful for writing tests in the packages using mcp.el.
+
 * Internals
 
 ** Transport

@@ -38,9 +38,6 @@
   "Test tool handler function for MCP tool testing."
   "test result")
 
-(defun mcp-test--tools-list-request (id)
-  "Create a tools/list JSON-RPC request with ID."
-  (json-encode `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . ,id))))
 
 (defun mcp-test--verify-tool-list-response (response expected-tools)
   "Verify RESPONSE from tools/list against EXPECTED-TOOLS.
@@ -207,7 +204,8 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-start)
   (unwind-protect
       (progn
-        (let* ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 5)))
+        (let* ((response
+                (mcp-process-jsonrpc (mcp-create-tools-list-request 5)))
                (response-obj (json-read-from-string response))
                (result (alist-get 'result response-obj)))
           (should result)
@@ -294,7 +292,8 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
          :id "test-tool"
          :description "A tool for testing")
 
-        (let ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 6))))
+        (let ((response
+               (mcp-process-jsonrpc (mcp-create-tools-list-request 6))))
           (mcp-test--verify-tool-list-response
            response
            '(("test-tool" .
@@ -316,7 +315,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
          :title "Friendly Tool Name")
 
         (let ((response
-               (mcp-process-jsonrpc (mcp-test--tools-list-request 14))))
+               (mcp-process-jsonrpc (mcp-create-tools-list-request 14))))
           (mcp-test--verify-tool-list-response
            response
            '(("tool-with-title" .
@@ -339,7 +338,8 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
          #'mcp-test--tool-handler
          :id "test-tool-2"
          :description "Second tool for testing")
-        (let ((response (mcp-process-jsonrpc (mcp-test--tools-list-request 7))))
+        (let ((response
+               (mcp-process-jsonrpc (mcp-create-tools-list-request 7))))
           (mcp-test--verify-tool-list-response
            response
            '(("test-tool-1" .
@@ -373,6 +373,24 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
    :description "Other test tool")
   (should-not (mcp-unregister-tool "nonexistent-tool"))
   (mcp-unregister-tool "test-other"))
+
+(ert-deftest mcp-test-create-tools-list-request-with-id ()
+  "Test `mcp-create-tools-list-request' with a specified ID."
+  (let* ((id 42)
+         (request (mcp-create-tools-list-request id))
+         (parsed (json-read-from-string request)))
+    ;; Verify basic JSON-RPC structure
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "tools/list" (alist-get 'method parsed)))
+    (should (equal id (alist-get 'id parsed)))))
+
+(ert-deftest mcp-test-create-tools-list-request-default-id ()
+  "Test `mcp-create-tools-list-request' with default ID."
+  (let* ((request (mcp-create-tools-list-request))
+         (parsed (json-read-from-string request)))
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "tools/list" (alist-get 'method parsed)))
+    (should (equal 1 (alist-get 'id parsed)))))
 
 (ert-deftest mcp-test-missing-id-error ()
   "Test that tool registration with missing :id produces an error."
@@ -555,9 +573,7 @@ Verifies that result has a content array with a proper text item."
          :description "A tool that returns an empty string")
 
         ;; First check the schema for this zero-arg handler
-        (let* ((list-req
-                (json-encode
-                 `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . 100))))
+        (let* ((list-req (mcp-create-tools-list-request 100))
                (list-response (mcp-process-jsonrpc list-req))
                (list-obj (json-read-from-string list-response))
                (tools (alist-get 'tools (alist-get 'result list-obj)))
@@ -589,9 +605,7 @@ Verifies that result has a content array with a proper text item."
          :description "A tool that requires an argument")
 
         ;; Get schema via tools/list
-        (let* ((list-req
-                (json-encode
-                 `(("jsonrpc" . "2.0") ("method" . "tools/list") ("id" . 42))))
+        (let* ((list-req (mcp-create-tools-list-request 42))
                (list-response (mcp-process-jsonrpc list-req))
                (list-obj (json-read-from-string list-response))
                (tool-list (alist-get 'tools (alist-get 'result list-obj)))
@@ -649,7 +663,7 @@ Verifies that result has a content array with a proper text item."
   (unwind-protect
       (progn
         ;; Make a tools/list request with a known ID
-        (let* ((request (mcp-test--tools-list-request 100))
+        (let* ((request (mcp-create-tools-list-request 100))
                (response (mcp-process-jsonrpc request)))
 
           ;; Check that log buffer exists
@@ -680,7 +694,7 @@ Verifies that result has a content array with a proper text item."
 
   (unwind-protect
       (progn
-        (let ((request (mcp-test--tools-list-request 101)))
+        (let ((request (mcp-create-tools-list-request 101)))
           (mcp-process-jsonrpc request)
           (should-not (get-buffer "*mcp-log*"))))
 
@@ -704,11 +718,7 @@ Verifies that result has a content array with a proper text item."
         (mcp-start)
 
         ;; Tool should be accessible via API
-        (let* ((list-request
-                (json-encode
-                 `(("jsonrpc" . "2.0")
-                   ("method" . "tools/list")
-                   ("id" . 1000))))
+        (let* ((list-request (mcp-create-tools-list-request 1000))
                (list-response (mcp-process-jsonrpc list-request))
                (list-obj (json-read-from-string list-response))
                (tools (alist-get 'tools (alist-get 'result list-obj))))
@@ -845,11 +855,7 @@ from a function loaded from bytecode rather than interpreted elisp."
              :id "bytecode-handler"
              :description "A tool with a handler loaded from bytecode"))
 
-          (let* ((list-req
-                  (json-encode
-                   `(("jsonrpc" . "2.0")
-                     ("method" . "tools/list")
-                     ("id" . 123))))
+          (let* ((list-req (mcp-create-tools-list-request 123))
                  (list-response (mcp-process-jsonrpc list-req))
                  (list-obj (json-read-from-string list-response))
                  (tool-list (alist-get 'tools (alist-get 'result list-obj)))
@@ -893,7 +899,7 @@ from a function loaded from bytecode rather than interpreted elisp."
          :read-only t)
 
         (let ((response
-               (mcp-process-jsonrpc (mcp-test--tools-list-request 15))))
+               (mcp-process-jsonrpc (mcp-create-tools-list-request 15))))
           (mcp-test--verify-tool-list-response
            response
            '(("read-only-tool" .
@@ -916,7 +922,7 @@ from a function loaded from bytecode rather than interpreted elisp."
          :read-only nil)
 
         (let ((response
-               (mcp-process-jsonrpc (mcp-test--tools-list-request 16))))
+               (mcp-process-jsonrpc (mcp-create-tools-list-request 16))))
           (mcp-test--verify-tool-list-response
            response
            '(("non-read-only-tool" .
@@ -940,7 +946,7 @@ from a function loaded from bytecode rather than interpreted elisp."
          :read-only t)
 
         (let ((response
-               (mcp-process-jsonrpc (mcp-test--tools-list-request 17))))
+               (mcp-process-jsonrpc (mcp-create-tools-list-request 17))))
           (mcp-test--verify-tool-list-response
            response
            '(("multi-annotated-tool" .
