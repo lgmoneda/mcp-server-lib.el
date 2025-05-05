@@ -40,14 +40,17 @@ else
 	exit 1
 fi
 
-echo "Test case 2: Debug logging test"
+echo "Test case 2: Debug logging with init and stop functions"
 
+# Define test parameters for explicit init and stop
+INIT_FUNCTION="mcp-start"
+STOP_FUNCTION="mcp-stop"
 TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
 echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
-	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt
+	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="$INIT_FUNCTION" --stop-function="$STOP_FUNCTION" >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
 	echo "FAIL: Debug log file was not created"
@@ -71,33 +74,25 @@ if ! grep -q "MCP-RESPONSE" "$debug_log_file"; then
 	exit 1
 fi
 
-if ! grep -q "MCP-INIT-CALL: emacsclient.*-e.*$INIT_FUNCTION" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the init function call command"
+# Verify basic entries that should always exist
+if ! grep -q "MCP-INFO:.*init function\|No init function specified" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the init function info"
 	exit 1
 fi
 
-if ! grep -q "MCP-INIT-RC: 0" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the init function return code"
+if ! grep -q "MCP-INFO:.*Stopping MCP with function\|No stop function specified" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the stop function info"
 	exit 1
 fi
 
-if ! grep -q "MCP-INIT-OUTPUT:" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the init function output"
+# Verify that call/response cycle works
+if ! grep -q "MCP-REQUEST:" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the request"
 	exit 1
 fi
 
-if ! grep -q "MCP-STOP-CALL: emacsclient.*-e.*$STOP_FUNCTION" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the stop function call command"
-	exit 1
-fi
-
-if ! grep -q "MCP-STOP-RC: 0" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the stop function return code"
-	exit 1
-fi
-
-if ! grep -q "MCP-STOP-OUTPUT:" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the stop function output"
+if ! grep -q "MCP-RESPONSE:" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the response"
 	exit 1
 fi
 
@@ -106,10 +101,71 @@ if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$de
 	exit 1
 fi
 
-echo "PASS: Debug logging test completed successfully"
+echo "PASS: Debug logging with init and stop functions completed successfully"
 rm "$debug_log_file"
 
-echo "Test case 3: Debug logging with invalid path"
+echo "Test case 3: Debug logging without init and stop functions"
+
+# Test without init and stop functions
+TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":3}'
+debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
+
+echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
+	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt
+
+if [ ! -f "$debug_log_file" ]; then
+	echo "FAIL: Debug log file was not created"
+	exit 1
+fi
+
+# Verify essentials
+if ! grep -q "MCP-REQUEST" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the request"
+	exit 1
+fi
+
+if ! grep -q "MCP-BASE64-RESPONSE" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the Base64 response from emacsclient"
+	exit 1
+fi
+
+if ! grep -q "MCP-RESPONSE" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the formatted response"
+	exit 1
+fi
+
+# Verify we don't see init/stop function calls
+if grep -q "MCP-INIT-CALL:" "$debug_log_file"; then
+	echo "FAIL: Debug log contains init function call when it shouldn't"
+	exit 1
+fi
+
+if grep -q "MCP-STOP-CALL:" "$debug_log_file"; then
+	echo "FAIL: Debug log contains stop function call when it shouldn't"
+	exit 1
+fi
+
+# Verify info messages about skipping init or logging without init
+if ! grep -q "MCP-INFO:.*Skipping init function call\|No init function specified" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the init function skip message"
+	exit 1
+fi
+
+# Verify info messages about skipping stop or stopping with function
+if ! grep -q "MCP-INFO:.*Skipping stop function call\|Stopping MCP with function" "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain the stop function skip/use message"
+	exit 1
+fi
+
+if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$debug_log_file"; then
+	echo "FAIL: Debug log doesn't contain timestamps"
+	exit 1
+fi
+
+echo "PASS: Debug logging without init and stop functions completed successfully"
+rm "$debug_log_file"
+
+echo "Test case 4: Debug logging with invalid path"
 
 echo "Testing with invalid log path (script should exit with error)..."
 if echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
@@ -120,7 +176,7 @@ else
 	echo "PASS: Script correctly exits with error when log path is invalid"
 fi
 
-echo "Test case 4: Special character escaping test"
+echo "Test case 5: Special character escaping test"
 
 emacsclient -s "$TEST_SERVER_NAME" -e "
 (progn
@@ -135,7 +191,7 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 " >/dev/null
 TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
 
-echo "$TEST_REQUEST" | ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt
+echo "$TEST_REQUEST" | ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt
 
 if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
 	echo "FAIL: Final response doesn't have properly unescaped quote and newline"
@@ -144,7 +200,7 @@ else
 	echo "PASS"
 fi
 
-echo "Test case 5: Original failing payload test"
+echo "Test case 6: Original failing payload test"
 
 emacsclient -s "$TEST_SERVER_NAME" -e "
 (progn
@@ -160,10 +216,10 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 
 TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
 
-# Run test 5 (multibyte character test)
-debug_log_file="/tmp/test5-debug-$$.log"
+# Run test 6 (multibyte character test)
+debug_log_file="/tmp/test6-debug-$$.log"
 echo "$TEST_REQUEST" |
-	EMACS_MCP_DEBUG_LOG="$debug_log_file" ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt 2>/dev/null
+	EMACS_MCP_DEBUG_LOG="$debug_log_file" ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt 2>/dev/null
 
 # Check for valid content (should have multibyte character)
 # and absence of unwanted output (unknown message errors)

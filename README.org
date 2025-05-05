@@ -12,66 +12,74 @@ This library enables Emacs users and developers to create MCP servers that can p
 * Features
 
 - MCP server creation and management in Emacs
-- Resource registration for exposing data to LLMs
-- Tool definitions for enabling LLMs to execute Elisp functions
-- Prompt templating for structured LLM interactions
-- Transport layer implementations (stdio, potentially others)
-- JSON-RPC message handling
+- API for tools to enable LLMs to execute Elisp functions
+- Uses MCP stdio transport layer through an emacsclient-wrapping script
 
 * Installation
 
+=M-x package-vc-install https://github.com/laurynas-biveinis/mcp.el/=
+
 * Usage
 
-** MCP API
+Start Emacs daemon, then do =M-x mcp-start= to start handling MCP requests and =M-x
+mcp-stop= to stop.
+
+For an MCP server example that uses this package, see [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]].
+
+To register with an MCP client, use the provided =emacs-mcp-stdio.sh= script as the
+server with the arguments to initialize and to clean up specific MCP functionality,
+for example, to register [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]] with Claude Code, do
+
+#+BEGIN_EXAMPLE
+claude mcp add -s user -t stdio elisp-dev -- $HOME/.emacs.d/elpa/mcp.el/emacs-mcp-stdio.sh --init-function=elisp-dev-mcp-enable --stop-function=elisp-dev-mcp-disable
+#+END_EXAMPLE
+
+The script internally communicates with Emacs daemon through =emacsclient= and
+handles serialization and deserialization so that arbitrary data survives transport.
+
+** =emacs-mcp-stdio.sh= Options and Environment Variables
+
+All options and environment variables are optional, although ~--init-function~ and
+~--stop-function~ are very likely to be needed in order for the script to be useful.
+
+*Script Options:*
+
+| Option              | Description                                            |
+|---------------------+--------------------------------------------------------|
+| --init-function=NAME | Emacs function to call for MCP initialization           |
+| --stop-function=NAME | Emacs function to call when the script exits            |
+| --socket=PATH       | Emacs server socket to connect to                      |
+
+*Environment Variables:*
+
+| Variable            | Description                                            |
+|---------------------+--------------------------------------------------------|
+| EMACS_MCP_DEBUG_LOG | Path to a log file for debug logging                   |
+
+When =EMACS_MCP_DEBUG_LOG= is set to a valid file path, the script will log all requests and responses with timestamps for debugging purposes. If the path is invalid or not writable, the script will exit with an error.
+
+* API for dependent packages
 
 =mcp.el= provides a simple API for setting up and using the Model Context Protocol in Emacs.
 
-*** Core Functions
+** Core Functions
 
 #+begin_src elisp
-;; Start the MCP server
-(mcp-start)
-
-;; Register a tool
 (mcp-register-tool #'tool-handler-function
   :id "tool-name"
   :description "Tool description"
   :title "User-friendly Tool Name")
-
-;; Stop the MCP server
-(mcp-stop)
 #+end_src
 
-*** Tool Handlers
+** Tool Handlers
 
 Tool handler functions should:
 - Return an Elisp string for successful execution
-- Call `mcp-tool-throw` for error returns
+- Call ~mcp-tool-throw~ for error returns
 
 *** Tool Parameter Documentation
 
 When registering tools with MCP, you can provide parameter descriptions that will be included in the JSON Schema.
-
-**** Optional Tool Properties
-
-When registering tools, you can provide optional properties:
-
-| Property      | Description                                        | Example                  |
-|--------------+--------------------------------------------------+--------------------------|
-| :title       | User-friendly display name for the tool           | "Get Weather Forecast"   |
-| :read-only   | If true, indicates tool doesn't modify environment | t or nil                 |
-
-Example with optional properties:
-
-#+begin_src elisp
-(mcp-register-tool #'my-weather-handler
-  :id "get-weather"
-  :description "Get weather information"
-  :title "Weather Forecast"
-  :read-only t)
-#+end_src
-
-**** Documenting Parameters
 
 Add an "MCP Parameters:" section to your handler function's docstring. This should be at the end of the docstring with each parameter in the format `parameter-name - description`:
 
@@ -91,9 +99,30 @@ MCP Parameters:
 
 Note: Do not include the "MCP Parameters:" section if your tool handler doesn't take any arguments.
 
-*** Stdio Transport
+*** Optional Tool Properties
 
-The main entry point for MCP communication via stdio is =mcp-process-jsonrpc=:
+When registering tools, you can provide optional properties:
+
+| Property      | Description                                        | Example                  |
+|--------------+--------------------------------------------------+--------------------------|
+| :title       | User-friendly display name for the tool           | "Get Weather Forecast"   |
+| :read-only   | If true, indicates tool doesn't modify environment | t or nil                 |
+
+Example with optional properties:
+
+#+begin_src elisp
+(mcp-register-tool #'my-weather-handler
+  :id "get-weather"
+  :description "Get weather information"
+  :title "Weather Forecast"
+  :read-only t)
+#+end_src
+
+* Internals
+
+** Transport
+
+The main entry point for MCP communication is =mcp-process-jsonrpc=:
 
 #+begin_src elisp
 (defun mcp-process-jsonrpc (json-string)
@@ -101,114 +130,7 @@ The main entry point for MCP communication via stdio is =mcp-process-jsonrpc=:
 This is the main entry point for stdio transport in MCP.")
 #+end_src
 
-*** Usage Pattern with emacsclient
-
-LLMs and other clients can interact with MCP.el using =emacsclient=:
-
-#+begin_src shell
-emacsclient -e '(mcp-process-jsonrpc "{\"jsonrpc\":\"2.0\",\"method\":\"mcp.server.describe\",\"id\":1}")'
-#+end_src
-
-The response is returned as stdout from the emacsclient process.
-
-*** Stdio Adapter Script
-
-For easier integration with tools that expect stdio communication, we provide =emacs-mcp-stdio.sh=:
-
-#+begin_src shell
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | ./emacs-mcp-stdio.sh
-#+end_src
-
-*Script Options:*
-
-| Option              | Description                                            | Default      |
-|---------------------+--------------------------------------------------------+--------------|
-| --init-function=NAME | Emacs function to call for MCP initialization           | mcp-start    |
-| --stop-function=NAME | Emacs function to call when the script exits            | mcp-stop     |
-| --socket=PATH       | Emacs server socket to connect to                      | (none)       |
-
-*Environment Variables:*
-
-| Variable            | Description                                            | Default      |
-|---------------------+--------------------------------------------------------+--------------|
-| EMACS_MCP_DEBUG_LOG | Path to a log file for debug logging                   | (none)       |
-
-When =EMACS_MCP_DEBUG_LOG= is set to a valid file path, the script will log all requests and responses with timestamps for debugging purposes. If the path is invalid or not writable, the script will exit with an error.
-
-*Examples:*
-
-- Basic usage:
-  #+begin_src shell
-  cat request.json | ./emacs-mcp-stdio.sh
-  #+end_src
-
-- Using a specific Emacs server:
-  #+begin_src shell
-  echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | \
-    ./emacs-mcp-stdio.sh --socket="my-emacs-server"
-  #+end_src
-
-- Using custom initialization:
-  #+begin_src shell
-  echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | \
-    ./emacs-mcp-stdio.sh --init-function=my-custom-mcp-setup --stop-function=my-custom-mcp-teardown
-  #+end_src
-
-** Implementation Details
-
-*** Server Architecture
-
-mcp.el uses a singleton server pattern:
-
-#+begin_src elisp
-;; Start the MCP server
-(mcp-start)
-
-;; Register tools with the global server
-(mcp-register-tool #'my-handler-function
-  :id "my-tool"
-  :description "Tool description")
-
-;; Stop the server when done
-(mcp-stop)
-#+end_src
-
-*** Transport
-
-mcp.el uses stdio transport via emacsclient.
-
-*** Client-Server Interaction Flow
-
-1. LLM prepares a JSON-RPC request
-2. LLM executes emacsclient with the request
-3. emacsclient sends the command to the Emacs server
-4. Emacs processes the request via =mcp-process-jsonrpc=
-5. Response is returned to emacsclient as a string
-6. emacsclient outputs the response to stdout
-7. LLM reads and processes the response
-
-*** Message Format
-
-The function accepts and returns standard JSON-RPC 2.0 messages:
-
-*Input Example:*
-#+begin_src json
-{
-  "jsonrpc": "2.0",
-  "method": "mcp.tool.my-tool",
-  "params": {"param1": "value1"},
-  "id": 1
-}
-#+end_src
-
-*Output Example:*
-#+begin_src json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {"key": "value"}
-}
-#+end_src
+This is what =emacs-mcp-stdio.sh= calls through emacsclient.
 
 * License
 
