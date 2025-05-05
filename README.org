@@ -58,6 +58,20 @@ All options and environment variables are optional, although ~--init-function~ a
 
 When =EMACS_MCP_DEBUG_LOG= is set to a valid file path, the script will log all requests and responses with timestamps for debugging purposes. If the path is invalid or not writable, the script will exit with an error.
 
+** Tracing
+
+The package provides an Elisp variable =mcp-log-io= that, when set to non-nil, enables logging of all JSON-RPC messages to the =*mcp-log*= buffer. This is useful for tracing MCP requests and responses:
+
+#+begin_src elisp
+;; Enable MCP communication tracing
+(setq mcp-log-io t)
+
+;; Start the MCP server
+(mcp-start)
+#+end_src
+
+The =*mcp-log*= buffer will show incoming requests with ="-> (request)"= prefix and outgoing responses with ="<- (response)"= prefix, along with the full JSON message content. This makes it easy to inspect the communication flow between clients and the MCP server.
+
 * API for dependent packages
 
 =mcp.el= provides a simple API for setting up and using the Model Context Protocol in Emacs.
