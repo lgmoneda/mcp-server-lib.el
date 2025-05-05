@@ -32,7 +32,7 @@
 
 (require 'json)
 
-;;; Variables
+;;; Customization variables
 
 (defgroup mcp nil
   "Model Context Protocol for Emacs."
@@ -44,12 +44,7 @@
   :group 'mcp
   :type 'boolean)
 
-;; Global state variables for singleton architecture
-(defvar mcp--running nil
-  "Whether the MCP server is currently running.")
-
-(defvar mcp--tools (make-hash-table :test 'equal)
-  "Hash table of registered MCP tools.")
+;;; Constants
 
 (defconst mcp--name "emacs-mcp"
   "Name of the MCP server.")
@@ -58,8 +53,14 @@
   "Current MCP protocol version supported by this server.
 Uses date-based versioning format to match current MCP practices.")
 
-(defvar mcp--client-capabilities nil
-  "Store client capabilities received during initialization.")
+;;; Internal global state variables
+
+(defvar mcp--running nil
+  "Whether the MCP server is currently running.")
+
+(defvar mcp--tools (make-hash-table :test 'equal)
+  "Hash table of registered MCP tools.")
+
 
 ;;; Core Functions
 
@@ -407,7 +408,7 @@ Returns a JSON-RPC response string for the request."
   (cond
    ;; Initialize handshake
    ((equal method "initialize")
-    (mcp--handle-initialize id params))
+    (mcp--handle-initialize id))
    ;; Notifications/initialized format
    ((equal method "notifications/initialized")
     (mcp--handle-initialized)
@@ -549,34 +550,31 @@ Returns a JSON-RPC response string."
 
 ;;; MCP Protocol Methods
 
-(defun mcp--handle-initialize (id params)
-  "Handle initialize request with ID and PARAMS.
+(defun mcp--handle-initialize (id)
+  "Handle initialize request with ID.
 
 This implements the MCP initialize handshake, which negotiates protocol
 version and capabilities between the client and server."
-  (let ((client-capabilities (alist-get 'capabilities params)))
-    ;; TODO: Add proper protocol version compatibility check
-    ;; For now, accept any protocol version for compatibility
-    ;; Store client capabilities for future use
-    (setq mcp--client-capabilities client-capabilities)
+  ;; TODO: Add proper protocol version compatibility check
+  ;; For now, accept any protocol version for compatibility
 
-    ;; Determine if we need to include tools capabilities
-    ;; Include listChanged:true when tools are registered
-    (let ((tools-capability
-           (if (> (hash-table-count mcp--tools) 0)
-               '((listChanged . t))
-             (make-hash-table))))
-      ;; Respond with server capabilities
-      (mcp--jsonrpc-response
-       id
-       `((protocolVersion . ,mcp--protocol-version)
-         (serverInfo . ((name . ,mcp--name) (version . ,mcp--protocol-version)))
-         ;; Format server capabilities according to MCP spec
-         (capabilities
-          .
-          ((tools . ,tools-capability)
-           (resources . ,(make-hash-table))
-           (prompts . ,(make-hash-table)))))))))
+  ;; Determine if we need to include tools capabilities
+  ;; Include listChanged:true when tools are registered
+  (let ((tools-capability
+         (if (> (hash-table-count mcp--tools) 0)
+             '((listChanged . t))
+           (make-hash-table))))
+    ;; Respond with server capabilities
+    (mcp--jsonrpc-response
+     id
+     `((protocolVersion . ,mcp--protocol-version)
+       (serverInfo . ((name . ,mcp--name) (version . ,mcp--protocol-version)))
+       ;; Format server capabilities according to MCP spec
+       (capabilities
+        .
+        ((tools . ,tools-capability)
+         (resources . ,(make-hash-table))
+         (prompts . ,(make-hash-table))))))))
 
 (defun mcp--handle-initialized ()
   "Handle initialized notification from client.
