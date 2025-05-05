@@ -49,7 +49,6 @@ Calls `mcp-start' before BODY and `mcp-stop' after BODY using `unwind-protect'."
   "Test tool handler function for MCP tool testing."
   "test result")
 
-
 (defun mcp-test--verify-tool-list-response (response expected-tools)
   "Verify RESPONSE from tools/list against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
@@ -99,13 +98,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
    :id "test-tool"
    :description "A tool for testing")
   (mcp-test-with-server
-    (let* ((initialize-request
-            (json-encode
-             `(("jsonrpc" . "2.0")
-               ("method" . "initialize") ("id" . 1)
-               ("params" .
-                (("protocolVersion" . "2024-11-05")
-                 ("capabilities" . (("tools" . t))))))))
+    (let* ((initialize-request (mcp-test--initialize-request 1))
            (initialize-response
             (mcp-process-jsonrpc initialize-request))
            (response-obj (json-read-from-string initialize-response)))
@@ -142,16 +135,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   "Test the MCP initialize request handling."
   (mcp-test-with-server
     ;; Test initialize with valid parameters
-    (let* ((initialize-request
-            (json-encode
-             `(("jsonrpc" . "2.0")
-               ("method" . "initialize") ("id" . 3)
-               ("params" .
-                (("protocolVersion" . "2024-11-05")
-                 ("capabilities" .
-                  (("tools" . t)
-                   ("resources" . nil)
-                   ("prompts" . nil))))))))
+    (let* ((initialize-request (mcp-test--initialize-request 3))
            (initialize-response
             (mcp-process-jsonrpc initialize-request))
            (initialize-result
@@ -433,6 +417,16 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
    :type 'error))
 
 ;;; Prompts Tests
+
+(defun mcp-test--initialize-request (id)
+  "Create an initialize JSON-RPC request with ID."
+  (json-encode
+   `(("jsonrpc" . "2.0")
+     ("method" . "initialize") ("id" . ,id)
+     ("params" .
+      (("protocolVersion" . "2024-11-05")
+       ("capabilities" .
+        (("tools" . t) ("resources" . nil) ("prompts" . nil))))))))
 
 (defun mcp-test--prompts-list-request (id)
   "Create a prompt list JSON-RPC request with ID."
