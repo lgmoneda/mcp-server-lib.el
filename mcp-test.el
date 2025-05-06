@@ -210,14 +210,9 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-tools-list-zero ()
   "Test the `tools/list` method returns empty array with no tools."
   (mcp-test--with-server
-    (let* ((resp
-            (mcp-process-jsonrpc (mcp-create-tools-list-request 5)))
-           (resp-obj (json-read-from-string resp))
-           (result (alist-get 'result resp-obj)))
-      (should result)
-      (should (alist-get 'tools result))
-      (should (arrayp (alist-get 'tools result)))
-      (should (= 0 (length (alist-get 'tools result)))))))
+    (let ((resp
+           (mcp-process-jsonrpc (mcp-create-tools-list-request 5))))
+      (mcp-test--verify-tool-list-response resp '()))))
 
 (defun mcp-test--failing-tool-handler ()
   "Test tool handler that always fails with `mcp-tool-throw'."
