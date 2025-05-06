@@ -1,4 +1,5 @@
 ((emacs-lisp-mode . ((fill-column . 80)
                      (indent-tabs-mode . nil)
                      (sentence-end-double-space . t)
-                     (elisp-lint-indent-specs . ((mcp-test--with-server . defun)))))))
+                     (elisp-lint-indent-specs . ((mcp-test--with-server . defun)
+                                                 (mcp-test--with-tools . 1)))))))
