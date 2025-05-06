@@ -54,8 +54,8 @@ Calls `mcp-start' before BODY and `mcp-stop' after BODY using `unwind-protect'."
 (defun mcp-test--verify-tool-list-response (response expected-tools)
   "Verify RESPONSE from tools/list against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
-  (let* ((response-obj (json-read-from-string response))
-         (result (alist-get 'result response-obj))
+  (let* ((resp-obj (json-read-from-string response))
+         (result (alist-get 'result resp-obj))
          (tools (alist-get 'tools result)))
     (should result)
     (should tools)
@@ -94,7 +94,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                  prop-value (alist-get prop-name found-tool)))))))))))
 
 (ert-deftest mcp-test-tool-registration-in-capabilities ()
-  "Test registered tool appears in server capabilities."
+  "Test that registered tool appears in server capabilities."
   (mcp-register-tool
    #'mcp-test--tool-handler
    :id "test-tool"
@@ -102,11 +102,11 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-test--with-server
     (let* ((req (mcp-test--initialize-request 1))
            (resp (mcp-process-jsonrpc req))
-           (response-obj (json-read-from-string resp)))
+           (resp-obj (json-read-from-string resp)))
 
-      (should (alist-get 'result response-obj))
+      (should (alist-get 'result resp-obj))
 
-      (let* ((result (alist-get 'result response-obj))
+      (let* ((result (alist-get 'result resp-obj))
              (capabilities (alist-get 'capabilities result))
              (tools-capability (alist-get 'tools capabilities)))
 
