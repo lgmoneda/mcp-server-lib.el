@@ -72,8 +72,8 @@ Example:
    (let ((response (mcp-process-jsonrpc (mcp-create-tools-list-request 7))))
      ...))"
   (declare (indent 1) (debug t))
-  (let* ((tool-registrations '())
-         (tool-ids '()))
+  (let ((tool-registrations '())
+        (tool-ids '()))
     ;; Extract tool IDs and build registration forms
     (dolist (tool-spec tools)
       (let* ((handler (car tool-spec))
@@ -163,33 +163,26 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   "Test the MCP initialize request handling."
   (mcp-test--with-server
     ;; Test initialize with valid parameters
-    (let* ((initialize-request (mcp-test--initialize-request 3))
-           (initialize-response
-            (mcp-process-jsonrpc initialize-request))
-           (initialize-result
-            (alist-get
-             'result (json-read-from-string initialize-response))))
+    (let* ((req (mcp-test--initialize-request 3))
+           (resp (mcp-process-jsonrpc req))
+           (result (alist-get 'result (json-read-from-string resp))))
       ;; Verify the server responded with its protocol version
+      (should (stringp (alist-get 'protocolVersion result)))
       (should
-       (stringp (alist-get 'protocolVersion initialize-result)))
-      (should
-       (string=
-        "2024-11-05" (alist-get 'protocolVersion initialize-result)))
+       (string= "2024-11-05" (alist-get 'protocolVersion result)))
       ;; Verify server capabilities
-      (should (alist-get 'capabilities initialize-result))
+      (should (alist-get 'capabilities result))
 
       ;; Verify capability objects are present and properly formatted
       ;; (empty objects deserialize to nil)
-      (let ((capabilities
-             (alist-get 'capabilities initialize-result)))
+      (let ((capabilities (alist-get 'capabilities result)))
         (should (equal nil (alist-get 'tools capabilities)))
         (should (equal nil (alist-get 'resources capabilities)))
         (should (equal nil (alist-get 'prompts capabilities))))
       ;; Verify server info
-      (should (alist-get 'serverInfo initialize-result))
+      (should (alist-get 'serverInfo result))
       (let ((server-name
-             (alist-get
-              'name (alist-get 'serverInfo initialize-result))))
+             (alist-get 'name (alist-get 'serverInfo result))))
         (should (string= mcp--name server-name))))))
 
 (ert-deftest mcp-test-notifications-initialized-format ()
@@ -217,10 +210,10 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-tools-list-zero ()
   "Test the `tools/list` method returns empty array with no tools."
   (mcp-test--with-server
-    (let* ((response
+    (let* ((resp
             (mcp-process-jsonrpc (mcp-create-tools-list-request 5)))
-           (response-obj (json-read-from-string response))
-           (result (alist-get 'result response-obj)))
+           (resp-obj (json-read-from-string resp))
+           (result (alist-get 'result resp-obj)))
       (should result)
       (should (alist-get 'tools result))
       (should (arrayp (alist-get 'tools result)))
