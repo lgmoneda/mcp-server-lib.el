@@ -38,6 +38,57 @@
   "Test tool handler function for MCP tool testing."
   "test result")
 
+(defun mcp-test--failing-tool-handler ()
+  "Test tool handler that always fails with `mcp-tool-throw'."
+  (mcp-tool-throw "This tool intentionally fails"))
+
+(defun mcp-test--generic-error-handler ()
+  "Test tool handler that throws a generic error."
+  (error "Generic error occurred"))
+
+(defconst mcp-test--string-list-result "item1 item2 item3"
+  "Test data for string list tool.")
+
+(defun mcp-test--string-list-tool-handler ()
+  "Test tool handler function to return a string with items."
+  mcp-test--string-list-result)
+
+(defun mcp-test--empty-array-tool-handler ()
+  "Test tool handler function to return an empty string."
+  "")
+
+(defun mcp-test--string-arg-tool-handler (input-string)
+  "Test tool handler that accepts a string argument.
+INPUT-STRING is the string argument passed to the tool.
+
+MCP Parameters:
+  input-string - test parameter for string input"
+  (concat "Echo: " input-string))
+
+(defun mcp-test--duplicate-param-handler (input-string)
+  "Test handler with duplicate parameter.
+INPUT-STRING is the string argument.
+
+MCP Parameters:
+  input-string - first description
+  input-string - second description"
+  (concat "Test: " input-string))
+
+(defun mcp-test--mismatched-param-handler (input-string)
+  "Test handler with mismatched parameter name.
+INPUT-STRING is the string argument.
+
+MCP Parameters:
+  wrong-param-name - description for non-existent parameter"
+  (concat "Test: " input-string))
+
+(defun mcp-test--missing-param-handler (input-string)
+  "Test handler with missing parameter documentation.
+INPUT-STRING is the string argument.
+
+MCP Parameters:"
+  (concat "Test: " input-string))
+
 ;;; Test Helpers
 
 (defmacro mcp-test--with-server (&rest body)
@@ -214,10 +265,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
            (mcp-process-jsonrpc (mcp-create-tools-list-request 5))))
       (mcp-test--verify-tool-list-response resp '()))))
 
-(defun mcp-test--failing-tool-handler ()
-  "Test tool handler that always fails with `mcp-tool-throw'."
-  (mcp-tool-throw "This tool intentionally fails"))
-
 (ert-deftest mcp-test-tools-call-error ()
   "Test that tool errors are properly formatted with isError=true."
   (mcp-test--with-tools ((#'mcp-test--failing-tool-handler
@@ -245,10 +292,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
       ;; Check isError field is true
       (should (alist-get 'isError result))
       (should (eq t (alist-get 'isError result))))))
-
-(defun mcp-test--generic-error-handler ()
-  "Test tool handler that throws a generic error."
-  (error "Generic error occurred"))
 
 (ert-deftest mcp-test-tools-call-generic-error ()
   "Test that generic errors use standard JSON-RPC error format."
@@ -494,49 +537,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
       (should (= 0 (length (alist-get 'prompts result)))))))
 
 ;;; Tool Call Tests
-
-(defconst mcp-test--string-list-result "item1 item2 item3"
-  "Test data for string list tool.")
-
-(defun mcp-test--string-list-tool-handler ()
-  "Test tool handler function to return a string with items."
-  mcp-test--string-list-result)
-
-(defun mcp-test--empty-array-tool-handler ()
-  "Test tool handler function to return an empty string."
-  "")
-
-(defun mcp-test--string-arg-tool-handler (input-string)
-  "Test tool handler that accepts a string argument.
-INPUT-STRING is the string argument passed to the tool.
-
-MCP Parameters:
-  input-string - test parameter for string input"
-  (concat "Echo: " input-string))
-
-(defun mcp-test--duplicate-param-handler (input-string)
-  "Test handler with duplicate parameter.
-INPUT-STRING is the string argument.
-
-MCP Parameters:
-  input-string - first description
-  input-string - second description"
-  (concat "Test: " input-string))
-
-(defun mcp-test--mismatched-param-handler (input-string)
-  "Test handler with mismatched parameter name.
-INPUT-STRING is the string argument.
-
-MCP Parameters:
-  wrong-param-name - description for non-existent parameter"
-  (concat "Test: " input-string))
-
-(defun mcp-test--missing-param-handler (input-string)
-  "Test handler with missing parameter documentation.
-INPUT-STRING is the string argument.
-
-MCP Parameters:"
-  (concat "Test: " input-string))
 
 (defun mcp-test--check-mcp-content-format (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT.
