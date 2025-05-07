@@ -297,7 +297,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
       ;; Verify server info
       (should (string= mcp--name server-name)))))
 
-(ert-deftest mcp-test-tool-registration-in-capabilities ()
+(ert-deftest mcp-test-initialize-registered-tool ()
   "Test that registered tool appears in server capabilities."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool"
@@ -308,7 +308,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
            (list-changed (alist-get 'listChanged tools-capability)))
       (should (eq t list-changed)))))
 
-(ert-deftest mcp-test-notifications-initialized-format ()
+(ert-deftest mcp-test-notifications-initialized ()
   "Test the MCP notifications/initialized format handling."
   (mcp-test--with-server
     (let* ((notifications-initialized
@@ -321,7 +321,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 
 ;;; `mcp-register-tool' tests
 
-(ert-deftest mcp-test-missing-id-error ()
+(ert-deftest mcp-test-register-tool-error-missing-id ()
   "Test that tool registration with missing :id produces an error."
   (should-error
    (mcp-register-tool
@@ -329,7 +329,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     :description "Test tool without ID")
    :type 'error))
 
-(ert-deftest mcp-test-missing-description-error ()
+(ert-deftest mcp-test-register-tool-error-missing-description ()
   "Test that tool registration with missing :description produces an error."
   (should-error
    (mcp-register-tool
@@ -337,7 +337,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     :id "test-tool-no-desc")
    :type 'error))
 
-(ert-deftest mcp-test-missing-handler-error ()
+(ert-deftest mcp-test-register-tool-error-missing-handler ()
   "Test that tool registration with non-function handler produces an error."
   (should-error
    (mcp-register-tool
@@ -346,7 +346,8 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     :description "Test tool with invalid handler")
    :type 'error))
 
-(ert-deftest mcp-test-duplicate-param-description-error ()
+(ert-deftest mcp-test-register-tool-error-duplicate-param-description
+    ()
   "Test that duplicate parameter descriptions cause an error."
   (should-error
    (mcp-register-tool
@@ -355,7 +356,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     :description "Tool with duplicate parameter")
    :type 'error))
 
-(ert-deftest mcp-test-mismatched-param-error ()
+(ert-deftest mcp-test-register-tool-error-mismatched-param ()
   "Test that parameter names must match function arguments."
   (should-error
    (mcp-register-tool
@@ -364,7 +365,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     :description "Tool with mismatched parameter")
    :type 'error))
 
-(ert-deftest mcp-test-missing-param-error ()
+(ert-deftest mcp-test-register-tool-error-missing-param ()
   "Test that all function parameters must be documented."
   (should-error
    (mcp-register-tool
@@ -372,6 +373,47 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
     :id "missing-param-tool"
     :description "Tool with missing parameter docs")
    :type 'error))
+
+(ert-deftest mcp-test-register-tool-bytecode ()
+  "Test schema generation for a handler loaded as bytecode.
+This test verifies that MCP can correctly extract parameter information
+from a function loaded from bytecode rather than interpreted elisp."
+  (let ((source-file
+         (expand-file-name "mcp-test-bytecode-handler.el"))
+        (bytecode-file
+         (expand-file-name "mcp-test-bytecode-handler.elc")))
+    (should (file-exists-p source-file))
+    (byte-compile-file source-file)
+
+    (let ((load-prefer-newer nil))
+      (load bytecode-file nil t))
+
+    (declare-function mcp-test-bytecode-handler--handler
+                      "mcp-test-bytecode-handler")
+    (mcp-test--with-tools
+        ((#'mcp-test-bytecode-handler--handler
+          :id "bytecode-handler"
+          :description "A tool with a handler loaded from bytecode"))
+      (let* ((tool-list (mcp-test--get-tool-list))
+             (tool (aref tool-list 0))
+             (schema (alist-get 'inputSchema tool)))
+
+        (should (equal "object" (alist-get 'type schema)))
+        (should (alist-get 'properties schema))
+        (should (equal ["input-string"] (alist-get 'required schema)))
+
+        (let ((param-schema
+               (alist-get
+                'input-string (alist-get 'properties schema))))
+          (should param-schema)
+          (should (equal "string" (alist-get 'type param-schema)))
+          (should
+           (equal
+            "Input string parameter for bytecode testing"
+            (alist-get 'description param-schema))))))
+
+    (when (file-exists-p bytecode-file)
+      (delete-file bytecode-file))))
 
 ;;; `mcp-unregister-tool' tests
 
@@ -401,7 +443,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
       (mcp-test--verify-tool-not-found
        mcp-test--unregister-tool-id))))
 
-(ert-deftest mcp-test-unregister-nonexistent-tool ()
+(ert-deftest mcp-test-unregister-tool-nonexistent ()
   "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
   (mcp-register-tool
    #'mcp-test--tool-handler-simple
@@ -410,14 +452,14 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (should-not (mcp-unregister-tool "nonexistent-tool"))
   (mcp-unregister-tool "test-other"))
 
-(ert-deftest mcp-test-unregister-when-no-tools ()
+(ert-deftest mcp-test-unregister-tool-when-no-tools ()
   "Test that `mcp-unregister-tool' works when no tools are registered."
   (should-not (mcp-unregister-tool "any-tool")))
 
 ;;; Notification tests
 
-(ert-deftest mcp-test-notifications-cancelled-format ()
-  "Test the MCP notifications/cancelled format handling."
+(ert-deftest mcp-test-notifications-cancelled ()
+  "Test the MCP notifications/cancelled handling."
   (mcp-test--with-server
     (let* ((notifications-cancelled
             (json-encode
@@ -472,7 +514,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
          (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-two ()
-  "Test the `tools/list` method returns multiple tools with correct fields."
+  "Test the `tools/list` method returning multiple tools with correct fields."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool-1"
                           :description "First tool for testing")
@@ -488,12 +530,12 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
          (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-zero ()
-  "Test the `tools/list` method returns empty array with no tools."
+  "Test the `tools/list` method returning empty array with no tools."
   (mcp-test--with-server
     (mcp-test--verify-tool-list-request '())))
 
-(ert-deftest mcp-test-schema-for-one-arg-handler ()
-  "Test schema includes parameter descriptions."
+(ert-deftest mcp-test-tools-list-schema-one-arg-handler ()
+  "Test that tools/list schema includes parameter descriptions."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-string-arg
         :id "requires-arg"
@@ -519,7 +561,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
           "test parameter for string input"
           (alist-get 'description param-schema)))))))
 
-(ert-deftest mcp-test-tools-list-with-extra-key ()
+(ert-deftest mcp-test-tools-list-extra-key ()
   "Test that tools/list request with an extra, unexpected key works correctly.
 Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   (mcp-test--with-server
@@ -533,48 +575,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       ;; Just checking if tool list is an array is enough
       (mcp-test--get-tool-list-for-request request-with-extra))))
 
-(ert-deftest mcp-test-schema-for-bytecode-handler ()
-  "Test schema generation for a handler loaded as bytecode.
-This test verifies that MCP can correctly extract parameter information
-from a function loaded from bytecode rather than interpreted elisp."
-  (let ((source-file
-         (expand-file-name "mcp-test-bytecode-handler.el"))
-        (bytecode-file
-         (expand-file-name "mcp-test-bytecode-handler.elc")))
-    (should (file-exists-p source-file))
-    (byte-compile-file source-file)
-
-    (let ((load-prefer-newer nil))
-      (load bytecode-file nil t))
-
-    (declare-function mcp-test-bytecode-handler--handler
-                      "mcp-test-bytecode-handler")
-    (mcp-test--with-tools
-        ((#'mcp-test-bytecode-handler--handler
-          :id "bytecode-handler"
-          :description "A tool with a handler loaded from bytecode"))
-      (let* ((tool-list (mcp-test--get-tool-list))
-             (tool (aref tool-list 0))
-             (schema (alist-get 'inputSchema tool)))
-
-        (should (equal "object" (alist-get 'type schema)))
-        (should (alist-get 'properties schema))
-        (should (equal ["input-string"] (alist-get 'required schema)))
-
-        (let ((param-schema
-               (alist-get
-                'input-string (alist-get 'properties schema))))
-          (should param-schema)
-          (should (equal "string" (alist-get 'type param-schema)))
-          (should
-           (equal
-            "Input string parameter for bytecode testing"
-            (alist-get 'description param-schema))))))
-
-    (when (file-exists-p bytecode-file)
-      (delete-file bytecode-file))))
-
-(ert-deftest mcp-test-tools-list-with-read-only-hint ()
+(ert-deftest mcp-test-tools-list-read-only-hint ()
   "Test that tools/list includes readOnlyHint=true in response."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-simple
@@ -587,7 +588,7 @@ from a function loaded from bytecode rather than interpreted elisp."
          (annotations . ((readOnlyHint . t)))
          (inputSchema . ((type . "object")))))))))
 
-(ert-deftest mcp-test-tools-list-with-read-only-hint-false ()
+(ert-deftest mcp-test-tools-list-read-only-hint-false ()
   "Test that tools/list includes readOnlyHint=false in response."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-simple
@@ -600,8 +601,8 @@ from a function loaded from bytecode rather than interpreted elisp."
          (annotations . ((readOnlyHint . :json-false)))
          (inputSchema . ((type . "object")))))))))
 
-(ert-deftest mcp-test-tools-list-with-multiple-annotations ()
-  "Test that tools/list handles multiple annotations in response."
+(ert-deftest mcp-test-tools-list-multiple-annotations ()
+  "Test that tools/list includes multiple annotations in response."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-simple
         :id "multi-annotated-tool"
@@ -617,7 +618,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 ;;; `mcp-create-tools-call-request' tests
 
-(ert-deftest mcp-test-create-tools-call-request-with-id-and-args ()
+(ert-deftest mcp-test-create-tools-call-request-id-and-args ()
   "Test `mcp-create-tools-call-request' with specified ID and arguments."
   (let* ((tool-name "test-tool")
          (id 42)
@@ -652,7 +653,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     (should (equal tool-name (alist-get 'name params)))
     (should (equal '() (alist-get 'arguments params)))))
 
-(ert-deftest mcp-test-create-tools-call-request-with-empty-args ()
+(ert-deftest mcp-test-create-tools-call-request-empty-args ()
   "Test `mcp-create-tools-call-request' with empty arguments list."
   (let* ((tool-name "test-tool")
          (id 43)
@@ -668,8 +669,8 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 ;;; tools/call tests
 
-(ert-deftest mcp-test-mcp-tool-throw ()
-  "Test `mcp-tool-throw'."
+(ert-deftest mcp-test-tools-call-mcp-tool-throw ()
+  "Test tool handler calling `mcp-tool-throw'."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-mcp-tool-throw
                           :id "failing-tool"
                           :description "A tool that always fails"))
