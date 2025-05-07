@@ -155,15 +155,17 @@ Example:
             (lambda (id) `(mcp-unregister-tool ,id))
             (nreverse tool-ids)))))))
 
-(defun mcp-test--initialize-request (id)
-  "Create an MCP initialize request with ID."
-  (json-encode
-   `(("jsonrpc" . "2.0")
-     ("method" . "initialize") ("id" . ,id)
-     ("params" .
-      (("protocolVersion" . "2025-03-26")
-       ("capabilities" .
-        (("tools" . t) ("resources" . nil) ("prompts" . nil))))))))
+(defun mcp-test--get-initialize-result ()
+  "Send an MCP initialize request and return its result."
+  (mcp-test--get-request-result
+   (json-encode
+    `(("jsonrpc" . "2.0")
+      ("method" . "initialize") ("id" . 15)
+      ("params" .
+       (("protocolVersion" . "2025-03-26")
+        ("capabilities"
+         .
+         (("tools" . t) ("resources" . nil) ("prompts" . nil)))))))))
 
 (defun mcp-test--prompts-list-request (id)
   "Create an MCP prompt list request with ID."
@@ -279,9 +281,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-initialize ()
   "Test the MCP initialize request handling."
   (mcp-test--with-server
-    (let* ((result
-            (mcp-test--get-request-result
-             (mcp-test--initialize-request 3)))
+    (let* ((result (mcp-test--get-initialize-result))
            (protocol-version (alist-get 'protocolVersion result))
            (capabilities (alist-get 'capabilities result))
            (server-name
@@ -302,9 +302,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool"
                           :description "A tool for testing"))
-    (let* ((result
-            (mcp-test--get-request-result
-             (mcp-test--initialize-request 1)))
+    (let* ((result (mcp-test--get-initialize-result))
            (capabilities (alist-get 'capabilities result))
            (tools-capability (alist-get 'tools capabilities))
            (list-changed (alist-get 'listChanged tools-capability)))
