@@ -170,21 +170,21 @@ Example:
 REQUEST is a string containing the JSON-RPC request.
 EXPECTED-CODE is the expected error code.
 EXPECTED-MESSAGE is a regex pattern to match against the error message."
-  (mcp-test--with-server
-    (let* ((resp (mcp-process-jsonrpc request))
-           (resp-obj (json-read-from-string resp))
-           (err-obj (alist-get 'error resp-obj))
-           (err-code (alist-get 'code err-obj))
-           (err-msg (alist-get 'message err-obj)))
-      (should (= err-code expected-code))
-      (should (string-match expected-message err-msg)))))
+  (let* ((resp (mcp-process-jsonrpc request))
+         (resp-obj (json-read-from-string resp))
+         (err-obj (alist-get 'error resp-obj))
+         (err-code (alist-get 'code err-obj))
+         (err-msg (alist-get 'message err-obj)))
+    (should (= err-code expected-code))
+    (should (string-match expected-message err-msg))))
 
 (defun mcp-test--check-invalid-jsonrpc-version (version)
   "Test that JSON-RPC request with VERSION is rejected properly."
-  (mcp-test--check-jsonrpc-error
-   (json-encode
-    `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
-   -32600 "Invalid Request: Not JSON-RPC 2.0"))
+  (mcp-test--with-server
+    (mcp-test--check-jsonrpc-error
+     (json-encode
+      `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
+     -32600 "Invalid Request: Not JSON-RPC 2.0")))
 
 (defun mcp-test--get-request-result (request)
   "Call `mcp-process-jsonrpc' with REQUEST and return its successful result."
@@ -193,12 +193,18 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
     (should (null (alist-get 'error resp-obj)))
     (alist-get 'result resp-obj)))
 
+(defun mcp-test--get-tool-list (request)
+  "Get the tool list from a tools/list REQUEST.
+Return the `tools` array from the result after verifying it is an array."
+  (let ((result
+         (alist-get 'tools (mcp-test--get-request-result request))))
+    (should (arrayp result))
+    result))
+
 (defun mcp-test--verify-tool-list-request (request expected-tools)
   "Verify a tools/list REQUEST from tools/list against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
-  (let ((tools
-         (alist-get 'tools (mcp-test--get-request-result request))))
-    (should (arrayp tools))
+  (let ((tools (mcp-test--get-tool-list request)))
     (should (= (length expected-tools) (length tools)))
     ;; Check each expected tool
     (dolist (expected expected-tools)
@@ -462,10 +468,9 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
         :id "requires-arg"
         :description "A tool that requires an argument"))
     ;; Get schema via tools/list
-    (let* ((result
-            (mcp-test--get-request-result
+    (let* ((tool-list
+            (mcp-test--get-tool-list
              (mcp-create-tools-list-request 42)))
-           (tool-list (alist-get 'tools result))
            (tool (aref tool-list 0))
            (schema (alist-get 'inputSchema tool)))
 
@@ -490,14 +495,14 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   (mcp-test--with-server
     ;; Create a tools/list request with an extra key
-    (let* ((request-with-extra
-            (json-encode
-             `(("jsonrpc" . "2.0")
-               ("method" . "tools/list")
-               ("id" . 43)
-               ("extra_key" . "unexpected value"))))
-           (result (mcp-test--get-request-result request-with-extra)))
-      (should (arrayp (alist-get 'tools result))))))
+    (let ((request-with-extra
+           (json-encode
+            `(("jsonrpc" . "2.0")
+              ("method" . "tools/list")
+              ("id" . 43)
+              ("extra_key" . "unexpected value")))))
+      ;; Just checking if tool list is an array is enough
+      (mcp-test--get-tool-list request-with-extra))))
 
 (ert-deftest mcp-test-schema-for-bytecode-handler ()
   "Test schema generation for a handler loaded as bytecode.
@@ -519,10 +524,9 @@ from a function loaded from bytecode rather than interpreted elisp."
         ((#'mcp-test-bytecode-handler--handler
           :id "bytecode-handler"
           :description "A tool with a handler loaded from bytecode"))
-      (let* ((result
-              (mcp-test--get-request-result
+      (let* ((tool-list
+              (mcp-test--get-tool-list
                (mcp-create-tools-list-request 123)))
-             (tool-list (alist-get 'tools result))
              (tool (aref tool-list 0))
              (schema (alist-get 'inputSchema tool)))
 
@@ -691,20 +695,15 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-test-tools-call-empty-string ()
   "Test the `tools/call` method with a tool that returns an empty string."
-  ;; Clear any previously registered tools to ensure only this tool exists
-  (clrhash mcp--tools)
-
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-empty-string
         :id "empty-string-tool"
         :description "A tool that returns an empty string"))
     ;; First check the schema for this zero-arg handler
-    (let* ((tools
-            (alist-get
-             'tools
-             (mcp-test--get-request-result
-              (mcp-create-tools-list-request 100))))
-           (tool (aref tools 0))
+    (let* ((tool-list
+            (mcp-test--get-tool-list
+             (mcp-create-tools-list-request 100)))
+           (tool (aref tool-list 0))
            (schema (alist-get 'inputSchema tool)))
 
       ;; Verify schema is correct for a zero-arg function
@@ -749,15 +748,17 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-test-parse-error ()
   "Test that invalid JSON input to `mcp-process-jsonrpc' returns a parse error."
-  (mcp-test--check-jsonrpc-error
-   "This is not valid JSON" -32700 "Parse error"))
+  (mcp-test--with-server
+    (mcp-test--check-jsonrpc-error
+     "This is not valid JSON" -32700 "Parse error")))
 
 (ert-deftest mcp-test-invalid-jsonrpc ()
   "Test that valid JSON that is not JSON-RPC returns an invalid request error."
-  (mcp-test--check-jsonrpc-error
-   (json-encode '(("name" . "Test Object") ("value" . 42)))
-   -32600
-   "Invalid Request: Not JSON-RPC 2.0"))
+  (mcp-test--with-server
+    (mcp-test--check-jsonrpc-error
+     (json-encode '(("name" . "Test Object") ("value" . 42)))
+     -32600
+     "Invalid Request: Not JSON-RPC 2.0")))
 
 (ert-deftest mcp-test-invalid-jsonrpc-older-version ()
   "Test that JSON-RPC with older version (1.1) is rejected properly."
@@ -769,17 +770,19 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-test-invalid-jsonrpc-missing-id ()
   "Test that JSON-RPC request lacking the \"id\" key is rejected properly."
-  (mcp-test--check-jsonrpc-error
-   (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/list")))
-   -32600
-   "Invalid Request: Missing required 'id' field"))
+  (mcp-test--with-server
+    (mcp-test--check-jsonrpc-error
+     (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/list")))
+     -32600
+     "Invalid Request: Missing required 'id' field")))
 
 (ert-deftest mcp-test-invalid-jsonrpc-missing-method ()
   "Test that JSON-RPC request lacking the \"method\" key is rejected properly."
-  (mcp-test--check-jsonrpc-error
-   (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
-   -32600
-   "Invalid Request: Missing required 'method' field"))
+  (mcp-test--with-server
+    (mcp-test--check-jsonrpc-error
+     (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
+     -32600
+     "Invalid Request: Missing required 'method' field")))
 
 ;;; Logging tests
 
@@ -838,10 +841,8 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-test--with-server
     ;; Tool should be accessible via API
     (let ((tools
-           (alist-get
-            'tools
-            (mcp-test--get-request-result
-             (mcp-create-tools-list-request 1000)))))
+           (mcp-test--get-tool-list
+            (mcp-create-tools-list-request 1000))))
       (should (= 1 (length tools)))
       (should
        (string= "persistent-tool" (alist-get 'name (aref tools 0))))))
