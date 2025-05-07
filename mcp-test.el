@@ -94,7 +94,7 @@ MCP Parameters:"
 
 (defmacro mcp-test--with-server (&rest body)
   "Run BODY with MCP server active.
-Calls `mcp-start' before BODY and `mcp-stop' after BODY using `unwind-protect'."
+Calls `mcp-start' before BODY and `mcp-stop' after BODY."
   (declare (indent defun) (debug t))
   `(progn
      (mcp-start)
@@ -110,7 +110,6 @@ All tools are automatically unregistered after BODY execution.
 Arguments:
   TOOLS  List of tool registration specs, each a list of arguments for
          `mcp-register-tool': (HANDLER &rest PROPERTIES)
-         Each spec must include :id in its property list
   BODY   Forms to execute with server running and tools registered
 
 Example:
