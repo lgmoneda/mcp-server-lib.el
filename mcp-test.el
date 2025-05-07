@@ -225,18 +225,13 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                  prop-value (alist-get prop-name found-tool)))))))))))
 
 (defun mcp-test--check-mcp-content-format (result expected-text)
-  "Check that RESULT follows the MCP content format with EXPECTED-TEXT.
-Verifies that result has a content array with a proper text item."
+  "Check that RESULT follows the MCP content format with EXPECTED-TEXT."
   ;; Check for proper MCP format
-  (should (alist-get 'content result))
-  (should (arrayp (alist-get 'content result)))
-  (should (= 1 (length (alist-get 'content result))))
-  ;; Check first content item
-  (let ((content-item (aref (alist-get 'content result) 0)))
-    (should (alist-get 'type content-item))
+  (let* ((content (alist-get 'content result))
+         (content-item (aref content 0)))
+    (should (arrayp content))
+    (should (= 1 (length content)))
     (should (string= "text" (alist-get 'type content-item)))
-    (should (alist-get 'text content-item))
-    ;; Verify the text field contains expected text
     (should (string= expected-text (alist-get 'text content-item))))
   ;; Check isError field
   (should (not (null (alist-get 'isError result nil t))))
