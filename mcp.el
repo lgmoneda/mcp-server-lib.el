@@ -1,7 +1,9 @@
 ;;; mcp.el --- Model Context Protocol implementation -*- lexical-binding: t; -*-
 
-;; Author: Laurynas Biveinis
-;; Keywords: comm, ai, tools
+;; Copyright (C) 2025 Laurynas Biveinis
+
+;; Author: Laurynas Biveinis <laurynas.biveinis@gmail.com>
+;; Keywords: comm, tools
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "27.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp.el

@@ -1,10 +1,9 @@
 ;;; mcp-test.el --- Tests for mcp.el -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2024 Laurynas Biveinis
+;; Copyright (C) 2025 Laurynas Biveinis
 
-;; Author: Laurynas Biveinis
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1"))
+;; Package-Requires: ((emacs "25.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -37,29 +36,29 @@
 (defconst mcp-test--string-list-result "item1 item2 item3"
   "Test data for string list tool.")
 
-;;; Test handlers
+;;; Test tool handlers
 
-(defun mcp-test--tool-handler ()
+(defun mcp-test--tool-handler-simple ()
   "Test tool handler function for MCP tool testing."
   "test result")
 
-(defun mcp-test--failing-tool-handler ()
+(defun mcp-test--tool-handler-mcp-tool-throw ()
   "Test tool handler that always fails with `mcp-tool-throw'."
   (mcp-tool-throw "This tool intentionally fails"))
 
-(defun mcp-test--generic-error-handler ()
+(defun mcp-test--tool-handler-error ()
   "Test tool handler that throws a generic error."
   (error "Generic error occurred"))
 
-(defun mcp-test--string-list-tool-handler ()
+(defun mcp-test--tool-handler-string-list ()
   "Test tool handler function to return a string with items."
   mcp-test--string-list-result)
 
-(defun mcp-test--empty-array-tool-handler ()
+(defun mcp-test--tool-handler-empty-string ()
   "Test tool handler function to return an empty string."
   "")
 
-(defun mcp-test--string-arg-tool-handler (input-string)
+(defun mcp-test--tool-handler-string-arg (input-string)
   "Test tool handler that accepts a string argument.
 INPUT-STRING is the string argument passed to the tool.
 
@@ -67,7 +66,7 @@ MCP Parameters:
   input-string - test parameter for string input"
   (concat "Echo: " input-string))
 
-(defun mcp-test--duplicate-param-handler (input-string)
+(defun mcp-test--tool-handler-duplicate-param (input-string)
   "Test handler with duplicate parameter.
 INPUT-STRING is the string argument.
 
@@ -76,7 +75,7 @@ MCP Parameters:
   input-string - second description"
   (concat "Test: " input-string))
 
-(defun mcp-test--mismatched-param-handler (input-string)
+(defun mcp-test--tool-handler-mismatched-param (input-string)
   "Test handler with mismatched parameter name.
 INPUT-STRING is the string argument.
 
@@ -84,7 +83,7 @@ MCP Parameters:
   wrong-param-name - description for non-existent parameter"
   (concat "Test: " input-string))
 
-(defun mcp-test--missing-param-handler (input-string)
+(defun mcp-test--tool-handler-missing-param (input-string)
   "Test handler with missing parameter documentation.
 INPUT-STRING is the string argument.
 
@@ -116,10 +115,10 @@ Arguments:
 
 Example:
   (mcp-test--with-tools
-   ((#\\='mcp-test--tool-handler
+   ((#\\='mcp-test--tool-handler-simple
      :id \"test-tool-1\"
      :description \"First tool\")
-    (#\\='mcp-test--tool-handler
+    (#\\='mcp-test--tool-handler-simple
      :id \"test-tool-2\"
      :description \"Second tool\"))
    (let ((response (mcp-process-jsonrpc (mcp-create-tools-list-request 7))))
@@ -279,7 +278,7 @@ Verifies that result has a content array with a proper text item."
 
 (ert-deftest mcp-test-tool-registration-in-capabilities ()
   "Test that registered tool appears in server capabilities."
-  (mcp-test--with-tools ((#'mcp-test--tool-handler
+  (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool"
                           :description "A tool for testing"))
     (let* ((req (mcp-test--initialize-request 1))
@@ -313,7 +312,7 @@ Verifies that result has a content array with a proper text item."
   "Test that tool registration with missing :id produces an error."
   (should-error
    (mcp-register-tool
-    #'mcp-test--tool-handler
+    #'mcp-test--tool-handler-simple
     :description "Test tool without ID")
    :type 'error))
 
@@ -321,7 +320,7 @@ Verifies that result has a content array with a proper text item."
   "Test that tool registration with missing :description produces an error."
   (should-error
    (mcp-register-tool
-    #'mcp-test--tool-handler
+    #'mcp-test--tool-handler-simple
     :id "test-tool-no-desc")
    :type 'error))
 
@@ -338,7 +337,7 @@ Verifies that result has a content array with a proper text item."
   "Test that duplicate parameter descriptions cause an error."
   (should-error
    (mcp-register-tool
-    #'mcp-test--duplicate-param-handler
+    #'mcp-test--tool-handler-duplicate-param
     :id "duplicate-param-tool"
     :description "Tool with duplicate parameter")
    :type 'error))
@@ -347,7 +346,7 @@ Verifies that result has a content array with a proper text item."
   "Test that parameter names must match function arguments."
   (should-error
    (mcp-register-tool
-    #'mcp-test--mismatched-param-handler
+    #'mcp-test--tool-handler-mismatched-param
     :id "mismatched-param-tool"
     :description "Tool with mismatched parameter")
    :type 'error))
@@ -356,7 +355,7 @@ Verifies that result has a content array with a proper text item."
   "Test that all function parameters must be documented."
   (should-error
    (mcp-register-tool
-    #'mcp-test--missing-param-handler
+    #'mcp-test--tool-handler-missing-param
     :id "missing-param-tool"
     :description "Tool with missing parameter docs")
    :type 'error))
@@ -367,7 +366,7 @@ Verifies that result has a content array with a proper text item."
   "Test that `mcp-unregister-tool' removes a tool correctly."
   (let ((tools-before (hash-table-count mcp--tools)))
     (mcp-register-tool
-     #'mcp-test--tool-handler
+     #'mcp-test--tool-handler-simple
      :id "test-unregister"
      :description "Tool for unregister test")
     (should (= (1+ tools-before) (hash-table-count mcp--tools)))
@@ -379,7 +378,7 @@ Verifies that result has a content array with a proper text item."
 (ert-deftest mcp-test-unregister-nonexistent-tool ()
   "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
   (mcp-register-tool
-   #'mcp-test--tool-handler
+   #'mcp-test--tool-handler-simple
    :id "test-other"
    :description "Other test tool")
   (should-not (mcp-unregister-tool "nonexistent-tool"))
@@ -426,7 +425,7 @@ Verifies that result has a content array with a proper text item."
 
 (ert-deftest mcp-test-tools-list-one ()
   "Test tools/list returns one tool with correct fields and schema."
-  (mcp-test--with-tools ((#'mcp-test--tool-handler
+  (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool"
                           :description "A tool for testing"))
     (let ((resp
@@ -439,7 +438,7 @@ Verifies that result has a content array with a proper text item."
 
 (ert-deftest mcp-test-tools-list-with-title ()
   "Test that tools/list includes title in response."
-  (mcp-test--with-tools ((#'mcp-test--tool-handler
+  (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "tool-with-title"
                           :description "A tool for testing titles"
                           :title "Friendly Tool Name"))
@@ -454,10 +453,10 @@ Verifies that result has a content array with a proper text item."
 
 (ert-deftest mcp-test-tools-list-two ()
   "Test the `tools/list` method returns multiple tools with correct fields."
-  (mcp-test--with-tools ((#'mcp-test--tool-handler
+  (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool-1"
                           :description "First tool for testing")
-                         (#'mcp-test--tool-handler
+                         (#'mcp-test--tool-handler-simple
                           :id "test-tool-2"
                           :description "Second tool for testing"))
     (let ((response
@@ -481,7 +480,7 @@ Verifies that result has a content array with a proper text item."
 (ert-deftest mcp-test-schema-for-one-arg-handler ()
   "Test schema includes parameter descriptions."
   (mcp-test--with-tools
-      ((#'mcp-test--string-arg-tool-handler
+      ((#'mcp-test--tool-handler-string-arg
         :id "requires-arg"
         :description "A tool that requires an argument"))
     ;; Get schema via tools/list
@@ -577,7 +576,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-tools-list-with-read-only-hint ()
   "Test that tools/list includes readOnlyHint=true in response."
   (mcp-test--with-tools
-      ((#'mcp-test--tool-handler
+      ((#'mcp-test--tool-handler-simple
         :id "read-only-tool"
         :description "A tool that doesn't modify its environment"
         :read-only t))
@@ -594,7 +593,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-tools-list-with-read-only-hint-false ()
   "Test that tools/list includes readOnlyHint=false in response."
   (mcp-test--with-tools
-      ((#'mcp-test--tool-handler
+      ((#'mcp-test--tool-handler-simple
         :id "non-read-only-tool"
         :description "Tool that modifies its environment"
         :read-only nil))
@@ -610,7 +609,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-tools-list-with-multiple-annotations ()
   "Test that tools/list handles multiple annotations in response."
   (mcp-test--with-tools
-      ((#'mcp-test--tool-handler
+      ((#'mcp-test--tool-handler-simple
         :id "multi-annotated-tool"
         :description "A tool with multiple annotations"
         :title "Friendly Multi-Tool"
@@ -678,9 +677,9 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 ;;; tools/call tests
 
-(ert-deftest mcp-test-tools-call-error ()
-  "Test that tool errors are properly formatted with isError=true."
-  (mcp-test--with-tools ((#'mcp-test--failing-tool-handler
+(ert-deftest mcp-test-mcp-tool-throw ()
+  "Test `mcp-tool-throw'."
+  (mcp-test--with-tools ((#'mcp-test--tool-handler-mcp-tool-throw
                           :id "failing-tool"
                           :description "A tool that always fails"))
     (let* ((response
@@ -709,7 +708,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-tools-call-generic-error ()
   "Test that generic errors use standard JSON-RPC error format."
   (mcp-test--with-tools
-      ((#'mcp-test--generic-error-handler
+      ((#'mcp-test--tool-handler-error
         :id "generic-error-tool"
         :description "A tool that throws a generic error"))
     (let* ((response
@@ -731,7 +730,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-tools-call-no-args ()
   "Test the `tools/call` method with a tool that takes no arguments."
   (mcp-test--with-tools
-      ((#'mcp-test--string-list-tool-handler
+      ((#'mcp-test--tool-handler-string-list
         :id "string-list-tool"
         :description "A tool that returns a string with items"))
     (let* ((response
@@ -749,7 +748,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (clrhash mcp--tools)
 
   (mcp-test--with-tools
-      ((#'mcp-test--empty-array-tool-handler
+      ((#'mcp-test--tool-handler-empty-string
         :id "empty-string-tool"
         :description "A tool that returns an empty string"))
     ;; First check the schema for this zero-arg handler
@@ -775,7 +774,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-tools-call-with-string-arg ()
   "Test the `tools/call` method with a tool that takes a string argument."
   (mcp-test--with-tools
-      ((#'mcp-test--string-arg-tool-handler
+      ((#'mcp-test--tool-handler-string-arg
         :id "string-arg-tool"
         :description "A tool that echoes a string argument"))
     (let* ((test-input "Hello, world!")
@@ -899,7 +898,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   "Test that server restart preserves registered tools."
   ;; Register a tool
   (mcp-register-tool
-   #'mcp-test--tool-handler
+   #'mcp-test--tool-handler-simple
    :id "persistent-tool"
    :description "Test persistence across restarts")
 
