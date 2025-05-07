@@ -155,6 +155,13 @@ Example:
             (lambda (id) `(mcp-unregister-tool ,id))
             (nreverse tool-ids)))))))
 
+(defun mcp-test--get-request-result (request)
+  "Call `mcp-process-jsonrpc' with REQUEST and return its successful result."
+  (let ((resp-obj
+         (json-read-from-string (mcp-process-jsonrpc request))))
+    (should (null (alist-get 'error resp-obj)))
+    (alist-get 'result resp-obj)))
+
 (defun mcp-test--get-initialize-result ()
   "Send an MCP initialize request and return its result."
   (mcp-test--get-request-result
@@ -167,10 +174,10 @@ Example:
          .
          (("tools" . t) ("resources" . nil) ("prompts" . nil)))))))))
 
-(defun mcp-test--prompts-list-request (id)
-  "Create an MCP prompt list request with ID."
+(defun mcp-test--prompts-list-request ()
+  "Create an MCP prompt list request with hardcoded ID 8."
   (json-encode
-   `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . ,id))))
+   `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . 8))))
 
 (defun mcp-test--check-jsonrpc-error
     (request expected-code expected-message)
@@ -206,13 +213,6 @@ Optional ARGS is the association list of arguments to pass to the tool."
   (mcp-test--check-jsonrpc-error
    (mcp-create-tools-call-request tool-id 999) -32600
    (format "Tool not found: %s" tool-id)))
-
-(defun mcp-test--get-request-result (request)
-  "Call `mcp-process-jsonrpc' with REQUEST and return its successful result."
-  (let ((resp-obj
-         (json-read-from-string (mcp-process-jsonrpc request))))
-    (should (null (alist-get 'error resp-obj)))
-    (alist-get 'result resp-obj)))
 
 (defun mcp-test--get-tool-list-for-request (request)
   "Get the tool list from a tools/list REQUEST.
@@ -749,7 +749,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-test--with-server
     (let ((result
            (mcp-test--get-request-result
-            (mcp-test--prompts-list-request 8))))
+            (mcp-test--prompts-list-request))))
       (should (alist-get 'prompts result))
       (should (arrayp (alist-get 'prompts result)))
       (should (= 0 (length (alist-get 'prompts result)))))))
