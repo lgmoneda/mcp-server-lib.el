@@ -63,7 +63,7 @@
 (defconst mcp--name "emacs-mcp"
   "Name of the MCP server.")
 
-(defconst mcp--protocol-version "2024-11-05"
+(defconst mcp--protocol-version "2025-03-26"
   "Current MCP protocol version supported by this server.
 Uses date-based versioning format to match current MCP practices.")
 
