@@ -126,7 +126,7 @@ Example:
     (#\\='mcp-test--tool-handler-simple
      :id \"test-tool-2\"
      :description \"Second tool\"))
-   (let ((response (mcp-process-jsonrpc (mcp-create-tools-list-request 7))))
+   (let ((response (mcp-process-jsonrpc (mcp-create-tools-list-request))))
      ...))"
   (declare (indent 1) (debug t))
   (let ((tool-registrations '())
@@ -192,6 +192,13 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
       `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
      -32600 "Invalid Request: Not JSON-RPC 2.0")))
 
+(defun mcp-test--call-tool (tool-id &optional id args)
+  "Call a tool with TOOL-ID and return its successful result.
+Optional ID is the JSON-RPC request ID (defaults to 1).
+Optional ARGS is the association list of arguments to pass to the tool."
+  (mcp-test--get-request-result
+   (mcp-create-tools-call-request tool-id id args)))
+
 (defun mcp-test--verify-tool-not-found (tool-id)
   "Verify a call to non-existent tool with TOOL-ID returning an error."
   (mcp-test--check-jsonrpc-error
@@ -205,7 +212,7 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
     (should (null (alist-get 'error resp-obj)))
     (alist-get 'result resp-obj)))
 
-(defun mcp-test--get-tool-list (request)
+(defun mcp-test--get-tool-list-for-request (request)
   "Get the tool list from a tools/list REQUEST.
 Return the `tools` array from the result after verifying it is an array."
   (let ((result
@@ -213,10 +220,15 @@ Return the `tools` array from the result after verifying it is an array."
     (should (arrayp result))
     result))
 
-(defun mcp-test--verify-tool-list-request (request expected-tools)
-  "Verify a tools/list REQUEST from tools/list against EXPECTED-TOOLS.
+(defun mcp-test--get-tool-list ()
+  "Get the response to a standard tool/list request."
+  (mcp-test--get-tool-list-for-request
+   (mcp-create-tools-list-request)))
+
+(defun mcp-test--verify-tool-list-request (expected-tools)
+  "Verify a tools/list response against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
-  (let ((tools (mcp-test--get-tool-list request)))
+  (let ((tools (mcp-test--get-tool-list)))
     (should (= (length expected-tools) (length tools)))
     ;; Check each expected tool
     (dolist (expected expected-tools)
@@ -368,35 +380,28 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-unregister-tool ()
   "Test that `mcp-unregister-tool' removes a tool correctly."
   (mcp-test--with-server
-   (mcp-register-tool
-    #'mcp-test--tool-handler-simple
-    :id mcp-test--unregister-tool-id
-    :description "Tool for unregister test")
+    (mcp-register-tool
+     #'mcp-test--tool-handler-simple
+     :id mcp-test--unregister-tool-id
+     :description "Tool for unregister test")
 
-   (let ((tools-before
-          (mcp-test--get-tool-list
-           (mcp-create-tools-list-request 42))))
-     (should (= 1 (length tools-before)))
-     (should
-      (string=
-       mcp-test--unregister-tool-id
-       (alist-get 'name (aref tools-before 0)))))
+    (let ((tools-before (mcp-test--get-tool-list)))
+      (should (= 1 (length tools-before)))
+      (should
+       (string=
+        mcp-test--unregister-tool-id
+        (alist-get 'name (aref tools-before 0)))))
 
-   (let ((result
-          (mcp-test--get-request-result
-           (mcp-create-tools-call-request
-            mcp-test--unregister-tool-id 44))))
-     (should result)
-     (mcp-test--check-mcp-content-format result "test result"))
+    (let ((result
+           (mcp-test--call-tool mcp-test--unregister-tool-id 44)))
+      (mcp-test--check-mcp-content-format result "test result"))
 
-   (should (mcp-unregister-tool mcp-test--unregister-tool-id))
+    (should (mcp-unregister-tool mcp-test--unregister-tool-id))
 
-   (let ((tools-after
-          (mcp-test--get-tool-list
-           (mcp-create-tools-list-request 43))))
-     (should (= 0 (length tools-after)))
-     (mcp-test--verify-tool-not-found
-      mcp-test--unregister-tool-id))))
+    (let ((tools-after (mcp-test--get-tool-list)))
+      (should (= 0 (length tools-after)))
+      (mcp-test--verify-tool-not-found
+       mcp-test--unregister-tool-id))))
 
 (ert-deftest mcp-test-unregister-nonexistent-tool ()
   "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
@@ -452,7 +457,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                           :id "test-tool"
                           :description "A tool for testing"))
     (mcp-test--verify-tool-list-request
-     (mcp-create-tools-list-request 6)
      '(("test-tool" .
         ((description . "A tool for testing")
          (inputSchema . ((type . "object")))))))))
@@ -464,7 +468,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                           :description "A tool for testing titles"
                           :title "Friendly Tool Name"))
     (mcp-test--verify-tool-list-request
-     (mcp-create-tools-list-request 14)
      '(("tool-with-title" .
         ((description . "A tool for testing titles")
          (annotations . ((title . "Friendly Tool Name")))
@@ -479,7 +482,6 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                           :id "test-tool-2"
                           :description "Second tool for testing"))
     (mcp-test--verify-tool-list-request
-     (mcp-create-tools-list-request 7)
      '(("test-tool-1" .
         ((description . "First tool for testing")
          (inputSchema . ((type . "object")))))
@@ -490,8 +492,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-tools-list-zero ()
   "Test the `tools/list` method returns empty array with no tools."
   (mcp-test--with-server
-    (mcp-test--verify-tool-list-request
-     (mcp-create-tools-list-request 5) '())))
+    (mcp-test--verify-tool-list-request '())))
 
 (ert-deftest mcp-test-schema-for-one-arg-handler ()
   "Test schema includes parameter descriptions."
@@ -500,9 +501,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
         :id "requires-arg"
         :description "A tool that requires an argument"))
     ;; Get schema via tools/list
-    (let* ((tool-list
-            (mcp-test--get-tool-list
-             (mcp-create-tools-list-request 42)))
+    (let* ((tool-list (mcp-test--get-tool-list))
            (tool (aref tool-list 0))
            (schema (alist-get 'inputSchema tool)))
 
@@ -534,7 +533,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
               ("id" . 43)
               ("extra_key" . "unexpected value")))))
       ;; Just checking if tool list is an array is enough
-      (mcp-test--get-tool-list request-with-extra))))
+      (mcp-test--get-tool-list-for-request request-with-extra))))
 
 (ert-deftest mcp-test-schema-for-bytecode-handler ()
   "Test schema generation for a handler loaded as bytecode.
@@ -556,9 +555,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         ((#'mcp-test-bytecode-handler--handler
           :id "bytecode-handler"
           :description "A tool with a handler loaded from bytecode"))
-      (let* ((tool-list
-              (mcp-test--get-tool-list
-               (mcp-create-tools-list-request 123)))
+      (let* ((tool-list (mcp-test--get-tool-list))
              (tool (aref tool-list 0))
              (schema (alist-get 'inputSchema tool)))
 
@@ -587,7 +584,6 @@ from a function loaded from bytecode rather than interpreted elisp."
         :description "A tool that doesn't modify its environment"
         :read-only t))
     (mcp-test--verify-tool-list-request
-     (mcp-create-tools-list-request 15)
      '(("read-only-tool" .
         ((description . "A tool that doesn't modify its environment")
          (annotations . ((readOnlyHint . t)))
@@ -601,7 +597,6 @@ from a function loaded from bytecode rather than interpreted elisp."
         :description "Tool that modifies its environment"
         :read-only nil))
     (mcp-test--verify-tool-list-request
-     (mcp-create-tools-list-request 16)
      '(("non-read-only-tool" .
         ((description . "Tool that modifies its environment")
          (annotations . ((readOnlyHint . :json-false)))
@@ -616,7 +611,6 @@ from a function loaded from bytecode rather than interpreted elisp."
         :title "Friendly Multi-Tool"
         :read-only t))
     (mcp-test--verify-tool-list-request
-     (mcp-create-tools-list-request 17)
      '(("multi-annotated-tool" .
         ((description . "A tool with multiple annotations")
          (annotations
@@ -681,9 +675,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-mcp-tool-throw
                           :id "failing-tool"
                           :description "A tool that always fails"))
-    (let ((result
-           (mcp-test--get-request-result
-            (mcp-create-tools-call-request "failing-tool" 11))))
+    (let ((result (mcp-test--call-tool "failing-tool" 11)))
       ;; Check for proper MCP format
       (should (alist-get 'content result))
       (should (arrayp (alist-get 'content result)))
@@ -718,10 +710,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       ((#'mcp-test--tool-handler-string-list
         :id "string-list-tool"
         :description "A tool that returns a string with items"))
-    (let ((result
-           (mcp-test--get-request-result
-            (mcp-create-tools-call-request "string-list-tool" 9))))
-      (should result)
+    (let ((result (mcp-test--call-tool "string-list-tool" 9)))
       (mcp-test--check-mcp-content-format
        result mcp-test--string-list-result))))
 
@@ -732,9 +721,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "empty-string-tool"
         :description "A tool that returns an empty string"))
     ;; First check the schema for this zero-arg handler
-    (let* ((tool-list
-            (mcp-test--get-tool-list
-             (mcp-create-tools-list-request 100)))
+    (let* ((tool-list (mcp-test--get-tool-list))
            (tool (aref tool-list 0))
            (schema (alist-get 'inputSchema tool)))
 
@@ -742,10 +729,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       (should (equal '((type . "object")) schema)))
 
     ;; Then test the actual tool execution
-    (let ((result
-           (mcp-test--get-request-result
-            (mcp-create-tools-call-request "empty-string-tool" 10))))
-      (should result)
+    (let ((result (mcp-test--call-tool "empty-string-tool" 10)))
       (mcp-test--check-mcp-content-format result ""))))
 
 (ert-deftest mcp-test-tools-call-with-string-arg ()
@@ -756,11 +740,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         :description "A tool that echoes a string argument"))
     (let* ((test-input "Hello, world!")
            (args `(("input" . ,test-input)))
-           (result
-            (mcp-test--get-request-result
-             (mcp-create-tools-call-request
-              "string-arg-tool" 13 args))))
-      (should result)
+           (result (mcp-test--call-tool "string-arg-tool" 13 args)))
       (mcp-test--check-mcp-content-format
        result (concat "Echo: " test-input)))))
 
@@ -830,7 +810,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
   (mcp-test--with-server
     ;; Make a tools/list request with a known ID
-    (let* ((request (mcp-create-tools-list-request 100))
+    (let* ((request (mcp-create-tools-list-request))
            (response (mcp-process-jsonrpc request)))
 
       ;; Check that log buffer exists
@@ -858,7 +838,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (setq mcp-log-io nil)
 
   (mcp-test--with-server
-    (let ((request (mcp-create-tools-list-request 101)))
+    (let ((request (mcp-create-tools-list-request)))
       (mcp-process-jsonrpc request)
       (should-not (get-buffer "*mcp-log*")))))
 
@@ -877,9 +857,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-stop)
   (mcp-test--with-server
     ;; Tool should be accessible via API
-    (let ((tools
-           (mcp-test--get-tool-list
-            (mcp-create-tools-list-request 1000))))
+    (let ((tools (mcp-test--get-tool-list)))
       (should (= 1 (length tools)))
       (should
        (string= "persistent-tool" (alist-get 'name (aref tools 0))))))
