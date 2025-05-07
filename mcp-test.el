@@ -185,12 +185,18 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
    -32600
    "Invalid Request: Not JSON-RPC 2.0"))
 
-(defun mcp-test--verify-tool-list-response (response expected-tools)
-  "Verify RESPONSE from tools/list against EXPECTED-TOOLS.
+(defun mcp-test--get-request-result (request)
+  "Call `mcp-process-jsonrpc' with REQUEST and return its successful result."
+  (let ((resp-obj
+         (json-read-from-string (mcp-process-jsonrpc request))))
+    (should (null (alist-get 'error resp-obj)))
+    (alist-get 'result resp-obj)))
+
+(defun mcp-test--verify-tool-list-request (request expected-tools)
+  "Verify a tools/list REQUEST from tools/list against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
-  (let* ((resp-obj (json-read-from-string response))
-         (result (alist-get 'result resp-obj))
-         (tools (alist-get 'tools result)))
+  (let ((tools
+         (alist-get 'tools (mcp-test--get-request-result request))))
     (should (arrayp tools))
     (should (= (length expected-tools) (length tools)))
     ;; Check each expected tool
@@ -242,9 +248,9 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-initialize ()
   "Test the MCP initialize request handling."
   (mcp-test--with-server
-    (let* ((req (mcp-test--initialize-request 3))
-           (resp (mcp-process-jsonrpc req))
-           (result (alist-get 'result (json-read-from-string resp)))
+    (let* ((result
+            (mcp-test--get-request-result
+             (mcp-test--initialize-request 3)))
            (protocol-version (alist-get 'protocolVersion result))
            (capabilities (alist-get 'capabilities result))
            (server-name
@@ -265,19 +271,13 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool"
                           :description "A tool for testing"))
-    (let* ((req (mcp-test--initialize-request 1))
-           (resp (mcp-process-jsonrpc req))
-           (resp-obj (json-read-from-string resp)))
-
-      (should (alist-get 'result resp-obj))
-
-      (let* ((result (alist-get 'result resp-obj))
-             (capabilities (alist-get 'capabilities result))
-             (tools-capability (alist-get 'tools capabilities)))
-
-        (should tools-capability)
-        (should (alist-get 'listChanged tools-capability))
-        (should (eq t (alist-get 'listChanged tools-capability)))))))
+    (let* ((result
+            (mcp-test--get-request-result
+             (mcp-test--initialize-request 1)))
+           (capabilities (alist-get 'capabilities result))
+           (tools-capability (alist-get 'tools capabilities))
+           (list-changed (alist-get 'listChanged tools-capability)))
+      (should (eq t list-changed)))))
 
 (ert-deftest mcp-test-notifications-initialized-format ()
   "Test the MCP notifications/initialized format handling."
@@ -412,13 +412,11 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool"
                           :description "A tool for testing"))
-    (let ((resp
-           (mcp-process-jsonrpc (mcp-create-tools-list-request 6))))
-      (mcp-test--verify-tool-list-response
-       resp
-       '(("test-tool" .
-          ((description . "A tool for testing")
-           (inputSchema . ((type . "object"))))))))))
+    (mcp-test--verify-tool-list-request
+     (mcp-create-tools-list-request 6)
+     '(("test-tool" .
+        ((description . "A tool for testing")
+         (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-with-title ()
   "Test that tools/list includes title in response."
@@ -426,14 +424,12 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                           :id "tool-with-title"
                           :description "A tool for testing titles"
                           :title "Friendly Tool Name"))
-    (let ((response
-           (mcp-process-jsonrpc (mcp-create-tools-list-request 14))))
-      (mcp-test--verify-tool-list-response
-       response
-       '(("tool-with-title" .
-          ((description . "A tool for testing titles")
-           (annotations . ((title . "Friendly Tool Name")))
-           (inputSchema . ((type . "object"))))))))))
+    (mcp-test--verify-tool-list-request
+     (mcp-create-tools-list-request 14)
+     '(("tool-with-title" .
+        ((description . "A tool for testing titles")
+         (annotations . ((title . "Friendly Tool Name")))
+         (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-two ()
   "Test the `tools/list` method returns multiple tools with correct fields."
@@ -443,23 +439,20 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                          (#'mcp-test--tool-handler-simple
                           :id "test-tool-2"
                           :description "Second tool for testing"))
-    (let ((response
-           (mcp-process-jsonrpc (mcp-create-tools-list-request 7))))
-      (mcp-test--verify-tool-list-response
-       response
-       '(("test-tool-1" .
-          ((description . "First tool for testing")
-           (inputSchema . ((type . "object")))))
-         ("test-tool-2" .
-          ((description . "Second tool for testing")
-           (inputSchema . ((type . "object"))))))))))
+    (mcp-test--verify-tool-list-request
+     (mcp-create-tools-list-request 7)
+     '(("test-tool-1" .
+        ((description . "First tool for testing")
+         (inputSchema . ((type . "object")))))
+       ("test-tool-2" .
+        ((description . "Second tool for testing")
+         (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-zero ()
   "Test the `tools/list` method returns empty array with no tools."
   (mcp-test--with-server
-    (let ((resp
-           (mcp-process-jsonrpc (mcp-create-tools-list-request 5))))
-      (mcp-test--verify-tool-list-response resp '()))))
+    (mcp-test--verify-tool-list-request
+     (mcp-create-tools-list-request 5) '())))
 
 (ert-deftest mcp-test-schema-for-one-arg-handler ()
   "Test schema includes parameter descriptions."
@@ -468,10 +461,10 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
         :id "requires-arg"
         :description "A tool that requires an argument"))
     ;; Get schema via tools/list
-    (let* ((list-req (mcp-create-tools-list-request 42))
-           (list-response (mcp-process-jsonrpc list-req))
-           (list-obj (json-read-from-string list-response))
-           (tool-list (alist-get 'tools (alist-get 'result list-obj)))
+    (let* ((result
+            (mcp-test--get-request-result
+             (mcp-create-tools-list-request 42)))
+           (tool-list (alist-get 'tools result))
            (tool (aref tool-list 0))
            (schema (alist-get 'inputSchema tool)))
 
@@ -502,13 +495,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
                ("method" . "tools/list")
                ("id" . 43)
                ("extra_key" . "unexpected value"))))
-           (response (mcp-process-jsonrpc request-with-extra))
-           (response-obj (json-read-from-string response))
-           (result (alist-get 'result response-obj)))
-      ;; Should be processed normally, not rejected as error
-      (should (null (alist-get 'error response-obj)))
-      (should result)
-      (should (alist-get 'tools result))
+           (result (mcp-test--get-request-result request-with-extra)))
       (should (arrayp (alist-get 'tools result))))))
 
 (ert-deftest mcp-test-schema-for-bytecode-handler ()
@@ -531,11 +518,10 @@ from a function loaded from bytecode rather than interpreted elisp."
           ((#'mcp-test-bytecode-handler--handler
             :id "bytecode-handler"
             :description "A tool with a handler loaded from bytecode"))
-        (let* ((list-req (mcp-create-tools-list-request 123))
-               (list-response (mcp-process-jsonrpc list-req))
-               (list-obj (json-read-from-string list-response))
-               (tool-list
-                (alist-get 'tools (alist-get 'result list-obj)))
+        (let* ((result
+                (mcp-test--get-request-result
+                 (mcp-create-tools-list-request 123)))
+               (tool-list (alist-get 'tools result))
                (tool (aref tool-list 0))
                (schema (alist-get 'inputSchema tool)))
 
@@ -564,15 +550,12 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "read-only-tool"
         :description "A tool that doesn't modify its environment"
         :read-only t))
-    (let ((response
-           (mcp-process-jsonrpc (mcp-create-tools-list-request 15))))
-      (mcp-test--verify-tool-list-response
-       response
-       '(("read-only-tool" .
-          ((description
-            . "A tool that doesn't modify its environment")
-           (annotations . ((readOnlyHint . t)))
-           (inputSchema . ((type . "object"))))))))))
+    (mcp-test--verify-tool-list-request
+     (mcp-create-tools-list-request 15)
+     '(("read-only-tool" .
+        ((description . "A tool that doesn't modify its environment")
+         (annotations . ((readOnlyHint . t)))
+         (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-with-read-only-hint-false ()
   "Test that tools/list includes readOnlyHint=false in response."
@@ -581,14 +564,12 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "non-read-only-tool"
         :description "Tool that modifies its environment"
         :read-only nil))
-    (let ((response
-           (mcp-process-jsonrpc (mcp-create-tools-list-request 16))))
-      (mcp-test--verify-tool-list-response
-       response
-       '(("non-read-only-tool" .
-          ((description . "Tool that modifies its environment")
-           (annotations . ((readOnlyHint . :json-false)))
-           (inputSchema . ((type . "object"))))))))))
+    (mcp-test--verify-tool-list-request
+     (mcp-create-tools-list-request 16)
+     '(("non-read-only-tool" .
+        ((description . "Tool that modifies its environment")
+         (annotations . ((readOnlyHint . :json-false)))
+         (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-with-multiple-annotations ()
   "Test that tools/list handles multiple annotations in response."
@@ -598,15 +579,13 @@ from a function loaded from bytecode rather than interpreted elisp."
         :description "A tool with multiple annotations"
         :title "Friendly Multi-Tool"
         :read-only t))
-    (let ((response
-           (mcp-process-jsonrpc (mcp-create-tools-list-request 17))))
-      (mcp-test--verify-tool-list-response
-       response
-       '(("multi-annotated-tool" .
-          ((description . "A tool with multiple annotations")
-           (annotations
-            . ((title . "Friendly Multi-Tool") (readOnlyHint . t)))
-           (inputSchema . ((type . "object"))))))))))
+    (mcp-test--verify-tool-list-request
+     (mcp-create-tools-list-request 17)
+     '(("multi-annotated-tool" .
+        ((description . "A tool with multiple annotations")
+         (annotations
+          . ((title . "Friendly Multi-Tool") (readOnlyHint . t)))
+         (inputSchema . ((type . "object")))))))))
 
 ;;; `mcp-create-tools-call-request' tests
 
@@ -666,13 +645,10 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-mcp-tool-throw
                           :id "failing-tool"
                           :description "A tool that always fails"))
-    (let* ((response
-            (mcp-process-jsonrpc
-             (mcp-create-tools-call-request "failing-tool" 11)))
-           (response-obj (json-read-from-string response))
-           (result (alist-get 'result response-obj)))
+    (let ((result
+           (mcp-test--get-request-result
+            (mcp-create-tools-call-request "failing-tool" 11))))
       ;; Check for proper MCP format
-      (should result)
       (should (alist-get 'content result))
       (should (arrayp (alist-get 'content result)))
       (should (= 1 (length (alist-get 'content result))))
@@ -717,11 +693,9 @@ from a function loaded from bytecode rather than interpreted elisp."
       ((#'mcp-test--tool-handler-string-list
         :id "string-list-tool"
         :description "A tool that returns a string with items"))
-    (let* ((response
-            (mcp-process-jsonrpc
-             (mcp-create-tools-call-request "string-list-tool" 9)))
-           (response-obj (json-read-from-string response))
-           (result (alist-get 'result response-obj)))
+    (let ((result
+           (mcp-test--get-request-result
+            (mcp-create-tools-call-request "string-list-tool" 9))))
       (should result)
       (mcp-test--check-mcp-content-format
        result mcp-test--string-list-result))))
@@ -736,10 +710,11 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "empty-string-tool"
         :description "A tool that returns an empty string"))
     ;; First check the schema for this zero-arg handler
-    (let* ((list-req (mcp-create-tools-list-request 100))
-           (list-response (mcp-process-jsonrpc list-req))
-           (list-obj (json-read-from-string list-response))
-           (tools (alist-get 'tools (alist-get 'result list-obj)))
+    (let* ((tools
+            (alist-get
+             'tools
+             (mcp-test--get-request-result
+              (mcp-create-tools-list-request 100))))
            (tool (aref tools 0))
            (schema (alist-get 'inputSchema tool)))
 
@@ -747,11 +722,9 @@ from a function loaded from bytecode rather than interpreted elisp."
       (should (equal '((type . "object")) schema)))
 
     ;; Then test the actual tool execution
-    (let* ((req
-            (mcp-create-tools-call-request "empty-string-tool" 10))
-           (response (mcp-process-jsonrpc req))
-           (response-obj (json-read-from-string response))
-           (result (alist-get 'result response-obj)))
+    (let ((result
+           (mcp-test--get-request-result
+            (mcp-create-tools-call-request "empty-string-tool" 10))))
       (should result)
       (mcp-test--check-mcp-content-format result ""))))
 
@@ -763,11 +736,10 @@ from a function loaded from bytecode rather than interpreted elisp."
         :description "A tool that echoes a string argument"))
     (let* ((test-input "Hello, world!")
            (args `(("input" . ,test-input)))
-           (req
-            (mcp-create-tools-call-request "string-arg-tool" 13 args))
-           (response (mcp-process-jsonrpc req))
-           (response-obj (json-read-from-string response))
-           (result (alist-get 'result response-obj)))
+           (result
+            (mcp-test--get-request-result
+             (mcp-create-tools-call-request
+              "string-arg-tool" 13 args))))
       (should result)
       (mcp-test--check-mcp-content-format
        result (concat "Echo: " test-input)))))
@@ -777,11 +749,9 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-prompts-list-zero ()
   "Test the `prompts/list` method returns empty array with no prompts."
   (mcp-test--with-server
-    (let* ((response
-            (mcp-process-jsonrpc (mcp-test--prompts-list-request 8)))
-           (response-obj (json-read-from-string response))
-           (result (alist-get 'result response-obj)))
-      (should result)
+    (let ((result
+           (mcp-test--get-request-result
+            (mcp-test--prompts-list-request 8))))
       (should (alist-get 'prompts result))
       (should (arrayp (alist-get 'prompts result)))
       (should (= 0 (length (alist-get 'prompts result)))))))
@@ -891,10 +861,11 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-stop)
   (mcp-test--with-server
     ;; Tool should be accessible via API
-    (let* ((list-request (mcp-create-tools-list-request 1000))
-           (list-response (mcp-process-jsonrpc list-request))
-           (list-obj (json-read-from-string list-response))
-           (tools (alist-get 'tools (alist-get 'result list-obj))))
+    (let ((tools
+           (alist-get
+            'tools
+            (mcp-test--get-request-result
+             (mcp-create-tools-list-request 1000)))))
       (should (= 1 (length tools)))
       (should
        (string= "persistent-tool" (alist-get 'name (aref tools 0))))))
