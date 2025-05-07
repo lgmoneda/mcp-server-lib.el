@@ -424,12 +424,11 @@ from a function loaded from bytecode rather than interpreted elisp."
      :id mcp-test--unregister-tool-id
      :description "Tool for unregister test")
 
-    (let ((tools-before (mcp-test--get-tool-list)))
-      (should (= 1 (length tools-before)))
-      (should
-       (string=
-        mcp-test--unregister-tool-id
-        (alist-get 'name (aref tools-before 0)))))
+    (mcp-test--verify-tool-list-request
+     `((,mcp-test--unregister-tool-id
+        .
+        ((description . "Tool for unregister test")
+         (inputSchema . ((type . "object")))))))
 
     (let ((result
            (mcp-test--call-tool mcp-test--unregister-tool-id 44)))
@@ -437,10 +436,8 @@ from a function loaded from bytecode rather than interpreted elisp."
 
     (should (mcp-unregister-tool mcp-test--unregister-tool-id))
 
-    (let ((tools-after (mcp-test--get-tool-list)))
-      (should (= 0 (length tools-after)))
-      (mcp-test--verify-tool-not-found
-       mcp-test--unregister-tool-id))))
+    (mcp-test--verify-tool-list-request '())
+    (mcp-test--verify-tool-not-found mcp-test--unregister-tool-id)))
 
 (ert-deftest mcp-test-unregister-tool-nonexistent ()
   "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
