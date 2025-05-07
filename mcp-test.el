@@ -96,6 +96,10 @@ INPUT-STRING is the string argument.
 MCP Parameters:"
   (concat "Test: " input-string))
 
+;; Bytecode handler function that will be loaded during tests
+(declare-function mcp-test-bytecode-handler--handler
+                  "mcp-test-bytecode-handler")
+
 ;;; Test helpers
 
 (defmacro mcp-test--with-server (&rest body)
@@ -388,8 +392,6 @@ from a function loaded from bytecode rather than interpreted elisp."
     (let ((load-prefer-newer nil))
       (load bytecode-file nil t))
 
-    (declare-function mcp-test-bytecode-handler--handler
-                      "mcp-test-bytecode-handler")
     (mcp-test--with-tools
         ((#'mcp-test-bytecode-handler--handler
           :id "bytecode-handler"
