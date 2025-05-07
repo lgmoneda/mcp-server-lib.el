@@ -242,28 +242,23 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 (ert-deftest mcp-test-initialize ()
   "Test the MCP initialize request handling."
   (mcp-test--with-server
-    ;; Test initialize with valid parameters
     (let* ((req (mcp-test--initialize-request 3))
            (resp (mcp-process-jsonrpc req))
-           (result (alist-get 'result (json-read-from-string resp))))
-      ;; Verify the server responded with its protocol version
-      (should (stringp (alist-get 'protocolVersion result)))
-      (should
-       (string= "2025-03-26" (alist-get 'protocolVersion result)))
-      ;; Verify server capabilities
-      (should (alist-get 'capabilities result))
-
+           (result (alist-get 'result (json-read-from-string resp)))
+           (protocol-version (alist-get 'protocolVersion result))
+           (capabilities (alist-get 'capabilities result))
+           (server-name
+            (alist-get 'name (alist-get 'serverInfo result))))
+      ;; Verify version
+      (should (stringp protocol-version))
+      (should (string= "2025-03-26" protocol-version))
       ;; Verify capability objects are present and properly formatted
       ;; (empty objects deserialize to nil)
-      (let ((capabilities (alist-get 'capabilities result)))
-        (should (equal nil (alist-get 'tools capabilities)))
-        (should (equal nil (alist-get 'resources capabilities)))
-        (should (equal nil (alist-get 'prompts capabilities))))
+      (should (equal nil (alist-get 'tools capabilities)))
+      (should (equal nil (alist-get 'resources capabilities)))
+      (should (equal nil (alist-get 'prompts capabilities)))
       ;; Verify server info
-      (should (alist-get 'serverInfo result))
-      (let ((server-name
-             (alist-get 'name (alist-get 'serverInfo result))))
-        (should (string= mcp--name server-name))))))
+      (should (string= mcp--name server-name)))))
 
 (ert-deftest mcp-test-tool-registration-in-capabilities ()
   "Test that registered tool appears in server capabilities."
