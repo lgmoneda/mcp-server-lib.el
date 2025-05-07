@@ -382,15 +382,12 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   "Test schema generation for a handler loaded as bytecode.
 This test verifies that MCP can correctly extract parameter information
 from a function loaded from bytecode rather than interpreted elisp."
-  (let ((source-file
-         (expand-file-name "mcp-test-bytecode-handler.el"))
-        (bytecode-file
-         (expand-file-name "mcp-test-bytecode-handler.elc")))
-    (should (file-exists-p source-file))
-    (byte-compile-file source-file)
+  (let* ((source-file
+          (expand-file-name "mcp-test-bytecode-handler.el"))
+         (bytecode-file (byte-compile-dest-file source-file)))
+    (should (byte-compile-file source-file))
 
-    (let ((load-prefer-newer nil))
-      (load bytecode-file nil t))
+    (should (load bytecode-file nil t t))
 
     (mcp-test--with-tools
         ((#'mcp-test-bytecode-handler--handler
