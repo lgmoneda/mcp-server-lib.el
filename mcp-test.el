@@ -36,7 +36,6 @@
 (defconst mcp-test--string-list-result "item1 item2 item3"
   "Test data for string list tool.")
 
-
 ;;; Test tool handlers
 
 (defun mcp-test--tool-handler-simple ()
@@ -166,12 +165,13 @@ Example:
    `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . ,id))))
 
 (defun mcp-test--check-jsonrpc-error
-    (request-object expected-code expected-message)
-  "Test that JSON-RPC REQUEST-OBJECT is rejected with expected error.
+    (request expected-code expected-message)
+  "Test that JSON-RPC REQUEST is rejected with expected error.
+REQUEST is a string containing the JSON-RPC request.
 EXPECTED-CODE is the expected error code.
 EXPECTED-MESSAGE is a regex pattern to match against the error message."
   (mcp-test--with-server
-    (let* ((resp (mcp-process-jsonrpc (json-encode request-object)))
+    (let* ((resp (mcp-process-jsonrpc request))
            (resp-obj (json-read-from-string resp))
            (err-obj (alist-get 'error resp-obj))
            (err-code (alist-get 'code err-obj))
@@ -182,9 +182,9 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
 (defun mcp-test--check-invalid-jsonrpc-version (version)
   "Test that JSON-RPC request with VERSION is rejected properly."
   (mcp-test--check-jsonrpc-error
-   `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42))
-   -32600
-   "Invalid Request: Not JSON-RPC 2.0"))
+   (json-encode
+    `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
+   -32600 "Invalid Request: Not JSON-RPC 2.0"))
 
 (defun mcp-test--get-request-result (request)
   "Call `mcp-process-jsonrpc' with REQUEST and return its successful result."
@@ -671,21 +671,10 @@ from a function loaded from bytecode rather than interpreted elisp."
       ((#'mcp-test--tool-handler-error
         :id "generic-error-tool"
         :description "A tool that throws a generic error"))
-    (let* ((response
-            (mcp-process-jsonrpc
-             (mcp-create-tools-call-request "generic-error-tool" 12)))
-           (response-obj (json-read-from-string response))
-           ;; Should have error field at the top level of the response
-           (error-obj (alist-get 'error response-obj)))
-      ;; Check it has a standard JSON-RPC error
-      (should error-obj)
-      (should (alist-get 'code error-obj))
-      (should (= -32603 (alist-get 'code error-obj)))
-      (should (alist-get 'message error-obj))
-      (should
-       (string-match
-        "Internal error executing tool"
-        (alist-get 'message error-obj))))))
+    (mcp-test--check-jsonrpc-error
+     (mcp-create-tools-call-request "generic-error-tool" 12)
+     -32603
+     "Internal error executing tool")))
 
 (ert-deftest mcp-test-tools-call-no-args ()
   "Test the `tools/call` method with a tool that takes no arguments."
@@ -760,26 +749,13 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-test-parse-error ()
   "Test that invalid JSON input to `mcp-process-jsonrpc' returns a parse error."
-  (mcp-test--with-server
-    ;; Send an invalid JSON string
-    (let* ((invalid-json "This is not valid JSON")
-           (response (mcp-process-jsonrpc invalid-json))
-           (response-obj (json-read-from-string response))
-           (error-obj (alist-get 'error response-obj)))
-      ;; Verify it's a proper error response
-      (should error-obj)
-      (should (alist-get 'code error-obj))
-      ;; Check it has the correct error code for parse error (-32700)
-      (should (= (alist-get 'code error-obj) -32700))
-      ;; Check it has an error message
-      (should (alist-get 'message error-obj))
-      (should
-       (string-match "Parse error" (alist-get 'message error-obj))))))
+  (mcp-test--check-jsonrpc-error
+   "This is not valid JSON" -32700 "Parse error"))
 
 (ert-deftest mcp-test-invalid-jsonrpc ()
   "Test that valid JSON that is not JSON-RPC returns an invalid request error."
   (mcp-test--check-jsonrpc-error
-   '(("name" . "Test Object") ("value" . 42))
+   (json-encode '(("name" . "Test Object") ("value" . 42)))
    -32600
    "Invalid Request: Not JSON-RPC 2.0"))
 
@@ -794,14 +770,14 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-test-invalid-jsonrpc-missing-id ()
   "Test that JSON-RPC request lacking the \"id\" key is rejected properly."
   (mcp-test--check-jsonrpc-error
-   '(("jsonrpc" . "2.0") ("method" . "tools/list"))
+   (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/list")))
    -32600
    "Invalid Request: Missing required 'id' field"))
 
 (ert-deftest mcp-test-invalid-jsonrpc-missing-method ()
   "Test that JSON-RPC request lacking the \"method\" key is rejected properly."
   (mcp-test--check-jsonrpc-error
-   '(("jsonrpc" . "2.0") ("id" . 42))
+   (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
    -32600
    "Invalid Request: Missing required 'method' field"))
 
