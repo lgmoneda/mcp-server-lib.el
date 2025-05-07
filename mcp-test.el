@@ -155,7 +155,7 @@ Example:
    `(("jsonrpc" . "2.0")
      ("method" . "initialize") ("id" . ,id)
      ("params" .
-      (("protocolVersion" . "2024-11-05")
+      (("protocolVersion" . "2025-03-26")
        ("capabilities" .
         (("tools" . t) ("resources" . nil) ("prompts" . nil))))))))
 
@@ -259,7 +259,7 @@ Verifies that result has a content array with a proper text item."
       ;; Verify the server responded with its protocol version
       (should (stringp (alist-get 'protocolVersion result)))
       (should
-       (string= "2024-11-05" (alist-get 'protocolVersion result)))
+       (string= "2025-03-26" (alist-get 'protocolVersion result)))
       ;; Verify server capabilities
       (should (alist-get 'capabilities result))
 

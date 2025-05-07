@@ -64,8 +64,7 @@
   "Name of the MCP server.")
 
 (defconst mcp--protocol-version "2025-03-26"
-  "Current MCP protocol version supported by this server.
-Uses date-based versioning format to match current MCP practices.")
+  "Current MCP protocol version supported by this server.")
 
 ;;; Internal global state variables
 
