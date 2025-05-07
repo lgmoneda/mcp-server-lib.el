@@ -36,6 +36,7 @@
 (defconst mcp-test--string-list-result "item1 item2 item3"
   "Test data for string list tool.")
 
+
 ;;; Test tool handlers
 
 (defun mcp-test--tool-handler-simple ()
@@ -502,43 +503,42 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test schema generation for a handler loaded as bytecode.
 This test verifies that MCP can correctly extract parameter information
 from a function loaded from bytecode rather than interpreted elisp."
-  (let* ((source-file
-          (expand-file-name "mcp-test-bytecode-handler.el"))
-         (bytecode-file
-          (expand-file-name "mcp-test-bytecode-handler.elc")))
+  (let ((source-file
+         (expand-file-name "mcp-test-bytecode-handler.el"))
+        (bytecode-file
+         (expand-file-name "mcp-test-bytecode-handler.elc")))
     (should (file-exists-p source-file))
     (byte-compile-file source-file)
 
     (let ((load-prefer-newer nil))
       (load bytecode-file nil t))
 
-    ;; Suppress byte-compiler warning about unknown function
-    (with-no-warnings
-      (mcp-test--with-tools
-          ((#'mcp-test-bytecode-handler--handler
-            :id "bytecode-handler"
-            :description "A tool with a handler loaded from bytecode"))
-        (let* ((result
-                (mcp-test--get-request-result
-                 (mcp-create-tools-list-request 123)))
-               (tool-list (alist-get 'tools result))
-               (tool (aref tool-list 0))
-               (schema (alist-get 'inputSchema tool)))
+    (declare-function mcp-test-bytecode-handler--handler
+                      "mcp-test-bytecode-handler")
+    (mcp-test--with-tools
+        ((#'mcp-test-bytecode-handler--handler
+          :id "bytecode-handler"
+          :description "A tool with a handler loaded from bytecode"))
+      (let* ((result
+              (mcp-test--get-request-result
+               (mcp-create-tools-list-request 123)))
+             (tool-list (alist-get 'tools result))
+             (tool (aref tool-list 0))
+             (schema (alist-get 'inputSchema tool)))
 
-          (should (equal "object" (alist-get 'type schema)))
-          (should (alist-get 'properties schema))
+        (should (equal "object" (alist-get 'type schema)))
+        (should (alist-get 'properties schema))
+        (should (equal ["input-string"] (alist-get 'required schema)))
+
+        (let ((param-schema
+               (alist-get
+                'input-string (alist-get 'properties schema))))
+          (should param-schema)
+          (should (equal "string" (alist-get 'type param-schema)))
           (should
-           (equal ["input-string"] (alist-get 'required schema)))
-
-          (let ((param-schema
-                 (alist-get
-                  'input-string (alist-get 'properties schema))))
-            (should param-schema)
-            (should (equal "string" (alist-get 'type param-schema)))
-            (should
-             (equal
-              "Input string parameter for bytecode testing"
-              (alist-get 'description param-schema)))))))
+           (equal
+            "Input string parameter for bytecode testing"
+            (alist-get 'description param-schema))))))
 
     (when (file-exists-p bytecode-file)
       (delete-file bytecode-file))))
