@@ -155,6 +155,11 @@ Example:
             (lambda (id) `(mcp-unregister-tool ,id))
             (nreverse tool-ids)))))))
 
+(defun mcp-test--prompts-list-request ()
+  "Create an MCP prompt list request."
+  (json-encode
+   `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . 8))))
+
 (defun mcp-test--get-request-result (request)
   "Call `mcp-process-jsonrpc' with REQUEST and return its successful result."
   (let ((resp-obj
@@ -163,7 +168,7 @@ Example:
     (alist-get 'result resp-obj)))
 
 (defun mcp-test--get-initialize-result ()
-  "Send an MCP initialize request and return its result."
+  "Send an MCP `initialize` request and return its result."
   (mcp-test--get-request-result
    (json-encode
     `(("jsonrpc" . "2.0")
@@ -173,11 +178,6 @@ Example:
         ("capabilities"
          .
          (("tools" . t) ("resources" . nil) ("prompts" . nil)))))))))
-
-(defun mcp-test--prompts-list-request ()
-  "Create an MCP prompt list request with hardcoded ID 8."
-  (json-encode
-   `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . 8))))
 
 (defun mcp-test--check-jsonrpc-error
     (request expected-code expected-message)
@@ -223,12 +223,12 @@ Return the `tools` array from the result after verifying it is an array."
     result))
 
 (defun mcp-test--get-tool-list ()
-  "Get the response to a standard tool/list request."
+  "Get the response to a standard `tool/list` request."
   (mcp-test--get-tool-list-for-request
    (mcp-create-tools-list-request)))
 
 (defun mcp-test--verify-tool-list-request (expected-tools)
-  "Verify a tools/list response against EXPECTED-TOOLS.
+  "Verify a `tools/list` response against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
   (let ((tools (mcp-test--get-tool-list)))
     (should (= (length expected-tools) (length tools)))
@@ -279,7 +279,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 ;;; Initialization and server capabilities tests
 
 (ert-deftest mcp-test-initialize ()
-  "Test the MCP initialize request handling."
+  "Test the MCP `initialize` request handling."
   (mcp-test--with-server
     (let* ((result (mcp-test--get-initialize-result))
            (protocol-version (alist-get 'protocolVersion result))
@@ -309,7 +309,7 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
       (should (eq t list-changed)))))
 
 (ert-deftest mcp-test-notifications-initialized ()
-  "Test the MCP notifications/initialized format handling."
+  "Test the MCP `notifications/initialized` request handling."
   (mcp-test--with-server
     (let* ((notifications-initialized
             (json-encode
@@ -459,7 +459,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 ;;; Notification tests
 
 (ert-deftest mcp-test-notifications-cancelled ()
-  "Test the MCP notifications/cancelled handling."
+  "Test the MCP `notifications/cancelled` request handling."
   (mcp-test--with-server
     (let* ((notifications-cancelled
             (json-encode
@@ -492,7 +492,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 ;;; tools/list tests
 
 (ert-deftest mcp-test-tools-list-one ()
-  "Test tools/list returns one tool with correct fields and schema."
+  "Test `tools/list` returning one tool with correct fields and schema."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "test-tool"
                           :description "A tool for testing"))
@@ -502,7 +502,7 @@ from a function loaded from bytecode rather than interpreted elisp."
          (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-with-title ()
-  "Test that tools/list includes title in response."
+  "Test that `tools/list` includes title in response."
   (mcp-test--with-tools ((#'mcp-test--tool-handler-simple
                           :id "tool-with-title"
                           :description "A tool for testing titles"
@@ -535,7 +535,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     (mcp-test--verify-tool-list-request '())))
 
 (ert-deftest mcp-test-tools-list-schema-one-arg-handler ()
-  "Test that tools/list schema includes parameter descriptions."
+  "Test that `tools/list` schema includes parameter descriptions."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-string-arg
         :id "requires-arg"
@@ -562,7 +562,7 @@ from a function loaded from bytecode rather than interpreted elisp."
           (alist-get 'description param-schema)))))))
 
 (ert-deftest mcp-test-tools-list-extra-key ()
-  "Test that tools/list request with an extra, unexpected key works correctly.
+  "Test that `tools/list` request with an extra, unexpected key works correctly.
 Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   (mcp-test--with-server
     ;; Create a tools/list request with an extra key
@@ -576,7 +576,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       (mcp-test--get-tool-list-for-request request-with-extra))))
 
 (ert-deftest mcp-test-tools-list-read-only-hint ()
-  "Test that tools/list includes readOnlyHint=true in response."
+  "Test that `tools/list` response includes readOnlyHint=true."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-simple
         :id "read-only-tool"
@@ -589,7 +589,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
          (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-read-only-hint-false ()
-  "Test that tools/list includes readOnlyHint=false in response."
+  "Test that `tools/list` response includes readOnlyHint=false."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-simple
         :id "non-read-only-tool"
@@ -602,7 +602,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
          (inputSchema . ((type . "object")))))))))
 
 (ert-deftest mcp-test-tools-list-multiple-annotations ()
-  "Test that tools/list includes multiple annotations in response."
+  "Test `tools/list` response including multiple annotations."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-simple
         :id "multi-annotated-tool"
@@ -704,7 +704,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
      "Internal error executing tool")))
 
 (ert-deftest mcp-test-tools-call-no-args ()
-  "Test the `tools/call` method with a tool that takes no arguments."
+  "Test the `tools/call` request with a tool that takes no arguments."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-string-list
         :id "string-list-tool"
@@ -714,7 +714,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
        result mcp-test--string-list-result))))
 
 (ert-deftest mcp-test-tools-call-empty-string ()
-  "Test the `tools/call` method with a tool that returns an empty string."
+  "Test the `tools/call` request with a tool that returns an empty string."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-empty-string
         :id "empty-string-tool"
@@ -732,7 +732,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       (mcp-test--check-mcp-content-format result ""))))
 
 (ert-deftest mcp-test-tools-call-with-string-arg ()
-  "Test the `tools/call` method with a tool that takes a string argument."
+  "Test the `tools/call` request with a tool that takes a string argument."
   (mcp-test--with-tools
       ((#'mcp-test--tool-handler-string-arg
         :id "string-arg-tool"
@@ -743,10 +743,15 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       (mcp-test--check-mcp-content-format
        result (concat "Echo: " test-input)))))
 
+(ert-deftest mcp-test-tools-call-unregistered-tool ()
+  "Test the `tools/call` request with a tool that was never registered."
+  (mcp-test--with-server
+    (mcp-test--verify-tool-not-found mcp-test--nonexistent-tool-id)))
+
 ;;; prompts/list tests
 
 (ert-deftest mcp-test-prompts-list-zero ()
-  "Test the `prompts/list` method returns empty array with no prompts."
+  "Test the `prompts/list` request returning an empty array with no prompts."
   (mcp-test--with-server
     (let ((result
            (mcp-test--get-request-result
@@ -754,11 +759,6 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       (should (alist-get 'prompts result))
       (should (arrayp (alist-get 'prompts result)))
       (should (= 0 (length (alist-get 'prompts result)))))))
-
-(ert-deftest mcp-test-tools-call-unregistered-tool ()
-  "Test the `tools/call` method with a tool that was never registered."
-  (mcp-test--with-server
-    (mcp-test--verify-tool-not-found mcp-test--nonexistent-tool-id)))
 
 ;;; `mcp-process-jsonrpc' tests
 
@@ -785,7 +785,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   (mcp-test--check-invalid-jsonrpc-version "non-standard"))
 
 (ert-deftest mcp-test-invalid-jsonrpc-missing-id ()
-  "Test that JSON-RPC request lacking the \"id\" key is rejected properly."
+  "Test that JSON-RPC request lacking the `id` key is rejected properly."
   (mcp-test--with-server
     (mcp-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/list")))
@@ -793,7 +793,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
      "Invalid Request: Missing required 'id' field")))
 
 (ert-deftest mcp-test-invalid-jsonrpc-missing-method ()
-  "Test that JSON-RPC request lacking the \"method\" key is rejected properly."
+  "Test that JSON-RPC request lacking the `method` key is rejected properly."
   (mcp-test--with-server
     (mcp-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
@@ -804,19 +804,15 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-test-log-io-t ()
   "Test that when `mcp-log-io' is t, JSON-RPC messages are logged."
-  ;; Set logging to enabled
   (setq mcp-log-io t)
 
   (mcp-test--with-server
-    ;; Make a tools/list request with a known ID
     (let* ((request (mcp-create-tools-list-request))
            (response (mcp-process-jsonrpc request)))
 
-      ;; Check that log buffer exists
       (let ((log-buffer (get-buffer "*mcp-log*")))
         (should log-buffer)
 
-        ;; Check buffer contents exactly - compare with expected content
         (with-current-buffer log-buffer
           (let ((content (buffer-string))
                 (expected-content
@@ -829,7 +825,6 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
                   "]\n")))
             (should (equal expected-content content)))))))
 
-  ;; Clean up
   (setq mcp-log-io nil))
 
 (ert-deftest mcp-test-log-io-nil ()
