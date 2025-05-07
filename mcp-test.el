@@ -36,6 +36,12 @@
 (defconst mcp-test--string-list-result "item1 item2 item3"
   "Test data for string list tool.")
 
+(defconst mcp-test--nonexistent-tool-id "non-existent-tool"
+  "Tool ID for a non-existent tool used in tests.")
+
+(defconst mcp-test--unregister-tool-id "test-unregister"
+  "Tool ID used for testing tool unregistration.")
+
 ;;; Test tool handlers
 
 (defun mcp-test--tool-handler-simple ()
@@ -185,6 +191,12 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
      (json-encode
       `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
      -32600 "Invalid Request: Not JSON-RPC 2.0")))
+
+(defun mcp-test--verify-tool-not-found (tool-id)
+  "Verify a call to non-existent tool with TOOL-ID returning an error."
+  (mcp-test--check-jsonrpc-error
+   (mcp-create-tools-call-request tool-id 999) -32600
+   (format "Tool not found: %s" tool-id)))
 
 (defun mcp-test--get-request-result (request)
   "Call `mcp-process-jsonrpc' with REQUEST and return its successful result."
@@ -355,16 +367,36 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
 
 (ert-deftest mcp-test-unregister-tool ()
   "Test that `mcp-unregister-tool' removes a tool correctly."
-  (let ((tools-before (hash-table-count mcp--tools)))
-    (mcp-register-tool
-     #'mcp-test--tool-handler-simple
-     :id "test-unregister"
-     :description "Tool for unregister test")
-    (should (= (1+ tools-before) (hash-table-count mcp--tools)))
-    (should (gethash "test-unregister" mcp--tools))
-    (should (mcp-unregister-tool "test-unregister"))
-    (should-not (gethash "test-unregister" mcp--tools))
-    (should (= tools-before (hash-table-count mcp--tools)))))
+  (mcp-test--with-server
+   (mcp-register-tool
+    #'mcp-test--tool-handler-simple
+    :id mcp-test--unregister-tool-id
+    :description "Tool for unregister test")
+
+   (let ((tools-before
+          (mcp-test--get-tool-list
+           (mcp-create-tools-list-request 42))))
+     (should (= 1 (length tools-before)))
+     (should
+      (string=
+       mcp-test--unregister-tool-id
+       (alist-get 'name (aref tools-before 0)))))
+
+   (let ((result
+          (mcp-test--get-request-result
+           (mcp-create-tools-call-request
+            mcp-test--unregister-tool-id 44))))
+     (should result)
+     (mcp-test--check-mcp-content-format result "test result"))
+
+   (should (mcp-unregister-tool mcp-test--unregister-tool-id))
+
+   (let ((tools-after
+          (mcp-test--get-tool-list
+           (mcp-create-tools-list-request 43))))
+     (should (= 0 (length tools-after)))
+     (mcp-test--verify-tool-not-found
+      mcp-test--unregister-tool-id))))
 
 (ert-deftest mcp-test-unregister-nonexistent-tool ()
   "Test that `mcp-unregister-tool' returns nil for nonexistent tools."
@@ -743,6 +775,11 @@ from a function loaded from bytecode rather than interpreted elisp."
       (should (alist-get 'prompts result))
       (should (arrayp (alist-get 'prompts result)))
       (should (= 0 (length (alist-get 'prompts result)))))))
+
+(ert-deftest mcp-test-tools-call-unregistered-tool ()
+  "Test the `tools/call` method with a tool that was never registered."
+  (mcp-test--with-server
+    (mcp-test--verify-tool-not-found mcp-test--nonexistent-tool-id)))
 
 ;;; `mcp-process-jsonrpc' tests
 
