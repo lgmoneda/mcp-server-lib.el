@@ -831,24 +831,18 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-test-server-restart-preserves-tools ()
   "Test that server restart preserves registered tools."
-  ;; Register a tool
-  (mcp-register-tool
-   #'mcp-test--tool-handler-simple
-   :id "persistent-tool"
-   :description "Test persistence across restarts")
+  (mcp-test--with-tools
+      ((#'mcp-test--tool-handler-simple
+        :id "persistent-tool"
+        :description "Test persistence across restarts"))
+    (mcp-stop)
+    (mcp-start)
 
-  ;; Start server, stop it, and then start again
-  (mcp-start)
-  (mcp-stop)
-  (mcp-test--with-server
-    ;; Tool should be accessible via API
     (let ((tools (mcp-test--get-tool-list)))
       (should (= 1 (length tools)))
       (should
-       (string= "persistent-tool" (alist-get 'name (aref tools 0))))))
-
-  ;; Cleanup
-  (mcp-unregister-tool "persistent-tool"))
+       (string=
+        "persistent-tool" (alist-get 'name (aref tools 0)))))))
 
 (ert-deftest mcp-test-interactive-commands ()
   "Test that `mcp-start' and `mcp-stop' are interactive commands."
