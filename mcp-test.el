@@ -267,16 +267,17 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                 (equal
                  prop-value (alist-get prop-name found-tool)))))))))))
 
-(defun mcp-test--verify-tool-schema
-    (tool &optional param-name param-type param-description)
-  "Verify TOOL's schema has correct structure for zero or one parameter.
-TOOL is the tool object containing inputSchema to validate.
+(defun mcp-test--verify-tool-schema-in-single-tool-list
+    (&optional param-name param-type param-description)
+  "Verify that schema of the only tool in the tool list has correct structure.
 When PARAM-NAME is nil, verifies a zero-argument tool schema.
 Otherwise, verifies a one-parameter tool schema with:
 PARAM-NAME as the name of the parameter to validate.
 PARAM-TYPE as the expected type of the parameter.
 PARAM-DESCRIPTION as the expected description of the parameter."
-  (let ((schema (alist-get 'inputSchema tool)))
+  (let* ((tools (mcp-test--get-tool-list))
+         (tool (aref tools 0))
+         (schema (alist-get 'inputSchema tool)))
     (should (equal "object" (alist-get 'type schema)))
 
     (if param-name
@@ -424,13 +425,10 @@ from a function loaded from bytecode rather than interpreted elisp."
         ((#'mcp-test-bytecode-handler--handler
           :id "bytecode-handler"
           :description "A tool with a handler loaded from bytecode"))
-      (let* ((tool-list (mcp-test--get-tool-list))
-             (tool (aref tool-list 0)))
-        (mcp-test--verify-tool-schema
-         tool
-         "input-string"
-         "string"
-         "Input string parameter for bytecode testing")))
+      (mcp-test--verify-tool-schema-in-single-tool-list
+       "input-string"
+       "string"
+       "Input string parameter for bytecode testing"))
 
     (when (file-exists-p bytecode-file)
       (delete-file bytecode-file))))
@@ -557,11 +555,8 @@ from a function loaded from bytecode rather than interpreted elisp."
       ((#'mcp-test--tool-handler-string-arg
         :id "requires-arg"
         :description "A tool that requires an argument"))
-    (let* ((tool-list (mcp-test--get-tool-list))
-           (tool (aref tool-list 0)))
-      (mcp-test--verify-tool-schema
-       tool
-       "input-string" "string" "test parameter for string input"))))
+    (mcp-test--verify-tool-schema-in-single-tool-list
+     "input-string" "string" "test parameter for string input")))
 
 (ert-deftest mcp-test-tools-list-extra-key ()
   "Test that `tools/list` request with an extra, unexpected key works correctly.
@@ -721,11 +716,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       ((#'mcp-test--tool-handler-empty-string
         :id "empty-string-tool"
         :description "A tool that returns an empty string"))
-    ;; First check the schema for this zero-arg handler
-    (let* ((tool-list (mcp-test--get-tool-list))
-           (tool (aref tool-list 0)))
-
-      (mcp-test--verify-tool-schema tool))
+    (mcp-test--verify-tool-schema-in-single-tool-list)
 
     ;; Then test the actual tool execution
     (let ((result (mcp-test--call-tool "empty-string-tool" 10)))
