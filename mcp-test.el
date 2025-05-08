@@ -268,24 +268,25 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                  prop-value (alist-get prop-name found-tool)))))))))))
 
 (defun mcp-test--verify-one-param-tool-schema
-    (schema param-name param-type param-description)
-  "Verify SCHEMA has one parameter with expected structure.
-SCHEMA is the input schema object to validate.
+    (tool param-name param-type param-description)
+  "Verify TOOL's schema has one parameter with expected structure.
+TOOL is the tool object containing inputSchema to validate.
 PARAM-NAME is the name of the parameter to validate.
 PARAM-TYPE is the expected type of the parameter.
 PARAM-DESCRIPTION is the expected description of the parameter."
-  ;; Verify schema base structure
-  (should (equal "object" (alist-get 'type schema)))
-  (should (equal (vector param-name) (alist-get 'required schema)))
+  (let ((schema (alist-get 'inputSchema tool)))
+    ;; Verify schema base structure
+    (should (equal "object" (alist-get 'type schema)))
+    (should (equal (vector param-name) (alist-get 'required schema)))
 
-  ;; Verify parameter includes correct type and description
-  (let ((param-schema
-         (alist-get
-          (intern param-name) (alist-get 'properties schema))))
-    (should (equal param-type (alist-get 'type param-schema)))
-    (should
-     (equal
-      param-description (alist-get 'description param-schema)))))
+    ;; Verify parameter includes correct type and description
+    (let ((param-schema
+           (alist-get
+            (intern param-name) (alist-get 'properties schema))))
+      (should (equal param-type (alist-get 'type param-schema)))
+      (should
+       (equal
+        param-description (alist-get 'description param-schema))))))
 
 (defun mcp-test--check-mcp-content-format (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT."
@@ -414,10 +415,9 @@ from a function loaded from bytecode rather than interpreted elisp."
           :id "bytecode-handler"
           :description "A tool with a handler loaded from bytecode"))
       (let* ((tool-list (mcp-test--get-tool-list))
-             (tool (aref tool-list 0))
-             (schema (alist-get 'inputSchema tool)))
+             (tool (aref tool-list 0)))
         (mcp-test--verify-one-param-tool-schema
-         schema
+         tool
          "input-string"
          "string"
          "Input string parameter for bytecode testing")))
@@ -548,10 +548,9 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "requires-arg"
         :description "A tool that requires an argument"))
     (let* ((tool-list (mcp-test--get-tool-list))
-           (tool (aref tool-list 0))
-           (schema (alist-get 'inputSchema tool)))
+           (tool (aref tool-list 0)))
       (mcp-test--verify-one-param-tool-schema
-       schema
+       tool
        "input-string"
        "string"
        "test parameter for string input"))))
