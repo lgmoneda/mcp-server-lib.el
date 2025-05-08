@@ -267,26 +267,36 @@ EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
                 (equal
                  prop-value (alist-get prop-name found-tool)))))))))))
 
-(defun mcp-test--verify-one-param-tool-schema
-    (tool param-name param-type param-description)
-  "Verify TOOL's schema has one parameter with expected structure.
+(defun mcp-test--verify-tool-schema
+    (tool &optional param-name param-type param-description)
+  "Verify TOOL's schema has correct structure for zero or one parameter.
 TOOL is the tool object containing inputSchema to validate.
-PARAM-NAME is the name of the parameter to validate.
-PARAM-TYPE is the expected type of the parameter.
-PARAM-DESCRIPTION is the expected description of the parameter."
+When PARAM-NAME is nil, verifies a zero-argument tool schema.
+Otherwise, verifies a one-parameter tool schema with:
+PARAM-NAME as the name of the parameter to validate.
+PARAM-TYPE as the expected type of the parameter.
+PARAM-DESCRIPTION as the expected description of the parameter."
   (let ((schema (alist-get 'inputSchema tool)))
-    ;; Verify schema base structure
     (should (equal "object" (alist-get 'type schema)))
-    (should (equal (vector param-name) (alist-get 'required schema)))
 
-    ;; Verify parameter includes correct type and description
-    (let ((param-schema
-           (alist-get
-            (intern param-name) (alist-get 'properties schema))))
-      (should (equal param-type (alist-get 'type param-schema)))
-      (should
-       (equal
-        param-description (alist-get 'description param-schema))))))
+    (if param-name
+        (progn
+          ;; One parameter case - verify required and properties
+          (should
+           (equal (vector param-name) (alist-get 'required schema)))
+          (let ((param-schema
+                 (alist-get
+                  (intern param-name)
+                  (alist-get 'properties schema))))
+            (should (equal param-type (alist-get 'type param-schema)))
+            (should
+             (equal
+              param-description
+              (alist-get 'description param-schema)))))
+
+      ;; Zero parameter case - schema should be just {type: "object"}
+      (should (null (alist-get 'required schema)))
+      (should (null (alist-get 'properties schema))))))
 
 (defun mcp-test--check-mcp-content-format (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT."
@@ -416,7 +426,7 @@ from a function loaded from bytecode rather than interpreted elisp."
           :description "A tool with a handler loaded from bytecode"))
       (let* ((tool-list (mcp-test--get-tool-list))
              (tool (aref tool-list 0)))
-        (mcp-test--verify-one-param-tool-schema
+        (mcp-test--verify-tool-schema
          tool
          "input-string"
          "string"
@@ -549,11 +559,9 @@ from a function loaded from bytecode rather than interpreted elisp."
         :description "A tool that requires an argument"))
     (let* ((tool-list (mcp-test--get-tool-list))
            (tool (aref tool-list 0)))
-      (mcp-test--verify-one-param-tool-schema
+      (mcp-test--verify-tool-schema
        tool
-       "input-string"
-       "string"
-       "test parameter for string input"))))
+       "input-string" "string" "test parameter for string input"))))
 
 (ert-deftest mcp-test-tools-list-extra-key ()
   "Test that `tools/list` request with an extra, unexpected key works correctly.
@@ -715,11 +723,9 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :description "A tool that returns an empty string"))
     ;; First check the schema for this zero-arg handler
     (let* ((tool-list (mcp-test--get-tool-list))
-           (tool (aref tool-list 0))
-           (schema (alist-get 'inputSchema tool)))
+           (tool (aref tool-list 0)))
 
-      ;; Verify schema is correct for a zero-arg function
-      (should (equal '((type . "object")) schema)))
+      (mcp-test--verify-tool-schema tool))
 
     ;; Then test the actual tool execution
     (let ((result (mcp-test--call-tool "empty-string-tool" 10)))
