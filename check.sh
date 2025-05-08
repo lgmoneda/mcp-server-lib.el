@@ -1,15 +1,33 @@
 #!/bin/bash
-# check.sh - Run all quality checks for mcp.el
+# check.sh - Run all quality checks, with focus on providing guardrails for LLM
+# coding agents.
+#
 # Continue on errors but track them
+
+# Partial ordering between the linters and autoformatters:
+# - Start with the Elisp syntax check (via byte compilation)
+#   - Catches major issues like unbalanced parentheses
+#   - LLMs tend to generate syntax errors, so check these first
+#
+# - If no syntax errors:
+#   - Run elisp-autofmt to format Elisp files automatically
+#     (Prevents incorrect indentation when syntax is broken)
+#   - Then run elisp-lint for additional style checks
+#     (May catch minor issues elisp-autofmt couldn't fix, like long docstrings)
+
+set -eu -o pipefail
+
+readonly EMACS="emacs -Q --batch"
+readonly ELISP_FILES="\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\""
 
 # Track if any errors occurred
 ERRORS=0
 
 echo "Checking Elisp syntax via byte compilation..."
-emacs -Q --batch \
+$EMACS \
 	--eval "(setq byte-compile-warnings nil)" \
 	--eval "(add-to-list 'load-path \".\")" \
-	--eval "(dolist (file '(\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\"))
+	--eval "(dolist (file '($ELISP_FILES))
       (message \"Checking syntax of %s...\" file)
       (if (not (byte-compile-file file))
           (kill-emacs 1)))" || {
@@ -20,12 +38,12 @@ emacs -Q --batch \
 # Only run indentation if there are no errors so far
 if [ $ERRORS -eq 0 ]; then
 	echo "Running elisp-autofmt on Elisp files..."
-	emacs -Q --batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-autofmt-20250421.1112\")
+	$EMACS --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-autofmt-20250421.1112\")
 	                                      (expand-file-name \".\"))))
 	                     (dolist (dir pkg-dirs)
 	                       (add-to-list 'load-path dir))
 	                     (require 'elisp-autofmt)
-	                     (dolist (file '(\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\"))
+	                     (dolist (file '($ELISP_FILES))
 	                       (message \"Formatting %s...\" file)
 	                       (find-file file)
 	                       (elisp-autofmt-buffer-to-file)
@@ -38,22 +56,22 @@ else
 fi
 
 echo "Running elisp-lint on Emacs Lisp files..."
-emacs -Q --batch --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
+$EMACS --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
                                       (locate-user-emacs-file \"elpa/package-lint-0.26\")
                                       (locate-user-emacs-file \"elpa/dash-20250312.1307\")
                                       (expand-file-name \".\"))))
                      (dolist (dir pkg-dirs)
                        (add-to-list 'load-path dir))
                      (require 'elisp-lint)
-                     (elisp-lint-file \"mcp.el\")
-                     (elisp-lint-file \"mcp-test.el\")
-                     (elisp-lint-file \"mcp-test-bytecode-handler.el\"))" || {
+                     (dolist (file (list $ELISP_FILES))
+                       (message \"Linting %s...\" file)
+                       (elisp-lint-file file)))" || {
 	echo "elisp-lint failed"
 	ERRORS=$((ERRORS + 1))
 }
 
 echo "Running all tests..."
-emacs -Q --batch -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)' || {
+$EMACS -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)' || {
 	echo "ERT tests failed"
 	ERRORS=$((ERRORS + 1))
 }
@@ -65,7 +83,7 @@ mdl ./*.md || {
 }
 
 echo "Checking README.org..."
-emacs -Q --batch --eval "(require 'org)" --eval "(require 'org-lint)" \
+$EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
 	--eval "(with-temp-buffer (insert-file-contents \"README.org\") \
              (org-mode) (let ((results (org-lint))) \
              (if results (progn (message \"Found issues: %S\" results) (exit 1)) \
@@ -75,7 +93,7 @@ emacs -Q --batch --eval "(require 'org)" --eval "(require 'org-lint)" \
 }
 
 echo "Checking TODO.org..."
-emacs -Q --batch --eval "(require 'org)" --eval "(require 'org-lint)" \
+$EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
 	--eval "(with-temp-buffer (insert-file-contents \"TODO.org\") \
              (org-mode) (let ((results (org-lint))) \
              (if results (progn (message \"Found issues: %S\" results) (exit 1)) \
