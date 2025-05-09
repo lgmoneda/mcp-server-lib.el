@@ -20,20 +20,20 @@ set -eu -o pipefail
 readonly EMACS="emacs -Q --batch"
 readonly ELISP_FILES="\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\""
 
-# Track if any errors occurred
 ERRORS=0
 
-echo "Checking Elisp syntax via byte compilation..."
-$EMACS \
-	--eval "(setq byte-compile-warnings nil)" \
+echo -n "Checking Elisp syntax... "
+if $EMACS --eval "(setq byte-compile-warnings nil)" \
 	--eval "(add-to-list 'load-path \".\")" \
 	--eval "(dolist (file '($ELISP_FILES))
-      (message \"Checking syntax of %s...\" file)
-      (if (not (byte-compile-file file))
-          (kill-emacs 1)))" || {
-	echo "Elisp byte compilation check failed"
+        (princ (format \"%s \" file))
+        (unless (byte-compile-file file)
+          (kill-emacs 1)))"; then
+	echo "OK!"
+else
+	echo "Elisp syntax check failed!"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
 # Only run indentation if there are no errors so far
 if [ $ERRORS -eq 0 ]; then
