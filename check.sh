@@ -4,16 +4,24 @@
 #
 # Continue on errors but track them
 
-# Partial ordering between the linters and autoformatters:
+#
+# Linters / tests / autoformatters and their dependencies:
+#
 # - Start with the Elisp syntax check (via byte compilation)
 #   - Catches major issues like unbalanced parentheses
 #   - LLMs tend to generate syntax errors, so check these first
 #
-# - If no syntax errors:
-#   - Run elisp-autofmt to format Elisp files automatically
-#     (Prevents incorrect indentation when syntax is broken)
-#   - Then run elisp-lint for additional style checks
-#     (May catch minor issues elisp-autofmt couldn't fix, like long docstrings)
+# - Run elisp-autofmt
+#   - Skip if there are syntax errors to prevent incorrect runaway
+#     re-indentation
+#
+# - Run elisp-lint
+#   - Skip if there are either syntax errors or autoformatting failure
+#   - It may still produce formatting issues even after a successful
+#     elisp-autofmt call, but much fewer of them, and more suitable for fixing
+#     by the LLM.
+#
+# - Run Elisp tests by ERT
 
 set -eu -o pipefail
 
@@ -28,6 +36,7 @@ readonly PACKAGE_LINT="package-lint-0.26"
 readonly DASH="dash-20250312.1307"
 
 ERRORS=0
+ELISP_SYNTAX_FAILED=0
 
 echo -n "Checking Elisp syntax... "
 if $EMACS --eval "(setq byte-compile-warnings nil)" \
@@ -40,10 +49,11 @@ if $EMACS --eval "(setq byte-compile-warnings nil)" \
 else
 	echo "Elisp syntax check failed!"
 	ERRORS=$((ERRORS + 1))
+	ELISP_SYNTAX_FAILED=1
 fi
 
-# Only run indentation if there are no errors so far
-if [ $ERRORS -eq 0 ]; then
+# Only run indentation if there are no syntax errors
+if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
 	echo -n "Running elisp-autofmt... "
 	if $EMACS --eval "(add-to-list 'load-path (locate-user-emacs-file \"elpa/$ELISP_AUTOFMT\"))" \
 		--eval "(add-to-list 'load-path (expand-file-name \".\"))" \
@@ -83,12 +93,17 @@ else
 	echo "Skipping elisp-lint due to previous errors"
 fi
 
-echo -n "Running all tests... "
-if $EMACS -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)'; then
-	echo "OK!"
+# Only run ERT tests if there are no Elisp syntax errors
+if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
+	echo -n "Running all tests... "
+	if $EMACS -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)'; then
+		echo "OK!"
+	else
+		echo "ERT tests failed"
+		ERRORS=$((ERRORS + 1))
+	fi
 else
-	echo "ERT tests failed"
-	ERRORS=$((ERRORS + 1))
+	echo "Skipping ERT tests due to Elisp syntax errors"
 fi
 
 echo -n "Checking Markdown files... "
