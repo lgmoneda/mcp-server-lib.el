@@ -54,107 +54,143 @@ if [ $ERRORS -eq 0 ]; then
 	           (elisp-autofmt-buffer-to-file))"; then
 		echo "OK!"
 	else
-	    echo "elisp-autofmt failed!"
-	    ERRORS=$((ERRORS + 1))
+		echo "elisp-autofmt failed!"
+		ERRORS=$((ERRORS + 1))
 	fi
 else
 	echo "Skipping indentation due to syntax errors"
 fi
 
-echo "Running elisp-lint on Emacs Lisp files..."
-$EMACS --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/$ELISP_LINT\")
-                                      (locate-user-emacs-file \"elpa/$PACKAGE_LINT\")
-                                      (locate-user-emacs-file \"elpa/$DASH\")
-                                      (expand-file-name \".\"))))
-                     (dolist (dir pkg-dirs)
-                       (add-to-list 'load-path dir))
-                     (require 'elisp-lint)
-                     (dolist (file (list $ELISP_FILES))
-                       (message \"Linting %s...\" file)
-                       (elisp-lint-file file)))" || {
-	echo "elisp-lint failed"
-	ERRORS=$((ERRORS + 1))
-}
+# Only run elisp-lint if there are no errors so far
+if [ $ERRORS -eq 0 ]; then
+	echo -n "Running elisp-lint... "
+	if $EMACS --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/$ELISP_LINT\")
+	                                      (locate-user-emacs-file \"elpa/$PACKAGE_LINT\")
+	                                      (locate-user-emacs-file \"elpa/$DASH\")
+	                                      (expand-file-name \".\"))))
+	                     (dolist (dir pkg-dirs)
+	                       (add-to-list 'load-path dir))
+	                     (require 'elisp-lint)
+	                     (dolist (file (list $ELISP_FILES))
+                               (princ (format \"%s \" file))
+	                       (elisp-lint-file file)))"; then
+		echo "OK!"
+	else
+		echo "elisp-lint failed"
+		ERRORS=$((ERRORS + 1))
+	fi
+else
+	echo "Skipping elisp-lint due to previous errors"
+fi
 
-echo "Running all tests..."
-$EMACS -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)' || {
+echo -n "Running all tests... "
+if $EMACS -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)'; then
+	echo "OK!"
+else
 	echo "ERT tests failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking Markdown files..."
-mdl ./*.md || {
+echo -n "Checking Markdown files... "
+if mdl ./*.md; then
+	echo "OK!"
+else
 	echo "mdl check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking README.org..."
-$EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
+echo -n "Checking README.org... "
+if $EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
 	--eval "(with-temp-buffer (insert-file-contents \"README.org\") \
              (org-mode) (let ((results (org-lint))) \
              (if results (progn (message \"Found issues: %S\" results) (exit 1)) \
-             (message \"No issues found\"))))" || {
+             (message \"No issues found\"))))"; then
+	echo "OK!"
+else
 	echo "README.org check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking TODO.org..."
-$EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
+echo -n "Checking TODO.org... "
+if $EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
 	--eval "(with-temp-buffer (insert-file-contents \"TODO.org\") \
              (org-mode) (let ((results (org-lint))) \
              (if results (progn (message \"Found issues: %S\" results) (exit 1)) \
-             (message \"No issues found\"))))" || {
+             (message \"No issues found\"))))"; then
+	echo "OK!"
+else
 	echo "TODO.org check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking for code duplication..."
-jscpd -r consoleFull -t 0 . || {
+echo -n "Checking for code duplication... "
+if jscpd -r consoleFull -t 0 .; then
+	echo "OK!"
+else
 	echo "jscpd check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking GitHub workflows..."
-actionlint .github/workflows/*.yml || {
+echo -n "Checking GitHub workflows... "
+if actionlint .github/workflows/*.yml; then
+	echo "OK!"
+else
 	echo "actionlint check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking YAML formatting..."
-prettier --check .github/workflows/*.yml || {
+echo -n "Checking YAML formatting... "
+if prettier --check .github/workflows/*.yml; then
+	echo "OK!"
+else
 	echo "prettier check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking Markdown formatting..."
-prettier --check ./*.md || {
+echo -n "Checking Markdown formatting... "
+if prettier --check ./*.md; then
+	echo "OK!"
+else
 	echo "prettier check for Markdown failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Checking terminology..."
-textlint --rule terminology ./*.md || {
+echo -n "Checking terminology... "
+if textlint --rule terminology ./*.md; then
+	echo "OK!"
+else
 	echo "textlint check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Running shellcheck..."
-shellcheck check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh || {
+echo -n "Running shellcheck... "
+if shellcheck check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh; then
+	echo "OK!"
+else
 	echo "shellcheck check failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
-echo "Running stdio adapter tests..."
-./emacs-mcp-stdio-test.sh || {
+echo -n "Running stdio adapter tests... "
+if ./emacs-mcp-stdio-test.sh; then
+	echo "OK!"
+else
 	echo "stdio adapter tests failed"
 	ERRORS=$((ERRORS + 1))
-}
+fi
 
 # Final result
 if [ $ERRORS -eq 0 ]; then
-	echo "Running shfmt to format all shell scripts..."
-	shfmt -w ./*.sh
-	echo "OK to proceed"
+	echo -n "Running shfmt to format all shell scripts... "
+	if shfmt -w ./*.sh; then
+		echo "OK!"
+		echo "All checks passed successfully!"
+	else
+		echo "shfmt failed!"
+		ERRORS=$((ERRORS + 1))
+		echo "$ERRORS check(s) failed"
+		exit 1
+	fi
 else
 	echo "$ERRORS check(s) failed"
 	exit 1
