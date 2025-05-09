@@ -7,21 +7,37 @@
 #
 # Linters / tests / autoformatters and their dependencies:
 #
-# - Start with the Elisp syntax check (via byte compilation)
-#   - Catches major issues like unbalanced parentheses
-#   - LLMs tend to generate syntax errors, so check these first
-#
-# - Run elisp-autofmt
-#   - Skip if there are syntax errors to prevent incorrect runaway
-#     re-indentation
-#
-# - Run elisp-lint
-#   - Skip if there are either syntax errors or autoformatting failure
-#   - It may still produce formatting issues even after a successful
-#     elisp-autofmt call, but much fewer of them, and more suitable for fixing
-#     by the LLM.
-#
-# - Run Elisp tests by ERT
+# - Elisp:
+#   - Start with the syntax check (via byte compilation)
+#     - Catches major issues like unbalanced parentheses
+#     - LLMs tend to generate syntax errors, so check these first
+#   - Run elisp-autofmt
+#     - Skip if there are syntax errors to prevent incorrect runaway
+#       re-indentation
+#   - Run elisp-lint
+#     - Skip if there are either syntax errors or autoformatting failure
+#     - It may still produce formatting issues even after a successful
+#       elisp-autofmt call, but much fewer of them, and more suitable for fixing
+#       by the LLM.
+#   - Run ERT tests
+#     - Skip if there were syntax errors#
+# - Org (elisp-adjacent): call Emacs org-lint on Org files
+# - Shell:
+#   - Check syntax with bash -n
+#   - Do shellcheck static analysis
+#     - Only if the syntax check passed
+#   - Run the MCP stdio adapter tests
+#     - Only if the syntax check passed
+#   - Format all the shell scripts with shfmt
+#     - Only if the syntax check passed to avoid runaway re-indentation
+# - Markdown:
+#   - Lint with mdl
+#   - Check formatting with prettier
+#   - Check terminology with textlint
+# - GitHub Actions / YAML:
+#   - Check GitHub workflows with actionlint
+#   - Check YAML formatting with prettier
+# - Check for code duplication with jscpd
 
 set -eu -o pipefail
 
@@ -39,6 +55,9 @@ readonly DASH="dash-20250312.1307"
 
 ERRORS=0
 ELISP_SYNTAX_FAILED=0
+SHELL_SYNTAX_FAILED=0
+
+# Elisp
 
 echo -n "Checking Elisp syntax... "
 if $EMACS --eval "(setq byte-compile-warnings nil)" \
@@ -109,13 +128,7 @@ else
 	echo "Skipping ERT tests due to Elisp syntax errors"
 fi
 
-echo -n "Checking Markdown files... $(echo ./*.md) "
-if mdl --no-verbose ./*.md; then
-	echo "OK!"
-else
-	echo "mdl check failed"
-	ERRORS=$((ERRORS + 1))
-fi
+# Org
 
 echo -n "Checking org files... $(echo "$ORG_FILES" | tr -d '"') "
 if $EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
@@ -135,27 +148,54 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Checking for code duplication with jscpd... "
-if jscpd -s -r consoleFull -t 0 .; then
+# Shell
+
+echo -n "Checking shell syntax... ${SHELL_FILES[*]} "
+if bash -n "${SHELL_FILES[@]}"; then
 	echo "OK!"
 else
-	echo "jscpd check failed"
+	echo "shell syntax check failed!"
 	ERRORS=$((ERRORS + 1))
+	SHELL_SYNTAX_FAILED=1
 fi
 
-echo -n "Checking GitHub workflows... $(echo .github/workflows/*.yml) "
-if actionlint .github/workflows/*.yml; then
-	echo "OK!"
+if [ $SHELL_SYNTAX_FAILED -eq 0 ]; then
+	echo -n "Running shellcheck... ${SHELL_FILES[*]} "
+	if shellcheck "${SHELL_FILES[@]}"; then
+		echo "OK!"
+	else
+		echo "shellcheck check failed"
+		ERRORS=$((ERRORS + 1))
+	fi
+
+	echo -n "Running stdio adapter tests... "
+	if ./emacs-mcp-stdio-test.sh; then
+		echo "OK!"
+	else
+		echo "stdio adapter tests failed"
+		ERRORS=$((ERRORS + 1))
+	fi
+
+	echo -n "Running shfmt to format all shell scripts... ${SHELL_FILES[*]} "
+	if shfmt -w "${SHELL_FILES[@]}"; then
+		echo "OK!"
+	else
+		echo "shfmt failed!"
+		ERRORS=$((ERRORS + 1))
+		echo "$ERRORS check(s) failed"
+		exit 1
+	fi
 else
-	echo "actionlint check failed"
-	ERRORS=$((ERRORS + 1))
+	echo "Skipping shellcheck, stdio adapter tests, and shfmt due to previous errors"
 fi
 
-echo -n "Checking YAML formatting... $(echo .github/workflows/*.yml) "
-if prettier --log-level warn --check .github/workflows/*.yml; then
+# Markdown
+
+echo -n "Checking Markdown files... $(echo ./*.md) "
+if mdl --no-verbose ./*.md; then
 	echo "OK!"
 else
-	echo "prettier check failed"
+	echo "mdl check failed"
 	ERRORS=$((ERRORS + 1))
 fi
 
@@ -175,35 +215,38 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Running shellcheck... ${SHELL_FILES[*]} "
-if shellcheck "${SHELL_FILES[@]}"; then
+# GitHub Actions / YAML
+
+echo -n "Checking GitHub workflows... $(echo .github/workflows/*.yml) "
+if actionlint .github/workflows/*.yml; then
 	echo "OK!"
 else
-	echo "shellcheck check failed"
+	echo "actionlint check failed!"
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Running stdio adapter tests... "
-if ./emacs-mcp-stdio-test.sh; then
+echo -n "Checking YAML formatting... $(echo .github/workflows/*.yml) "
+if prettier --log-level warn --check .github/workflows/*.yml; then
 	echo "OK!"
 else
-	echo "stdio adapter tests failed"
+	echo "prettier check failed!"
+	ERRORS=$((ERRORS + 1))
+fi
+
+# Last step: check for duplicates
+
+echo -n "Checking for code duplication with jscpd... "
+if jscpd -s -r consoleFull -t 0 .; then
+	echo "OK!"
+else
+	echo "jscpd check failed!"
 	ERRORS=$((ERRORS + 1))
 fi
 
 # Final result
 if [ $ERRORS -eq 0 ]; then
-	echo -n "Running shfmt to format all shell scripts... ${SHELL_FILES[*]} "
-	if shfmt -w "${SHELL_FILES[@]}"; then
-		echo "OK!"
-		echo "All checks passed successfully!"
-	else
-		echo "shfmt failed!"
-		ERRORS=$((ERRORS + 1))
-		echo "$ERRORS check(s) failed"
-		exit 1
-	fi
+	echo "All checks passed successfully!"
 else
-	echo "$ERRORS check(s) failed"
+	echo "$ERRORS check(s) failed!"
 	exit 1
 fi
