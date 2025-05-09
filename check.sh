@@ -27,6 +27,7 @@ set -eu -o pipefail
 
 readonly ELISP_FILES="\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\""
 readonly ORG_FILES='"README.org" "TODO.org"'
+readonly SHELL_FILES=(check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh)
 
 readonly EMACS="emacs -Q --batch"
 
@@ -174,8 +175,8 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Running shellcheck... "
-if shellcheck check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh; then
+echo -n "Running shellcheck... ${SHELL_FILES[*]} "
+if shellcheck "${SHELL_FILES[@]}"; then
 	echo "OK!"
 else
 	echo "shellcheck check failed"
@@ -192,8 +193,8 @@ fi
 
 # Final result
 if [ $ERRORS -eq 0 ]; then
-	echo -n "Running shfmt to format all shell scripts... $(echo ./*.sh) "
-	if shfmt -w ./*.sh; then
+	echo -n "Running shfmt to format all shell scripts... ${SHELL_FILES[*]} "
+	if shfmt -w "${SHELL_FILES[@]}"; then
 		echo "OK!"
 		echo "All checks passed successfully!"
 	else
