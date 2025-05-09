@@ -96,7 +96,8 @@ fi
 # Only run ERT tests if there are no Elisp syntax errors
 if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
 	echo -n "Running all tests... "
-	if $EMACS -l mcp.el -l mcp-test.el --eval '(ert-run-tests-batch-and-exit)'; then
+	if $EMACS -l mcp.el -l mcp-test.el --eval '(let ((ert-quiet t))
+          (ert-run-tests-batch-and-exit))'; then
 		echo "OK!"
 	else
 		echo "ERT tests failed"
