@@ -134,8 +134,8 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Checking for code duplication... "
-if jscpd -r consoleFull -t 0 .; then
+echo -n "Checking for code duplication with jscpd... "
+if jscpd -s -r consoleFull -t 0 .; then
 	echo "OK!"
 else
 	echo "jscpd check failed"
