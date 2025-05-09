@@ -17,8 +17,15 @@
 
 set -eu -o pipefail
 
-readonly EMACS="emacs -Q --batch"
 readonly ELISP_FILES="\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\""
+
+readonly EMACS="emacs -Q --batch"
+
+# Elisp packages in ELPA
+readonly ELISP_AUTOFMT="elisp-autofmt-20250421.1112"
+readonly ELISP_LINT="elisp-lint-20220419.252"
+readonly PACKAGE_LINT="package-lint-0.26"
+readonly DASH="dash-20250312.1307"
 
 ERRORS=0
 
@@ -37,28 +44,27 @@ fi
 
 # Only run indentation if there are no errors so far
 if [ $ERRORS -eq 0 ]; then
-	echo "Running elisp-autofmt on Elisp files..."
-	$EMACS --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-autofmt-20250421.1112\")
-	                                      (expand-file-name \".\"))))
-	                     (dolist (dir pkg-dirs)
-	                       (add-to-list 'load-path dir))
-	                     (require 'elisp-autofmt)
-	                     (dolist (file '($ELISP_FILES))
-	                       (message \"Formatting %s...\" file)
-	                       (find-file file)
-	                       (elisp-autofmt-buffer-to-file)
-	                       (message \"Formatted %s\" file)))" || {
-		echo "elisp-autofmt failed"
-		ERRORS=$((ERRORS + 1))
-	}
+	echo -n "Running elisp-autofmt... "
+	if $EMACS --eval "(add-to-list 'load-path (locate-user-emacs-file \"elpa/$ELISP_AUTOFMT\"))" \
+		--eval "(add-to-list 'load-path (expand-file-name \".\"))" \
+		--eval "(require 'elisp-autofmt)" \
+		--eval "(dolist (file '($ELISP_FILES))
+                   (princ (format \"%s \" file))
+	           (find-file file)
+	           (elisp-autofmt-buffer-to-file))"; then
+		echo "OK!"
+	else
+	    echo "elisp-autofmt failed!"
+	    ERRORS=$((ERRORS + 1))
+	fi
 else
 	echo "Skipping indentation due to syntax errors"
 fi
 
 echo "Running elisp-lint on Emacs Lisp files..."
-$EMACS --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/elisp-lint-20220419.252\")
-                                      (locate-user-emacs-file \"elpa/package-lint-0.26\")
-                                      (locate-user-emacs-file \"elpa/dash-20250312.1307\")
+$EMACS --eval "(let ((pkg-dirs (list (locate-user-emacs-file \"elpa/$ELISP_LINT\")
+                                      (locate-user-emacs-file \"elpa/$PACKAGE_LINT\")
+                                      (locate-user-emacs-file \"elpa/$DASH\")
                                       (expand-file-name \".\"))))
                      (dolist (dir pkg-dirs)
                        (add-to-list 'load-path dir))
