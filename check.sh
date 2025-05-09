@@ -26,6 +26,7 @@
 set -eu -o pipefail
 
 readonly ELISP_FILES="\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\""
+readonly ORG_FILES='"README.org" "TODO.org"'
 
 readonly EMACS="emacs -Q --batch"
 
@@ -115,27 +116,21 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Checking README.org... "
+echo -n "Checking org files... $(echo "$ORG_FILES" | tr -d '"') "
 if $EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
-	--eval "(with-temp-buffer (insert-file-contents \"README.org\") \
-             (org-mode) (let ((results (org-lint))) \
-             (if results (progn (message \"Found issues: %S\" results) (exit 1)) \
-             (message \"No issues found\"))))"; then
+	--eval "(let ((all-checks-passed t))
+             (dolist (file '($ORG_FILES) all-checks-passed)
+               (with-temp-buffer
+                 (insert-file-contents file)
+                 (org-mode)
+                 (let ((results (org-lint)))
+                   (when results
+                     (message \"Found issues in %s: %S\" file results)
+                     (setq all-checks-passed nil)))))
+             (unless all-checks-passed (exit 1)))"; then
 	echo "OK!"
 else
-	echo "README.org check failed"
-	ERRORS=$((ERRORS + 1))
-fi
-
-echo -n "Checking TODO.org... "
-if $EMACS --eval "(require 'org)" --eval "(require 'org-lint)" \
-	--eval "(with-temp-buffer (insert-file-contents \"TODO.org\") \
-             (org-mode) (let ((results (org-lint))) \
-             (if results (progn (message \"Found issues: %S\" results) (exit 1)) \
-             (message \"No issues found\"))))"; then
-	echo "OK!"
-else
-	echo "TODO.org check failed"
+	echo "org files check failed"
 	ERRORS=$((ERRORS + 1))
 fi
 
