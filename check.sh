@@ -107,8 +107,8 @@ else
 	echo "Skipping ERT tests due to Elisp syntax errors"
 fi
 
-echo -n "Checking Markdown files... "
-if mdl ./*.md; then
+echo -n "Checking Markdown files... $(echo ./*.md) "
+if mdl --no-verbose ./*.md; then
 	echo "OK!"
 else
 	echo "mdl check failed"
@@ -147,7 +147,7 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Checking GitHub workflows... "
+echo -n "Checking GitHub workflows... $(echo .github/workflows/*.yml) "
 if actionlint .github/workflows/*.yml; then
 	echo "OK!"
 else
@@ -155,23 +155,23 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Checking YAML formatting... "
-if prettier --check .github/workflows/*.yml; then
+echo -n "Checking YAML formatting... $(echo .github/workflows/*.yml) "
+if prettier --log-level warn --check .github/workflows/*.yml; then
 	echo "OK!"
 else
 	echo "prettier check failed"
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Checking Markdown formatting... "
-if prettier --check ./*.md; then
+echo -n "Checking Markdown formatting... $(echo ./*.md) "
+if prettier --log-level warn --check ./*.md; then
 	echo "OK!"
 else
 	echo "prettier check for Markdown failed"
 	ERRORS=$((ERRORS + 1))
 fi
 
-echo -n "Checking terminology... "
+echo -n "Checking terminology... $(echo ./*.md) "
 if textlint --rule terminology ./*.md; then
 	echo "OK!"
 else
@@ -197,7 +197,7 @@ fi
 
 # Final result
 if [ $ERRORS -eq 0 ]; then
-	echo -n "Running shfmt to format all shell scripts... "
+	echo -n "Running shfmt to format all shell scripts... $(echo ./*.sh) "
 	if shfmt -w ./*.sh; then
 		echo "OK!"
 		echo "All checks passed successfully!"
