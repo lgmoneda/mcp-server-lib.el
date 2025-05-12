@@ -1,12 +1,13 @@
 #!/bin/bash
 # emacs-mcp-stdio.sh - Connect to Emacs MCP server via stdio transport
 
-set -o pipefail
+set -u -o pipefail
 
 # Default values
 INIT_FUNCTION=""
 STOP_FUNCTION=""
 SOCKET=""
+EMACS_MCP_DEBUG_LOG=${EMACS_MCP_DEBUG_LOG:-""}
 
 # Debug logging setup
 if [ -n "$EMACS_MCP_DEBUG_LOG" ]; then
