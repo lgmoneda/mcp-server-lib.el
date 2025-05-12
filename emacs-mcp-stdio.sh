@@ -1,6 +1,8 @@
 #!/bin/bash
 # emacs-mcp-stdio.sh - Connect to Emacs MCP server via stdio transport
 
+set -o pipefail
+
 # Default values
 INIT_FUNCTION=""
 STOP_FUNCTION=""

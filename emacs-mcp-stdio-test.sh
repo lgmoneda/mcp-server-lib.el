@@ -1,6 +1,8 @@
 #!/bin/bash
 # emacs-mcp-stdio-test.sh - Test the MCP stdio adapter
 
+set -eu -o pipefail
+
 TEST_SERVER_NAME="mcp-test-server-$$"
 
 echo "Starting test Emacs server..."
