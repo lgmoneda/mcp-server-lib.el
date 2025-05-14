@@ -115,10 +115,6 @@ while read -r line; do
 
 	mcp_debug_log "BASE64-RESPONSE" "$base64_response"
 
-	# Write the Base64 response to a temp file and process it
-	temp_file="/tmp/mcp-response.$$"
-	echo "$base64_response" >"$temp_file"
-
 	# Handle the base64 response - first strip quotes if present
 	if [[ "$base64_response" == \"* && "$base64_response" == *\" ]]; then
 		# Remove the surrounding quotes
@@ -134,9 +130,6 @@ while read -r line; do
 
 	# Output the response
 	echo "$formatted_response"
-
-	# Clean up temp file
-	rm -f "$temp_file"
 done
 
 # Stop MCP if stop function is provided
