@@ -3,13 +3,13 @@
 
 set -eu -o pipefail
 
-TEST_SERVER_NAME="mcp-test-server-$$"
+readonly TEST_SERVER_NAME="mcp-test-server-$$"
 
 echo "Starting test Emacs server..."
 emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp.el" &
-SERVER_PID=$!
+readonly SERVER_PID=$!
 
-MAX_TRIES=50
+readonly MAX_TRIES=50
 COUNT=0
 while ! emacsclient -s "$TEST_SERVER_NAME" -e 't' >/dev/null 2>&1; do
 	sleep 0.2
@@ -27,7 +27,7 @@ echo "Test case 1: Basic functionality test"
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
 	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="mcp-start" >stdio-response.txt
 
-EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
+readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
 
 trap 'rm -f stdio-response.txt' EXIT
 
@@ -45,8 +45,8 @@ fi
 echo "Test case 2: Debug logging with init and stop functions"
 
 # Define test parameters for explicit init and stop
-INIT_FUNCTION="mcp-start"
-STOP_FUNCTION="mcp-stop"
+readonly INIT_FUNCTION="mcp-start"
+readonly STOP_FUNCTION="mcp-stop"
 TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
