@@ -58,10 +58,11 @@ while [ $# -gt 0 ]; do
 done
 
 # Set socket arguments if provided
-SOCKET_OPTIONS=()
 if [ -n "$SOCKET" ]; then
-	SOCKET_OPTIONS=("-s" "$SOCKET")
+	readonly SOCKET_OPTIONS=("-s" "$SOCKET")
 	mcp_debug_log "INFO" "Using socket: $SOCKET"
+else
+	readonly SOCKET_OPTIONS=()
 fi
 
 # Log init function info if provided
