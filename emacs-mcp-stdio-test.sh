@@ -9,6 +9,8 @@ echo "Starting test Emacs server..."
 emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp.el" &
 readonly SERVER_PID=$!
 
+trap 'emacsclient -s "$TEST_SERVER_NAME" -e "(kill-emacs)" >/dev/null 2>&1 || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
+
 readonly MAX_TRIES=50
 COUNT=0
 while ! emacsclient -s "$TEST_SERVER_NAME" -e 't' >/dev/null 2>&1; do
@@ -16,7 +18,6 @@ while ! emacsclient -s "$TEST_SERVER_NAME" -e 't' >/dev/null 2>&1; do
 	COUNT=$((COUNT + 1))
 	if [ $COUNT -ge $MAX_TRIES ]; then
 		echo "ERROR: Server failed to start after 10 seconds"
-		kill -9 $SERVER_PID >/dev/null 2>&1 || true
 		exit 1
 	fi
 done
@@ -30,8 +31,6 @@ echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
 readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
 
 trap 'rm -f stdio-response.txt' EXIT
-
-trap 'emacsclient -s "$TEST_SERVER_NAME" -e "(kill-emacs)" >/dev/null 2>&1 || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
 
 if [ "$(cat stdio-response.txt)" = "$EXPECTED" ]; then
 	echo "PASS: Received expected response from stdio adapter"
