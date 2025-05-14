@@ -4,6 +4,7 @@
 set -eu -o pipefail
 
 readonly TEST_SERVER_NAME="mcp-test-server-$$"
+readonly STDIO_CMD="./emacs-mcp-stdio.sh --socket=$TEST_SERVER_NAME"
 
 echo "Starting test Emacs server..."
 emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp.el" &
@@ -26,7 +27,7 @@ echo "Server started"
 echo "Test case 1: Basic functionality test"
 
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
-	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="mcp-start" >stdio-response.txt
+	$STDIO_CMD --init-function="mcp-start" >stdio-response.txt
 
 readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
 
@@ -51,7 +52,7 @@ TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
 echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
-	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="$INIT_FUNCTION" --stop-function="$STOP_FUNCTION" >stdio-response.txt
+	$STDIO_CMD --init-function="$INIT_FUNCTION" --stop-function="$STOP_FUNCTION" >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
 	echo "FAIL: Debug log file was not created"
@@ -112,7 +113,7 @@ TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":3}'
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
 echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
-	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt
+	$STDIO_CMD >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
 	echo "FAIL: Debug log file was not created"
@@ -170,7 +171,7 @@ echo "Test case 4: Debug logging with invalid path"
 
 echo "Testing with invalid log path (script should exit with error)..."
 if echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
-	./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" >stdio-response.txt 2>/dev/null; then
+	$STDIO_CMD >stdio-response.txt 2>/dev/null; then
 	echo "FAIL: Script should exit with error when log path is invalid"
 	exit 1
 else
@@ -192,7 +193,7 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 " >/dev/null
 TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
 
-echo "$TEST_REQUEST" | ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt
+echo "$TEST_REQUEST" | $STDIO_CMD --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt
 
 if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
 	echo "FAIL: Final response doesn't have properly unescaped quote and newline"
@@ -220,7 +221,7 @@ TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\"
 # Run test 6 (multibyte character test)
 debug_log_file="/tmp/test6-debug-$$.log"
 echo "$TEST_REQUEST" |
-	EMACS_MCP_DEBUG_LOG="$debug_log_file" ./emacs-mcp-stdio.sh --socket="$TEST_SERVER_NAME" --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt 2>/dev/null
+	EMACS_MCP_DEBUG_LOG="$debug_log_file" $STDIO_CMD --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt 2>/dev/null
 
 # Check for valid content (should have multibyte character)
 # and absence of unwanted output (unknown message errors)
