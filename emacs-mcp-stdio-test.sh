@@ -3,11 +3,24 @@
 
 set -eu -o pipefail
 
+check_log_contains() {
+	local log="$1"
+	local pattern="$2"
+	local message="$3"
+
+	if ! grep -q "$pattern" "$log"; then
+		echo "$TEST_CASE"
+		echo "FAIL: $message: $log"
+		exit 1
+	fi
+}
+
+TESTS_RUN=0
+
 readonly TEST_SERVER_NAME="mcp-test-server-$$"
 readonly STDIO_CMD="./emacs-mcp-stdio.sh --socket=$TEST_SERVER_NAME"
 
-echo "Starting test Emacs server..."
-emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp.el" &
+emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp.el" --eval "(mcp-start)" 2>/dev/null &
 readonly SERVER_PID=$!
 
 trap 'emacsclient -s "$TEST_SERVER_NAME" -e "(kill-emacs)" >/dev/null 2>&1 || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
@@ -22,10 +35,8 @@ while ! emacsclient -s "$TEST_SERVER_NAME" -e 't' >/dev/null 2>&1; do
 		exit 1
 	fi
 done
-echo "Server started"
-emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-start)"
 
-echo "Test case 1: Basic functionality test"
+TEST_CASE="Test case 1: Basic functionality test"
 
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
 	$STDIO_CMD >stdio-response.txt
@@ -35,15 +46,16 @@ readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
 trap 'rm -f stdio-response.txt' EXIT
 
 if [ "$(cat stdio-response.txt)" = "$EXPECTED" ]; then
-	echo "PASS: Received expected response from stdio adapter"
+	TESTS_RUN=$((TESTS_RUN + 1))
 else
+	echo "$TEST_CASE"
 	echo "FAIL: Response from stdio adapter doesn't match expected"
 	echo "Expected: $EXPECTED"
 	echo "Actual: $(cat stdio-response.txt)"
 	exit 1
 fi
 
-echo "Test case 2: Debug logging with init and stop functions"
+TEST_CASE="Test case 2: Debug logging with init and stop functions"
 
 # Define test parameters for explicit init and stop
 readonly INIT_FUNCTION="mcp-start"
@@ -51,7 +63,12 @@ readonly STOP_FUNCTION="mcp-stop"
 TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 
 # Stop MCP for this test as we want to test explicit init/stop functions
-emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)"
+output=$(emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)")
+RETURN_CODE=$?
+if [ $RETURN_CODE -ne 0 ] || [ "$output" != "t" ]; then
+	echo "FAIL: Failed to stop MCP, got output: $output, return code: $RETURN_CODE"
+	exit 1
+fi
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
@@ -59,61 +76,59 @@ echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
 	$STDIO_CMD --init-function="$INIT_FUNCTION" --stop-function="$STOP_FUNCTION" >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
-	echo "FAIL: Debug log file was not created"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log file was not created: $debug_log_file"
 	exit 1
 fi
 
-echo "Debug log file created: $debug_log_file"
-
-if ! grep -q "MCP-REQUEST.*$TEST_REQUEST" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the request"
-	exit 1
-fi
-
-if ! grep -q "MCP-BASE64-RESPONSE" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the Base64 response from emacsclient"
-	exit 1
-fi
-
-if ! grep -q "MCP-RESPONSE" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the formatted response"
-	exit 1
-fi
+check_log_contains "$debug_log_file" "MCP-REQUEST.*$TEST_REQUEST" "Debug log doesn't contain the request"
+check_log_contains "$debug_log_file" "MCP-BASE64-RESPONSE" "Debug log doesn't contain the Base64 response from emacsclient"
+check_log_contains "$debug_log_file" "MCP-RESPONSE" "Debug log doesn't contain the formatted response"
 
 # Verify basic entries that should always exist
 if ! grep -q "MCP-INFO:.*init function\|No init function specified" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the init function info"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain the init function info: $debug_log_file"
 	exit 1
 fi
 
 if ! grep -q "MCP-INFO:.*Stopping MCP with function\|No stop function specified" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the stop function info"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain the stop function info: $debug_log_file"
 	exit 1
 fi
 
 # Verify that call/response cycle works
 if ! grep -q "MCP-REQUEST:" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the request"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain the request: $debug_log_file"
 	exit 1
 fi
 
 if ! grep -q "MCP-RESPONSE:" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the response"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain the response: $debug_log_file"
 	exit 1
 fi
 
 if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain timestamps"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain timestamps: $debug_log_file"
 	exit 1
 fi
 
-echo "PASS: Debug logging with init and stop functions completed successfully"
 rm "$debug_log_file"
+TESTS_RUN=$((TESTS_RUN + 1))
 
 # Start MCP again after the test
-emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-start)"
+output=$(emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-start)")
+RETURN_CODE=$?
+if [ $RETURN_CODE -ne 0 ] || [ "$output" != "t" ]; then
+	echo "FAIL: Failed to restart MCP, got output: $output, return code: $RETURN_CODE"
+	exit 1
+fi
 
-echo "Test case 3: Debug logging without init and stop functions"
+TEST_CASE="Test case 3: Debug logging without init and stop functions"
 
 # Test without init and stop functions
 TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":3}'
@@ -123,69 +138,62 @@ echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
 	$STDIO_CMD >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
-	echo "FAIL: Debug log file was not created"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log file was not created: $debug_log_file"
 	exit 1
 fi
 
-# Verify essentials
-if ! grep -q "MCP-REQUEST" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the request"
-	exit 1
-fi
-
-if ! grep -q "MCP-BASE64-RESPONSE" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the Base64 response from emacsclient"
-	exit 1
-fi
-
-if ! grep -q "MCP-RESPONSE" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the formatted response"
-	exit 1
-fi
+check_log_contains "$debug_log_file" "MCP-REQUEST" "Debug log doesn't contain the request"
+check_log_contains "$debug_log_file" "MCP-BASE64-RESPONSE" "Debug log doesn't contain the Base64 response from emacsclient"
+check_log_contains "$debug_log_file" "MCP-RESPONSE" "Debug log doesn't contain the formatted response"
 
 # Verify we don't see init/stop function calls
 if grep -q "MCP-INIT-CALL:" "$debug_log_file"; then
-	echo "FAIL: Debug log contains init function call when it shouldn't"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log contains init function call when it shouldn't: $debug_log_file"
 	exit 1
 fi
 
 if grep -q "MCP-STOP-CALL:" "$debug_log_file"; then
-	echo "FAIL: Debug log contains stop function call when it shouldn't"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log contains stop function call when it shouldn't: $debug_log_file"
 	exit 1
 fi
 
 # Verify info messages about skipping init or logging without init
 if ! grep -q "MCP-INFO:.*Skipping init function call\|No init function specified" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the init function skip message"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain the init function skip message: $debug_log_file"
 	exit 1
 fi
 
 # Verify info messages about skipping stop or stopping with function
 if ! grep -q "MCP-INFO:.*Skipping stop function call\|Stopping MCP with function" "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain the stop function skip/use message"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain the stop function skip/use message: $debug_log_file"
 	exit 1
 fi
 
 if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$debug_log_file"; then
-	echo "FAIL: Debug log doesn't contain timestamps"
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log doesn't contain timestamps: $debug_log_file"
 	exit 1
 fi
 
-echo "PASS: Debug logging without init and stop functions completed successfully"
 rm "$debug_log_file"
+TESTS_RUN=$((TESTS_RUN + 1))
 
-echo "Test case 4: Debug logging with invalid path"
+TEST_CASE="Test case 4: Debug logging with invalid path"
 
-echo "Testing with invalid log path (script should exit with error)..."
 if echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
 	$STDIO_CMD >stdio-response.txt 2>/dev/null; then
+	echo "$TEST_CASE"
 	echo "FAIL: Script should exit with error when log path is invalid"
 	exit 1
-else
-	echo "PASS: Script correctly exits with error when log path is invalid"
 fi
+TESTS_RUN=$((TESTS_RUN + 1))
 
-echo "Test case 5: Special character escaping test"
+TEST_CASE="Test case 5: Special character escaping test"
 
 emacsclient -s "$TEST_SERVER_NAME" -e "
 (progn
@@ -203,13 +211,13 @@ TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\"
 echo "$TEST_REQUEST" | $STDIO_CMD >stdio-response.txt
 
 if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
+	echo "$TEST_CASE"
 	echo "FAIL: Final response doesn't have properly unescaped quote and newline"
 	exit 1
-else
-	echo "PASS"
 fi
+TESTS_RUN=$((TESTS_RUN + 1))
 
-echo "Test case 6: Original failing payload test"
+TEST_CASE="Test case 6: Original failing payload test"
 
 emacsclient -s "$TEST_SERVER_NAME" -e "
 (progn
@@ -235,18 +243,25 @@ echo "$TEST_REQUEST" |
 if grep -q "oooooą pp qqqqq" stdio-response.txt; then
 	# Check for absence of the error message that base64 encoding is supposed to prevent
 	if grep -q "\*ERROR\*: Unknown message" stdio-response.txt; then
+		echo "$TEST_CASE"
 		echo "ISSUE DETECTED: Base64 encoding failed to prevent unknown message errors"
 		exit 1
-	else
-		echo "PASS: Response contains the multibyte character correctly and no unwanted messages"
 	fi
 else
+	echo "$TEST_CASE"
 	echo "ISSUE DETECTED: Response doesn't contain expected content with multibyte character"
 	exit 1
 fi
 
-# Stop the MCP server at the end
-emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)"
+TESTS_RUN=$((TESTS_RUN + 1))
 
-echo "All tests completed."
+# Stop the MCP server at the end
+output=$(emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)")
+RETURN_CODE=$?
+if [ $RETURN_CODE -ne 0 ] || [ "$output" != "t" ]; then
+	echo "FAIL: Failed to stop MCP at end, got output: $output, return code: $RETURN_CODE"
+	exit 1
+fi
+
+echo "$TESTS_RUN tests run OK!"
 exit 0
