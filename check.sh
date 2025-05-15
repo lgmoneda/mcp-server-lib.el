@@ -169,9 +169,7 @@ if [ $SHELL_SYNTAX_FAILED -eq 0 ]; then
 	fi
 
 	echo -n "Running stdio adapter tests... "
-	if ./emacs-mcp-stdio-test.sh; then
-		echo "OK!"
-	else
+	if ! ./emacs-mcp-stdio-test.sh; then
 		echo "stdio adapter tests failed"
 		ERRORS=$((ERRORS + 1))
 	fi
@@ -236,10 +234,13 @@ fi
 # Last step: check for duplicates
 
 echo -n "Checking for code duplication with jscpd... "
-if jscpd -s -r consoleFull -t 0 .; then
+# NOTE: Would be ideal to merge these two invocations into one if jscpd
+# had an option to be silent on success but verbose on failure
+if jscpd -s -t 0 .; then
 	echo "OK!"
 else
 	echo "jscpd check failed!"
+	jscpd -t 0 .
 	ERRORS=$((ERRORS + 1))
 fi
 
