@@ -23,11 +23,12 @@ while ! emacsclient -s "$TEST_SERVER_NAME" -e 't' >/dev/null 2>&1; do
 	fi
 done
 echo "Server started"
+emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-start)"
 
 echo "Test case 1: Basic functionality test"
 
 echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
-	$STDIO_CMD --init-function="mcp-start" >stdio-response.txt
+	$STDIO_CMD >stdio-response.txt
 
 readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
 
@@ -48,6 +49,9 @@ echo "Test case 2: Debug logging with init and stop functions"
 readonly INIT_FUNCTION="mcp-start"
 readonly STOP_FUNCTION="mcp-stop"
 TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
+
+# Stop MCP for this test as we want to test explicit init/stop functions
+emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)"
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
@@ -105,6 +109,9 @@ fi
 
 echo "PASS: Debug logging with init and stop functions completed successfully"
 rm "$debug_log_file"
+
+# Start MCP again after the test
+emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-start)"
 
 echo "Test case 3: Debug logging without init and stop functions"
 
@@ -193,7 +200,7 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 " >/dev/null
 TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
 
-echo "$TEST_REQUEST" | $STDIO_CMD --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt
+echo "$TEST_REQUEST" | $STDIO_CMD >stdio-response.txt
 
 if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
 	echo "FAIL: Final response doesn't have properly unescaped quote and newline"
@@ -221,7 +228,7 @@ TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\"
 # Run test 6 (multibyte character test)
 debug_log_file="/tmp/test6-debug-$$.log"
 echo "$TEST_REQUEST" |
-	EMACS_MCP_DEBUG_LOG="$debug_log_file" $STDIO_CMD --init-function="mcp-start" --stop-function="mcp-stop" >stdio-response.txt 2>/dev/null
+	EMACS_MCP_DEBUG_LOG="$debug_log_file" $STDIO_CMD >stdio-response.txt 2>/dev/null
 
 # Check for valid content (should have multibyte character)
 # and absence of unwanted output (unknown message errors)
@@ -237,6 +244,9 @@ else
 	echo "ISSUE DETECTED: Response doesn't contain expected content with multibyte character"
 	exit 1
 fi
+
+# Stop the MCP server at the end
+emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)"
 
 echo "All tests completed."
 exit 0
