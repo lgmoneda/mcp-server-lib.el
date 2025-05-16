@@ -16,12 +16,12 @@ check_log_contains() {
 }
 
 run_emacs_function() {
-	local function_name="$1"
+	local func_name="$1"
 	local error_message="$2"
 	local func_output
 	local func_return_code
 
-	func_output=$(emacsclient -s "$TEST_SERVER_NAME" -e "($function_name)")
+	func_output=$(emacsclient -s "$TEST_SERVER_NAME" -e "($func_name)")
 	func_return_code=$?
 
 	if [ $func_return_code -ne 0 ] || [ "$func_output" != "t" ]; then
