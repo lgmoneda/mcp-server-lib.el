@@ -17,7 +17,7 @@ check_log_contains() {
 
 run_emacs_function() {
 	local func_name="$1"
-	local error_message="$2"
+	local err_msg="$2"
 	local func_output
 	local func_return_code
 
@@ -25,7 +25,7 @@ run_emacs_function() {
 	func_return_code=$?
 
 	if [ $func_return_code -ne 0 ] || [ "$func_output" != "t" ]; then
-		echo "FAIL: $error_message, got output: $func_output, return code: $func_return_code"
+		echo "FAIL: $err_msg, got output: $func_output, return code: $func_return_code"
 		exit 1
 	fi
 }
