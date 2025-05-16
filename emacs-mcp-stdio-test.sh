@@ -39,21 +39,20 @@ done
 TEST_CASE="Test case 1: Basic functionality test"
 
 REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":1}'
-RESPONSE=$(echo "$REQUEST" |
-	$STDIO_CMD)
+RESPONSE=$(echo "$REQUEST" | $STDIO_CMD)
 readonly RESPONSE
 
 readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
 
-if [ "$RESPONSE" = "$EXPECTED" ]; then
-	TESTS_RUN=$((TESTS_RUN + 1))
-else
+if [ "$RESPONSE" != "$EXPECTED" ]; then
 	echo "$TEST_CASE"
 	echo "FAIL: Response from stdio adapter doesn't match expected"
 	echo "Expected: $EXPECTED"
 	echo "Actual: $RESPONSE"
 	exit 1
 fi
+
+TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 2: Debug logging with init and stop functions"
 
