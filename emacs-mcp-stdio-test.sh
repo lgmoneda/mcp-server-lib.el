@@ -38,7 +38,8 @@ done
 
 TEST_CASE="Test case 1: Basic functionality test"
 
-RESPONSE=$(echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
+REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":1}'
+RESPONSE=$(echo "$REQUEST" |
 	$STDIO_CMD)
 readonly RESPONSE
 
