@@ -15,6 +15,21 @@ check_log_contains() {
 	fi
 }
 
+run_emacs_function() {
+	local function_name="$1"
+	local error_message="$2"
+	local func_output
+	local func_return_code
+
+	func_output=$(emacsclient -s "$TEST_SERVER_NAME" -e "($function_name)")
+	func_return_code=$?
+
+	if [ $func_return_code -ne 0 ] || [ "$func_output" != "t" ]; then
+		echo "FAIL: $error_message, got output: $func_output, return code: $func_return_code"
+		exit 1
+	fi
+}
+
 TESTS_RUN=0
 
 readonly TEST_SERVER_NAME="mcp-test-server-$$"
@@ -62,12 +77,7 @@ readonly STOP_FUNCTION="mcp-stop"
 REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 
 # Stop MCP for this test as we want to test explicit init/stop functions
-output=$(emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)")
-RETURN_CODE=$?
-if [ $RETURN_CODE -ne 0 ] || [ "$output" != "t" ]; then
-	echo "FAIL: Failed to stop MCP, got output: $output, return code: $RETURN_CODE"
-	exit 1
-fi
+run_emacs_function "mcp-stop" "Failed to stop MCP"
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
@@ -120,12 +130,7 @@ rm "$debug_log_file"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Start MCP again after the test
-output=$(emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-start)")
-RETURN_CODE=$?
-if [ $RETURN_CODE -ne 0 ] || [ "$output" != "t" ]; then
-	echo "FAIL: Failed to restart MCP, got output: $output, return code: $RETURN_CODE"
-	exit 1
-fi
+run_emacs_function "mcp-start" "Failed to restart MCP"
 
 TEST_CASE="Test case 3: Debug logging without init and stop functions"
 
@@ -255,12 +260,7 @@ fi
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Stop the MCP server at the end
-output=$(emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)")
-RETURN_CODE=$?
-if [ $RETURN_CODE -ne 0 ] || [ "$output" != "t" ]; then
-	echo "FAIL: Failed to stop MCP at end, got output: $output, return code: $RETURN_CODE"
-	exit 1
-fi
+run_emacs_function "mcp-stop" "Failed to stop MCP at end"
 
 echo "$TESTS_RUN tests run OK!"
 exit 0
