@@ -38,20 +38,19 @@ done
 
 TEST_CASE="Test case 1: Basic functionality test"
 
-echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
-	$STDIO_CMD >stdio-response.txt
+RESPONSE=$(echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' |
+	$STDIO_CMD)
+readonly RESPONSE
 
 readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
 
-trap 'rm -f stdio-response.txt' EXIT
-
-if [ "$(cat stdio-response.txt)" = "$EXPECTED" ]; then
+if [ "$RESPONSE" = "$EXPECTED" ]; then
 	TESTS_RUN=$((TESTS_RUN + 1))
 else
 	echo "$TEST_CASE"
 	echo "FAIL: Response from stdio adapter doesn't match expected"
 	echo "Expected: $EXPECTED"
-	echo "Actual: $(cat stdio-response.txt)"
+	echo "Actual: $RESPONSE"
 	exit 1
 fi
 
