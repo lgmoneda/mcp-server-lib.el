@@ -6,11 +6,11 @@ set -eu -o pipefail
 check_log_contains() {
 	local log="$1"
 	local pattern="$2"
-	local message="$3"
+	local err_msg="$3"
 
 	if ! grep -q "$pattern" "$log"; then
 		echo "$TEST_CASE"
-		echo "FAIL: $message: $log"
+		echo "FAIL: $err_msg: $log"
 		exit 1
 	fi
 }
