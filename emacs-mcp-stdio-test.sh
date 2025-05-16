@@ -59,7 +59,7 @@ TEST_CASE="Test case 2: Debug logging with init and stop functions"
 # Define test parameters for explicit init and stop
 readonly INIT_FUNCTION="mcp-start"
 readonly STOP_FUNCTION="mcp-stop"
-TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
+REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 
 # Stop MCP for this test as we want to test explicit init/stop functions
 output=$(emacsclient -s "$TEST_SERVER_NAME" -e "(mcp-stop)")
@@ -71,7 +71,7 @@ fi
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
-echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
+echo "$REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
 	$STDIO_CMD --init-function="$INIT_FUNCTION" --stop-function="$STOP_FUNCTION" >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
@@ -80,7 +80,7 @@ if [ ! -f "$debug_log_file" ]; then
 	exit 1
 fi
 
-check_log_contains "$debug_log_file" "MCP-REQUEST.*$TEST_REQUEST" "Debug log doesn't contain the request"
+check_log_contains "$debug_log_file" "MCP-REQUEST.*$REQUEST" "Debug log doesn't contain the request"
 check_log_contains "$debug_log_file" "MCP-BASE64-RESPONSE" "Debug log doesn't contain the Base64 response from emacsclient"
 check_log_contains "$debug_log_file" "MCP-RESPONSE" "Debug log doesn't contain the formatted response"
 
@@ -130,10 +130,10 @@ fi
 TEST_CASE="Test case 3: Debug logging without init and stop functions"
 
 # Test without init and stop functions
-TEST_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":3}'
+REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":3}'
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
-echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
+echo "$REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
 	$STDIO_CMD >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
@@ -184,7 +184,7 @@ TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 4: Debug logging with invalid path"
 
-if echo "$TEST_REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
+if echo "$REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
 	$STDIO_CMD >stdio-response.txt 2>/dev/null; then
 	echo "$TEST_CASE"
 	echo "FAIL: Script should exit with error when log path is invalid"
@@ -205,9 +205,9 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
     :description \"Returns a test string with special characters\")
 )
 " >/dev/null
-TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
+REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
 
-echo "$TEST_REQUEST" | $STDIO_CMD >stdio-response.txt
+echo "$REQUEST" | $STDIO_CMD >stdio-response.txt
 
 if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
 	echo "$TEST_CASE"
@@ -230,11 +230,11 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 )
 " >/dev/null
 
-TEST_REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
+REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
 
 # Run test 6 (multibyte character test)
 debug_log_file="/tmp/test6-debug-$$.log"
-echo "$TEST_REQUEST" |
+echo "$REQUEST" |
 	EMACS_MCP_DEBUG_LOG="$debug_log_file" $STDIO_CMD >stdio-response.txt 2>/dev/null
 
 # Check for valid content (should have multibyte character)
