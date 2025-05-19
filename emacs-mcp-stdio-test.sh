@@ -53,6 +53,7 @@ readonly SERVER_PID=$!
 # shellcheck disable=SC2317  # Called by trap
 cleanup() {
 	[ -n "${debug_log_file:-}" ] && [ -f "$debug_log_file" ] && rm -f "$debug_log_file"
+	rm -f "stdio-response.txt"
 	emacsclient -s "$TEST_SERVER_NAME" -e "(kill-emacs)" >/dev/null 2>&1 || true
 	wait "$SERVER_PID" 2>/dev/null || true
 }
