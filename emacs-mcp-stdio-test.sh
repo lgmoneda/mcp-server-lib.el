@@ -38,7 +38,13 @@ readonly STDIO_CMD="./emacs-mcp-stdio.sh --socket=$TEST_SERVER_NAME"
 emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp.el" --eval "(mcp-start)" 2>/dev/null &
 readonly SERVER_PID=$!
 
-trap 'emacsclient -s "$TEST_SERVER_NAME" -e "(kill-emacs)" >/dev/null 2>&1 || true; wait "$SERVER_PID" 2>/dev/null || true' EXIT
+# shellcheck disable=SC2317  # Called by trap
+cleanup() {
+	[ -n "${debug_log_file:-}" ] && [ -f "$debug_log_file" ] && rm -f "$debug_log_file"
+	emacsclient -s "$TEST_SERVER_NAME" -e "(kill-emacs)" >/dev/null 2>&1 || true
+	wait "$SERVER_PID" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 readonly MAX_TRIES=50
 COUNT=0
@@ -71,9 +77,9 @@ TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 2: Debug logging with init and stop functions"
 
-# Define test parameters for explicit init and stop
 readonly INIT_FUNCTION="mcp-start"
 readonly STOP_FUNCTION="mcp-stop"
+
 REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 
 # Stop MCP for this test as we want to test explicit init/stop functions
@@ -126,7 +132,6 @@ if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$de
 	exit 1
 fi
 
-rm "$debug_log_file"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Start MCP again after the test
