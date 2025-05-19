@@ -180,8 +180,6 @@ if [ $SHELL_SYNTAX_FAILED -eq 0 ]; then
 	else
 		echo "shfmt failed!"
 		ERRORS=$((ERRORS + 1))
-		echo "$ERRORS check(s) failed"
-		exit 1
 	fi
 else
 	echo "Skipping shellcheck, stdio adapter tests, and shfmt due to previous errors"
