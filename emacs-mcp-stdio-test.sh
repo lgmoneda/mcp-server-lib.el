@@ -101,30 +101,12 @@ check_log_contains "$debug_log_file" "MCP-BASE64-RESPONSE" "Debug log doesn't co
 check_log_contains "$debug_log_file" "MCP-RESPONSE" "Debug log doesn't contain the formatted response"
 
 # Verify basic entries that should always exist
-if ! grep -q "MCP-INFO:.*init function\|No init function specified" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log doesn't contain the init function info: $debug_log_file"
-	exit 1
-fi
-
-if ! grep -q "MCP-INFO:.*Stopping MCP with function\|No stop function specified" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log doesn't contain the stop function info: $debug_log_file"
-	exit 1
-fi
+check_log_contains "$debug_log_file" "MCP-INFO:.*init function\|No init function specified" "Debug log doesn't contain the init function info"
+check_log_contains "$debug_log_file" "MCP-INFO:.*Stopping MCP with function\|No stop function specified" "Debug log doesn't contain the stop function info"
 
 # Verify that call/response cycle works
-if ! grep -q "MCP-REQUEST:" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log doesn't contain the request: $debug_log_file"
-	exit 1
-fi
-
-if ! grep -q "MCP-RESPONSE:" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log doesn't contain the response: $debug_log_file"
-	exit 1
-fi
+check_log_contains "$debug_log_file" "MCP-REQUEST:" "Debug log doesn't contain the request"
+check_log_contains "$debug_log_file" "MCP-RESPONSE:" "Debug log doesn't contain the response"
 
 if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$debug_log_file"; then
 	echo "$TEST_CASE"
@@ -132,6 +114,7 @@ if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$de
 	exit 1
 fi
 
+rm "$debug_log_file"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Start MCP again after the test
@@ -262,6 +245,7 @@ else
 	exit 1
 fi
 
+rm "$debug_log_file"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Stop the MCP server at the end
