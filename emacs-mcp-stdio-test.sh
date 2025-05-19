@@ -184,12 +184,12 @@ TEST_CASE="Test case 5: Special character escaping test"
 
 emacsclient -s "$TEST_SERVER_NAME" -e "
 (progn
-  (defun mcp-test-quote-string ()
+  (defun mcp-test--quote-string ()
     \"Return a test string with a double quote and newline.\"
     \"\\\"\n\")
 
-  (mcp-register-tool #'mcp-test-quote-string
-    :id \"test-quote-string\" 
+  (mcp-register-tool #'mcp-test--quote-string
+    :id \"test-quote-string\"
     :description \"Returns a test string with special characters\")
 )
 " >/dev/null
@@ -208,12 +208,12 @@ TEST_CASE="Test case 6: Original failing payload test"
 
 emacsclient -s "$TEST_SERVER_NAME" -e "
 (progn
-  (defun mcp-test-original-payload ()
+  (defun mcp-test--original-payload ()
     \"Return the exact original payload that caused the issue.\"
     \"** aaa bbbbbbbbb ccccccc ddd eeeee ffffff                                :@ggggggggg:\\n   https://hhhhhh.iii/jjjjjjjjjjj/kkkkkkkkk/llllll/387\\n   mmmmmmmmm nnn oooooą pp qqqqq\\n** rr s tt uuuu++ vvvvvv wwww xxxx                                       :@yyyyyyyyy:\\n:zzzzzzz:\\n- aaaaa \\\"bbbb\\\"       cccc \\\"dddd\\\"       [1234-56-78 eee 90:12]\\n- fffff \\\"gggg\\\"       hhhh \\\"iiii\\\"       [1234-56-78 jjj 90:12]\\n- kkkkk \\\"llll\\\"       mmmm              [3456-78-90 nnn 12:34]\\n- nnnnn \\\"oooo\\\"       pppp              [5678-90-12 qqq 34:56]\\nrrrrr: [7890-12-34 sss 56:78]--[9012-34-56 ttt 78:90] =>  1:23\\n:uuu:\\nvvvvvv wwwwww xxxxxx yyyyyyyy zzz ~aaa::bbbbb~\\n\")
 
-  (mcp-register-tool #'mcp-test-original-payload
-    :id \"test-original-payload\" 
+  (mcp-register-tool #'mcp-test--original-payload
+    :id \"test-original-payload\"
     :description \"Returns the exact original payload that caused the issue\")
 )
 " >/dev/null
@@ -221,7 +221,7 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
 
 # Run test 6 (multibyte character test)
-debug_log_file="/tmp/test6-debug-$$.log"
+debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 echo "$REQUEST" |
 	EMACS_MCP_DEBUG_LOG="$debug_log_file" $STDIO_CMD >stdio-response.txt 2>/dev/null
 
