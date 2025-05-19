@@ -227,18 +227,8 @@ echo "$REQUEST" |
 
 # Check for valid content (should have multibyte character)
 # and absence of unwanted output (unknown message errors)
-if grep -q "oooooą pp qqqqq" stdio-response.txt; then
-	# Check for absence of the error message that base64 encoding is supposed to prevent
-	if grep -q "\*ERROR\*: Unknown message" stdio-response.txt; then
-		echo "$TEST_CASE"
-		echo "ISSUE DETECTED: Base64 encoding failed to prevent unknown message errors"
-		exit 1
-	fi
-else
-	echo "$TEST_CASE"
-	echo "ISSUE DETECTED: Response doesn't contain expected content with multibyte character"
-	exit 1
-fi
+check_log_contains "stdio-response.txt" "oooooą pp qqqqq" "Response doesn't contain expected content with multibyte character"
+check_log_not_contains "stdio-response.txt" "\*ERROR\*: Unknown message" "Base64 encoding failed to prevent unknown message errors"
 
 rm "$debug_log_file"
 TESTS_RUN=$((TESTS_RUN + 1))
