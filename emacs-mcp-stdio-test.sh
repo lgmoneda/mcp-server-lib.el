@@ -15,6 +15,18 @@ check_log_contains() {
 	fi
 }
 
+check_log_not_contains() {
+	local log="$1"
+	local pattern="$2"
+	local err_msg="$3"
+
+	if grep -q "$pattern" "$log"; then
+		echo "$TEST_CASE"
+		echo "FAIL: $err_msg: $log"
+		exit 1
+	fi
+}
+
 run_emacs_function() {
 	local func_name="$1"
 	local err_msg="$2"
@@ -140,31 +152,14 @@ check_log_contains "$debug_log_file" "MCP-BASE64-RESPONSE" "Debug log doesn't co
 check_log_contains "$debug_log_file" "MCP-RESPONSE" "Debug log doesn't contain the formatted response"
 
 # Verify we don't see init/stop function calls
-if grep -q "MCP-INIT-CALL:" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log contains init function call when it shouldn't: $debug_log_file"
-	exit 1
-fi
-
-if grep -q "MCP-STOP-CALL:" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log contains stop function call when it shouldn't: $debug_log_file"
-	exit 1
-fi
+check_log_not_contains "$debug_log_file" "MCP-INIT-CALL:" "Debug log contains init function call when it shouldn't"
+check_log_not_contains "$debug_log_file" "MCP-STOP-CALL:" "Debug log contains stop function call when it shouldn't"
 
 # Verify info messages about skipping init or logging without init
-if ! grep -q "MCP-INFO:.*Skipping init function call\|No init function specified" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log doesn't contain the init function skip message: $debug_log_file"
-	exit 1
-fi
+check_log_contains "$debug_log_file" "MCP-INFO:.*Skipping init function call\|No init function specified" "Debug log doesn't contain the init function skip message"
 
 # Verify info messages about skipping stop or stopping with function
-if ! grep -q "MCP-INFO:.*Skipping stop function call\|Stopping MCP with function" "$debug_log_file"; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log doesn't contain the stop function skip/use message: $debug_log_file"
-	exit 1
-fi
+check_log_contains "$debug_log_file" "MCP-INFO:.*Skipping stop function call\|Stopping MCP with function" "Debug log doesn't contain the stop function skip/use message"
 
 if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$debug_log_file"; then
 	echo "$TEST_CASE"
