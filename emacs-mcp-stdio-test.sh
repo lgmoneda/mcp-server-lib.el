@@ -128,6 +128,7 @@ if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$de
 fi
 
 rm "$debug_log_file"
+rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Start MCP again after the test
@@ -169,6 +170,7 @@ if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$de
 fi
 
 rm "$debug_log_file"
+rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 4: Debug logging with invalid path"
@@ -179,6 +181,7 @@ if echo "$REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
 	echo "FAIL: Script should exit with error when log path is invalid"
 	exit 1
 fi
+rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 5: Special character escaping test"
@@ -203,6 +206,7 @@ if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
 	echo "FAIL: Final response doesn't have properly unescaped quote and newline"
 	exit 1
 fi
+rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 6: Original failing payload test"
@@ -232,6 +236,7 @@ check_log_contains "stdio-response.txt" "oooooą pp qqqqq" "Response doesn't con
 check_log_not_contains "stdio-response.txt" "\*ERROR\*: Unknown message" "Base64 encoding failed to prevent unknown message errors"
 
 rm "$debug_log_file"
+rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Stop the MCP server at the end
