@@ -4,9 +4,9 @@
 set -eu -o pipefail
 
 check_log_contains() {
-	local log="$1"
-	local pattern="$2"
-	local err_msg="$3"
+	local -r log="$1"
+	local -r pattern="$2"
+	local -r err_msg="$3"
 
 	if ! grep -q "$pattern" "$log"; then
 		echo "$TEST_CASE"
@@ -16,9 +16,9 @@ check_log_contains() {
 }
 
 check_log_not_contains() {
-	local log="$1"
-	local pattern="$2"
-	local err_msg="$3"
+	local -r log="$1"
+	local -r pattern="$2"
+	local -r err_msg="$3"
 
 	if grep -q "$pattern" "$log"; then
 		echo "$TEST_CASE"
@@ -27,9 +27,29 @@ check_log_not_contains() {
 	fi
 }
 
+verify_handshake_sequence() {
+	local -r debug_log="$1"
+
+	# Verify from the log file that all requests were processed
+	local -r init_count=$(grep -c "MCP-REQUEST.*$INIT_REQUEST" "$debug_log")
+	local -r notification_count=$(grep -c "MCP-REQUEST.*$NOTIFICATION" "$debug_log")
+	local -r tools_count=$(grep -c "MCP-REQUEST.*$TOOLS_REQUEST" "$debug_log")
+
+	# All three requests should be processed in a correct implementation
+	if [ "$init_count" -ne 1 ] || [ "$notification_count" -ne 1 ] || [ "$tools_count" -ne 1 ]; then
+		echo "$TEST_CASE"
+		echo "FAIL: Not all requests in the handshake sequence were processed"
+		echo "Init request count: $init_count"
+		echo "Notification count: $notification_count"
+		echo "Tools request count: $tools_count"
+		cat "$debug_log"
+		exit 1
+	fi
+}
+
 run_emacs_function() {
-	local func_name="$1"
-	local err_msg="$2"
+	local -r func_name="$1"
+	local -r err_msg="$2"
 	local func_output
 	local func_return_code
 
@@ -92,22 +112,8 @@ if [ $CMD_EXIT_CODE -ne 0 ]; then
 	cat "$debug_log_file"
 fi
 
-# Verify from the log file that all requests were processed
-INIT_COUNT=$(grep -c "MCP-REQUEST.*$INIT_REQUEST" "$debug_log_file")
-NOTIFICATION_COUNT=$(grep -c "MCP-REQUEST.*$NOTIFICATION" "$debug_log_file")
-TOOLS_COUNT=$(grep -c "MCP-REQUEST.*$TOOLS_REQUEST" "$debug_log_file")
-
-# All three requests should be processed in a correct implementation
-if [ "$INIT_COUNT" -ne 1 ] || [ "$NOTIFICATION_COUNT" -ne 1 ] || [ "$TOOLS_COUNT" -ne 1 ]; then
-	echo "$TEST_CASE"
-	echo "FAIL: Not all requests in the handshake sequence were processed"
-	echo "Init request count: $INIT_COUNT"
-	echo "Notification count: $NOTIFICATION_COUNT"
-	echo "Tools request count: $TOOLS_COUNT"
-	cat "$debug_log_file"
-	rm -f "$debug_log_file"
-	exit 1
-fi
+# Verify all handshake requests were processed
+verify_handshake_sequence "$debug_log_file"
 
 # Check that we got responses to both initialize and tools/list requests
 # We should have two lines in the output, one for each response
@@ -144,14 +150,18 @@ TEST_CASE="Test case 2: Debug logging with init and stop functions"
 readonly INIT_FUNCTION="mcp-start"
 readonly STOP_FUNCTION="mcp-stop"
 
-REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
-
 # Stop MCP for this test as we want to test explicit init/stop functions
 run_emacs_function "mcp-stop" "Failed to stop MCP"
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
-echo "$REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
+# These are the three messages in the MCP protocol handshake
+INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+NOTIFICATION='{"jsonrpc":"2.0","method":"notifications/initialized"}'
+TOOLS_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
+
+# Send all three requests to the script with the init and stop functions
+printf "%s\n%s\n%s\n" "$INIT_REQUEST" "$NOTIFICATION" "$TOOLS_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
 	$STDIO_CMD --init-function="$INIT_FUNCTION" --stop-function="$STOP_FUNCTION" >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
@@ -160,7 +170,34 @@ if [ ! -f "$debug_log_file" ]; then
 	exit 1
 fi
 
-check_log_contains "$debug_log_file" "MCP-REQUEST.*$REQUEST" "Debug log doesn't contain the request"
+# Verify all handshake requests were processed
+verify_handshake_sequence "$debug_log_file"
+
+# Check that we got responses to both initialize and tools/list requests
+# We should have two lines in the output, one for each response
+LINE_COUNT=$(wc -l <stdio-response.txt)
+if [ "$LINE_COUNT" -ne 2 ]; then
+	echo "$TEST_CASE"
+	echo "FAIL: Expected 2 response lines (initialize and tools/list), got $LINE_COUNT"
+	echo "Response: $(cat stdio-response.txt)"
+	exit 1
+fi
+
+# Now extract the tools/list response (second line)
+TOOLS_RESPONSE=$(tail -n 1 stdio-response.txt)
+
+# Check against the expected response format for tools/list
+readonly EXPECTED_TOOLS_2='{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}'
+
+if [ "$TOOLS_RESPONSE" != "$EXPECTED_TOOLS_2" ]; then
+	echo "$TEST_CASE"
+	echo "FAIL: tools/list response doesn't match expected"
+	echo "Expected: $EXPECTED_TOOLS_2"
+	echo "Actual: $TOOLS_RESPONSE"
+	exit 1
+fi
+
+# Check for responses from the handshake in the debug log
 check_log_contains "$debug_log_file" "MCP-BASE64-RESPONSE" "Debug log doesn't contain the Base64 response from emacsclient"
 check_log_contains "$debug_log_file" "MCP-RESPONSE" "Debug log doesn't contain the formatted response"
 
