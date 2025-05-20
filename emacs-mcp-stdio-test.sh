@@ -334,11 +334,12 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
 )
 " >/dev/null
 
-REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
+INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+NOTIFICATION='{"jsonrpc":"2.0","method":"notifications/initialized"}'
+TOOLS_CALL="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
 
-# Run test 6 (multibyte character test)
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
-echo "$REQUEST" |
+printf "%s\n%s\n%s\n" "$INIT_REQUEST" "$NOTIFICATION" "$TOOLS_CALL" |
 	EMACS_MCP_DEBUG_LOG="$debug_log_file" $STDIO_CMD >stdio-response.txt 2>/dev/null
 
 # Check for valid content (should have multibyte character)
