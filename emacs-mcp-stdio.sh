@@ -106,7 +106,7 @@ while read -r line; do
 	elisp_expr="(base64-encode-string (encode-coding-string (mcp-process-jsonrpc (base64-decode-string \"$base64_input\")) 'utf-8 t) t)"
 
 	# Get response from emacsclient - capture stderr for debugging
-	readonly stderr_file="/tmp/mcp-stderr.$$"
+	stderr_file="/tmp/mcp-stderr.$$-$(date +%s%N)"
 	base64_response=$(emacsclient "${SOCKET_OPTIONS[@]+"${SOCKET_OPTIONS[@]}"}" -e "$elisp_expr" 2>"$stderr_file")
 
 	# Check for stderr output

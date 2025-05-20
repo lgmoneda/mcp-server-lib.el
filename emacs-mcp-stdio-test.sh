@@ -239,6 +239,56 @@ rm "$debug_log_file"
 rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
+TEST_CASE="Test case 7: Multiple sequential requests"
+
+debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
+
+REQUEST1='{"jsonrpc":"2.0","method":"tools/list","id":6}'
+REQUEST2='{"jsonrpc":"2.0","method":"tools/list","id":7}'
+
+export EMACS_MCP_DEBUG_LOG="$debug_log_file"
+
+(printf "%s\n%s\n" "$REQUEST1" "$REQUEST2") | $STDIO_CMD >multi-response.txt
+
+if [ ! -f "$debug_log_file" ]; then
+	echo "$TEST_CASE"
+	echo "FAIL: Debug log file not created"
+	exit 1
+fi
+
+REQUEST1_COUNT=$(grep -c "MCP-REQUEST.*$REQUEST1" "$debug_log_file")
+REQUEST2_COUNT=$(grep -c "MCP-REQUEST.*$REQUEST2" "$debug_log_file")
+
+if [ "$REQUEST1_COUNT" -ne 1 ] || [ "$REQUEST2_COUNT" -ne 1 ]; then
+	echo "$TEST_CASE"
+	echo "FAIL: Not all requests were processed"
+	echo "Request 1 count: $REQUEST1_COUNT"
+	echo "Request 2 count: $REQUEST2_COUNT"
+	cat "$debug_log_file"
+	rm "$debug_log_file" multi-response.txt
+	exit 1
+fi
+
+if ! grep -q '"id":6' multi-response.txt; then
+	echo "$TEST_CASE"
+	echo "FAIL: Response for request with id:6 not found"
+	cat multi-response.txt
+	rm "$debug_log_file" multi-response.txt
+	exit 1
+fi
+
+if ! grep -q '"id":7' multi-response.txt; then
+	echo "$TEST_CASE"
+	echo "FAIL: Response for request with id:7 not found"
+	cat multi-response.txt
+	rm "$debug_log_file" multi-response.txt
+	exit 1
+fi
+
+rm "$debug_log_file" multi-response.txt
+
+TESTS_RUN=$((TESTS_RUN + 1))
+
 # Stop the MCP server at the end
 run_emacs_function "mcp-stop" "Failed to stop MCP at end"
 
