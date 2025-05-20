@@ -70,22 +70,73 @@ while ! emacsclient -s "$TEST_SERVER_NAME" -e 't' >/dev/null 2>&1; do
 	fi
 done
 
-TEST_CASE="Test case 1: Basic functionality test"
+TEST_CASE="Test case 1: MCP protocol handshake sequence"
 
-REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":1}'
-RESPONSE=$(echo "$REQUEST" | $STDIO_CMD)
-readonly RESPONSE
+# Create a log file for debugging
+debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
+export EMACS_MCP_DEBUG_LOG="$debug_log_file"
 
-readonly EXPECTED='{"jsonrpc":"2.0","id":1,"result":{"tools":[]}}'
+# These are the three messages in the MCP protocol handshake
+INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+NOTIFICATION='{"jsonrpc":"2.0","method":"notifications/initialized"}'
+TOOLS_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":2}'
 
-if [ "$RESPONSE" != "$EXPECTED" ]; then
+# Send all three requests to the script - this should complete successfully
+set +e
+RESPONSE=$(printf "%s\n%s\n%s\n" "$INIT_REQUEST" "$NOTIFICATION" "$TOOLS_REQUEST" | $STDIO_CMD)
+CMD_EXIT_CODE=$?
+set -e
+if [ $CMD_EXIT_CODE -ne 0 ]; then
+	echo "STDIO command failed with exit code: $CMD_EXIT_CODE"
+	echo "Debug output may help identify the issue:"
+	cat "$debug_log_file"
+fi
+
+# Verify from the log file that all requests were processed
+INIT_COUNT=$(grep -c "MCP-REQUEST.*$INIT_REQUEST" "$debug_log_file")
+NOTIFICATION_COUNT=$(grep -c "MCP-REQUEST.*$NOTIFICATION" "$debug_log_file")
+TOOLS_COUNT=$(grep -c "MCP-REQUEST.*$TOOLS_REQUEST" "$debug_log_file")
+
+# All three requests should be processed in a correct implementation
+if [ "$INIT_COUNT" -ne 1 ] || [ "$NOTIFICATION_COUNT" -ne 1 ] || [ "$TOOLS_COUNT" -ne 1 ]; then
 	echo "$TEST_CASE"
-	echo "FAIL: Response from stdio adapter doesn't match expected"
-	echo "Expected: $EXPECTED"
-	echo "Actual: $RESPONSE"
+	echo "FAIL: Not all requests in the handshake sequence were processed"
+	echo "Init request count: $INIT_COUNT"
+	echo "Notification count: $NOTIFICATION_COUNT"
+	echo "Tools request count: $TOOLS_COUNT"
+	cat "$debug_log_file"
+	rm -f "$debug_log_file"
 	exit 1
 fi
 
+# Check that we got responses to both initialize and tools/list requests
+# We should have two lines in the output, one for each response
+LINE_COUNT=$(echo "$RESPONSE" | wc -l)
+if [ "$LINE_COUNT" -ne 2 ]; then
+	echo "$TEST_CASE"
+	echo "FAIL: Expected 2 response lines (initialize and tools/list), got $LINE_COUNT"
+	echo "Response: $RESPONSE"
+	rm -f "$debug_log_file"
+	exit 1
+fi
+
+# Now extract the tools/list response (second line)
+TOOLS_RESPONSE=$(echo "$RESPONSE" | tail -n 1)
+
+# Check against the expected response format for tools/list
+readonly EXPECTED_TOOLS='{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}'
+
+if [ "$TOOLS_RESPONSE" != "$EXPECTED_TOOLS" ]; then
+	echo "$TEST_CASE"
+	echo "FAIL: tools/list response doesn't match expected"
+	echo "Expected: $EXPECTED_TOOLS"
+	echo "Actual: $TOOLS_RESPONSE"
+	rm -f "$debug_log_file"
+	exit 1
+fi
+
+# Clean up
+rm -f "$debug_log_file"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 2: Debug logging with init and stop functions"
@@ -237,56 +288,6 @@ check_log_not_contains "stdio-response.txt" "\*ERROR\*: Unknown message" "Base64
 
 rm "$debug_log_file"
 rm -f "stdio-response.txt"
-TESTS_RUN=$((TESTS_RUN + 1))
-
-TEST_CASE="Test case 7: Multiple sequential requests"
-
-debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
-
-REQUEST1='{"jsonrpc":"2.0","method":"tools/list","id":6}'
-REQUEST2='{"jsonrpc":"2.0","method":"tools/list","id":7}'
-
-export EMACS_MCP_DEBUG_LOG="$debug_log_file"
-
-(printf "%s\n%s\n" "$REQUEST1" "$REQUEST2") | $STDIO_CMD >multi-response.txt
-
-if [ ! -f "$debug_log_file" ]; then
-	echo "$TEST_CASE"
-	echo "FAIL: Debug log file not created"
-	exit 1
-fi
-
-REQUEST1_COUNT=$(grep -c "MCP-REQUEST.*$REQUEST1" "$debug_log_file")
-REQUEST2_COUNT=$(grep -c "MCP-REQUEST.*$REQUEST2" "$debug_log_file")
-
-if [ "$REQUEST1_COUNT" -ne 1 ] || [ "$REQUEST2_COUNT" -ne 1 ]; then
-	echo "$TEST_CASE"
-	echo "FAIL: Not all requests were processed"
-	echo "Request 1 count: $REQUEST1_COUNT"
-	echo "Request 2 count: $REQUEST2_COUNT"
-	cat "$debug_log_file"
-	rm "$debug_log_file" multi-response.txt
-	exit 1
-fi
-
-if ! grep -q '"id":6' multi-response.txt; then
-	echo "$TEST_CASE"
-	echo "FAIL: Response for request with id:6 not found"
-	cat multi-response.txt
-	rm "$debug_log_file" multi-response.txt
-	exit 1
-fi
-
-if ! grep -q '"id":7' multi-response.txt; then
-	echo "$TEST_CASE"
-	echo "FAIL: Response for request with id:7 not found"
-	cat multi-response.txt
-	rm "$debug_log_file" multi-response.txt
-	exit 1
-fi
-
-rm "$debug_log_file" multi-response.txt
-
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Stop the MCP server at the end

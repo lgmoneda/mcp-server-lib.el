@@ -103,7 +103,8 @@ while read -r line; do
 
 	# Process JSON-RPC request and return the result with proper UTF-8 encoding
 	# Encode the response to base64 to avoid any character encoding issues
-	elisp_expr="(base64-encode-string (encode-coding-string (mcp-process-jsonrpc (base64-decode-string \"$base64_input\")) 'utf-8 t) t)"
+	# Handle nil responses from notifications by converting to empty string
+	elisp_expr="(base64-encode-string (encode-coding-string (or (mcp-process-jsonrpc (base64-decode-string \"$base64_input\")) \"\") 'utf-8 t) t)"
 
 	# Get response from emacsclient - capture stderr for debugging
 	stderr_file="/tmp/mcp-stderr.$$-$(date +%s%N)"
@@ -130,8 +131,11 @@ while read -r line; do
 
 	mcp_debug_log "RESPONSE" "$formatted_response"
 
-	# Output the response
-	echo "$formatted_response"
+	# Only output non-empty responses
+	if [ -n "$formatted_response" ]; then
+		# Output the response
+		echo "$formatted_response"
+	fi
 done
 
 # Stop MCP if stop function is provided
