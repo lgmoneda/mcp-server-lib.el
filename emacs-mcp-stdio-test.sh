@@ -225,10 +225,15 @@ run_emacs_function "mcp-start" "Failed to restart MCP"
 TEST_CASE="Test case 3: Debug logging without init and stop functions"
 
 # Test without init and stop functions
-REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":3}'
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
-echo "$REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
+# These are the three messages in the MCP protocol handshake
+INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+NOTIFICATION='{"jsonrpc":"2.0","method":"notifications/initialized"}'
+TOOLS_REQUEST='{"jsonrpc":"2.0","method":"tools/list","id":3}'
+
+# Send all three requests to the script
+printf "%s\n%s\n%s\n" "$INIT_REQUEST" "$NOTIFICATION" "$TOOLS_REQUEST" | EMACS_MCP_DEBUG_LOG="$debug_log_file" \
 	$STDIO_CMD >stdio-response.txt
 
 if [ ! -f "$debug_log_file" ]; then
@@ -236,6 +241,9 @@ if [ ! -f "$debug_log_file" ]; then
 	echo "FAIL: Debug log file was not created: $debug_log_file"
 	exit 1
 fi
+
+# Verify all handshake requests were processed
+verify_handshake_sequence "$debug_log_file"
 
 check_log_contains "$debug_log_file" "MCP-REQUEST" "Debug log doesn't contain the request"
 check_log_contains "$debug_log_file" "MCP-BASE64-RESPONSE" "Debug log doesn't contain the Base64 response from emacsclient"
@@ -257,13 +265,23 @@ if ! grep -q -E '\[[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\]' "$de
 	exit 1
 fi
 
+# Check that we got responses to both initialize and tools/list requests
+# We should have two lines in the output, one for each response
+LINE_COUNT=$(wc -l <stdio-response.txt)
+if [ "$LINE_COUNT" -ne 2 ]; then
+	echo "$TEST_CASE"
+	echo "FAIL: Expected 2 response lines (initialize and tools/list), got $LINE_COUNT"
+	echo "Response: $(cat stdio-response.txt)"
+	exit 1
+fi
+
 rm "$debug_log_file"
 rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 4: Debug logging with invalid path"
 
-if echo "$REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
+if echo "$TOOLS_REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
 	$STDIO_CMD >stdio-response.txt 2>/dev/null; then
 	echo "$TEST_CASE"
 	echo "FAIL: Script should exit with error when log path is invalid"
