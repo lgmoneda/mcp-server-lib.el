@@ -305,9 +305,12 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
     :description \"Returns a test string with special characters\")
 )
 " >/dev/null
-REQUEST="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
 
-echo "$REQUEST" | $STDIO_CMD >stdio-response.txt
+INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+NOTIFICATION='{"jsonrpc":"2.0","method":"notifications/initialized"}'
+TOOLS_CALL="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":4,\"params\":{\"name\":\"test-quote-string\"}}"
+
+printf "%s\n%s\n%s\n" "$INIT_REQUEST" "$NOTIFICATION" "$TOOLS_CALL" | $STDIO_CMD >stdio-response.txt
 
 if ! grep -q '"text":"\\"\\n"' stdio-response.txt; then
 	echo "$TEST_CASE"
