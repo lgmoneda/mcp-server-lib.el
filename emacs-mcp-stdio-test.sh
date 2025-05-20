@@ -281,7 +281,9 @@ TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 4: Debug logging with invalid path"
 
-if echo "$TOOLS_REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
+INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
+
+if echo "$INIT_REQUEST" | EMACS_MCP_DEBUG_LOG="/non-existent-dir/mcp-debug.log" \
 	$STDIO_CMD >stdio-response.txt 2>/dev/null; then
 	echo "$TEST_CASE"
 	echo "FAIL: Script should exit with error when log path is invalid"
