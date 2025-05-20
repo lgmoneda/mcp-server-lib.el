@@ -74,7 +74,8 @@ fi
 
 # Initialize MCP if init function is provided
 if [ -n "$INIT_FUNCTION" ]; then
-	readonly INIT_CMD="emacsclient ${SOCKET_OPTIONS[*]} -e \"($INIT_FUNCTION)\""
+	# shellcheck disable=SC2124
+	readonly INIT_CMD="emacsclient ${SOCKET_OPTIONS[@]+"${SOCKET_OPTIONS[@]}"} -e \"($INIT_FUNCTION)\""
 
 	mcp_debug_log "INIT-CALL" "$INIT_CMD"
 
@@ -106,7 +107,7 @@ while read -r line; do
 
 	# Get response from emacsclient - capture stderr for debugging
 	readonly stderr_file="/tmp/mcp-stderr.$$"
-	base64_response=$(emacsclient "${SOCKET_OPTIONS[@]}" -e "$elisp_expr" 2>"$stderr_file")
+	base64_response=$(emacsclient "${SOCKET_OPTIONS[@]+"${SOCKET_OPTIONS[@]}"}" -e "$elisp_expr" 2>"$stderr_file")
 
 	# Check for stderr output
 	if [ -s "$stderr_file" ]; then
@@ -137,7 +138,8 @@ done
 if [ -n "$STOP_FUNCTION" ]; then
 	mcp_debug_log "INFO" "Stopping MCP with function: $STOP_FUNCTION"
 
-	readonly STOP_CMD="emacsclient ${SOCKET_OPTIONS[*]} -e \"($STOP_FUNCTION)\""
+	# shellcheck disable=SC2124
+	readonly STOP_CMD="emacsclient ${SOCKET_OPTIONS[@]+"${SOCKET_OPTIONS[@]}"} -e \"($STOP_FUNCTION)\""
 
 	mcp_debug_log "STOP-CALL" "$STOP_CMD"
 
