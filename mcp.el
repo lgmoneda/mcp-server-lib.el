@@ -428,6 +428,8 @@ handlers that have been registered with `mcp-register-tool'."
   (when mcp--running
     (error "MCP server is already running"))
 
+  (when (called-interactively-p 'any)
+    (message "Emacs starting handling MCP requests"))
   (setq mcp--running t))
 
 (defun mcp-stop ()
@@ -440,6 +442,8 @@ tools, it simply prevents `mcp-process-jsonrpc' from accepting new requests."
   (unless mcp--running
     (error "MCP server is not running"))
 
+  (when (called-interactively-p 'any)
+    (message "Emacs stopping handling MCP requests"))
   ;; Mark server as not running
   (setq mcp--running nil)
   t)
