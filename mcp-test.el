@@ -355,6 +355,28 @@ PARAM-DESCRIPTION as the expected description of the parameter."
       ;; Notifications are one-way, should return nil
       (should (null response)))))
 
+(ert-deftest mcp-test-initialize-old-protocol-version ()
+  "Test server responds with its version for older client version."
+  (mcp-test--with-server
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize") ("id" . 16)
+               ("params" .
+                (("protocolVersion" . "2024-11-05")
+                 ("capabilities" .
+                  (("tools" . t)
+                   ("resources" . nil)
+                   ("prompts" . nil))))))))
+           (response (mcp-process-jsonrpc init-request))
+           (resp-obj (json-read-from-string response))
+           (result (alist-get 'result resp-obj))
+           (protocol-version (alist-get 'protocolVersion result)))
+      ;; Server should respond with its supported version, not client's
+      (should (string= "2025-03-26" protocol-version))
+      ;; Response should not have an error
+      (should (null (alist-get 'error resp-obj))))))
+
 ;;; `mcp-register-tool' tests
 
 (ert-deftest mcp-test-register-tool-error-missing-id ()

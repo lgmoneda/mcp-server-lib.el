@@ -297,9 +297,6 @@ Returns a JSON-RPC response string for the request."
 
 This implements the MCP initialize handshake, which negotiates protocol
 version and capabilities between the client and server."
-  ;; TODO: Add proper protocol version compatibility check
-  ;; For now, accept any protocol version for compatibility
-
   ;; Determine if we need to include tools capabilities
   ;; Include listChanged:true when tools are registered
   (let ((tools-capability
