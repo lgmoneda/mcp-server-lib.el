@@ -558,6 +558,9 @@ With optional properties:
       (error "Tool registration requires :id property"))
     (unless description
       (error "Tool registration requires :description property"))
+    ;; Check for duplicate registration
+    (when (gethash id mcp--tools)
+      (error "MCP tool with ID '%s' is already registered" id))
     ;; Generate schema from handler function
     (let* ((schema (mcp--generate-schema-from-function handler))
            (tool

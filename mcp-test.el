@@ -432,6 +432,23 @@ PARAM-DESCRIPTION as the expected description of the parameter."
     :description "Tool with missing parameter docs")
    :type 'error))
 
+(ert-deftest mcp-test-register-tool-error-duplicate-id ()
+  "Test that registering a tool with duplicate ID produces an error."
+  (mcp-register-tool
+   #'mcp-test--tool-handler-simple
+   :id "duplicate-test"
+   :description "First registration")
+
+  (should-error
+   (mcp-register-tool
+    #'mcp-test--tool-handler-simple
+    :id "duplicate-test"
+    :description "Second registration")
+   :type 'error)
+
+  ;; Clean up
+  (mcp-unregister-tool "duplicate-test"))
+
 (ert-deftest mcp-test-register-tool-bytecode ()
   "Test schema generation for a handler loaded as bytecode.
 This test verifies that MCP can correctly extract parameter information
