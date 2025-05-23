@@ -238,7 +238,7 @@ if jscpd -s -t 0 .; then
 	echo "OK!"
 else
 	echo "jscpd check failed!"
-	jscpd -t 0 .
+	jscpd -r consoleFull -t 0 .
 	ERRORS=$((ERRORS + 1))
 fi
 
