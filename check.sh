@@ -102,9 +102,13 @@ if [ $ERRORS -eq 0 ]; then
 	                     (dolist (dir pkg-dirs)
 	                       (add-to-list 'load-path dir))
 	                     (require 'elisp-lint)
-	                     (dolist (file (list $ELISP_FILES))
-                               (princ (format \"%s \" file))
-	                       (elisp-lint-file file)))"; then
+	                     (let ((has-errors nil))
+	                       (dolist (file (list $ELISP_FILES))
+	                           (princ (format \"%s \" file))
+	                       (unless (elisp-lint-file file)
+	                         (setq has-errors t)))
+	                       (when has-errors
+	                         (kill-emacs 1))))"; then
 		echo "OK!"
 	else
 		echo "elisp-lint failed"
