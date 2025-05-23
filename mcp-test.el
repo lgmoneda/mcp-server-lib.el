@@ -759,6 +759,16 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
     (mcp-test--check-jsonrpc-error
      "This is not valid JSON" -32700 "Parse error")))
 
+(ert-deftest mcp-test-method-not-found ()
+  "Test that unknown methods return method-not-found error."
+  (mcp-test--with-server
+    (mcp-test--check-jsonrpc-error
+     (json-encode
+      '(("jsonrpc" . "2.0")
+        ("method" . "unknown/method")
+        ("id" . 99)))
+     -32601 "Method not found: unknown/method")))
+
 (ert-deftest mcp-test-invalid-jsonrpc ()
   "Test that valid JSON that is not JSON-RPC returns an invalid request error."
   (mcp-test--with-server
