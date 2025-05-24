@@ -256,12 +256,14 @@ Returns a JSON-RPC response string for the request."
                                  (cdr (car tool-args))))
                             (funcall handler first-arg-value))
                         (funcall handler)))
+                     ;; Ensure result is a string, convert nil to empty string
+                     (result-text (or result ""))
                      ;; Wrap the handler result in the MCP format
                      (formatted-result
                       `((content
                          .
                          ,(vector
-                           `((type . "text") (text . ,result))))
+                           `((type . "text") (text . ,result-text))))
                         (isError . :json-false))))
                   (mcp--respond-with-result context formatted-result))
               ;; Handle tool-specific errors thrown with mcp-tool-throw

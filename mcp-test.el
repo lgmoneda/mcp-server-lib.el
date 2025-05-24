@@ -64,6 +64,10 @@
   "Test tool handler function to return an empty string."
   "")
 
+(defun mcp-test--tool-handler-returns-nil ()
+  "Test tool handler function returning nil."
+  nil)
+
 (defun mcp-test--tool-handler-string-arg (input-string)
   "Test tool handler that accepts a string argument.
 INPUT-STRING is the string argument passed to the tool.
@@ -894,6 +898,25 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test the `tools/call` request with a tool that was never registered."
   (mcp-test--with-server
     (mcp-test--verify-tool-not-found mcp-test--nonexistent-tool-id)))
+
+(ert-deftest mcp-test-tools-call-handler-returns-nil ()
+  "Test tool handler that returns nil value."
+  (mcp-test--with-tools ((#'mcp-test--tool-handler-returns-nil
+                          :id "nil-returning-tool"
+                          :description "A tool that returns nil"))
+    (let ((result (mcp-test--call-tool "nil-returning-tool" 14)))
+      ;; Check for proper MCP format with empty string
+      (should (alist-get 'content result))
+      (should (arrayp (alist-get 'content result)))
+      (should (= 1 (length (alist-get 'content result))))
+      ;; Check content item
+      (let ((content-item (aref (alist-get 'content result) 0)))
+        (should (alist-get 'type content-item))
+        (should (string= "text" (alist-get 'type content-item)))
+        ;; When handler returns nil, it should be converted to empty string
+        (should (string= "" (alist-get 'text content-item))))
+      ;; Ensure isError is false
+      (should (eq :json-false (alist-get 'isError result))))))
 
 ;;; prompts/list tests
 
