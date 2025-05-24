@@ -68,6 +68,10 @@
   "Test tool handler function returning nil."
   nil)
 
+(defun mcp-test--tool-handler-to-be-undefined ()
+  "Test tool handler function that will be undefined after registration."
+  "Handler was defined when called")
+
 (defun mcp-test--tool-handler-string-arg (input-string)
   "Test tool handler that accepts a string argument.
 INPUT-STRING is the string argument passed to the tool.
@@ -917,6 +921,21 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         (should (string= "" (alist-get 'text content-item))))
       ;; Ensure isError is false
       (should (eq :json-false (alist-get 'isError result))))))
+
+(ert-deftest mcp-test-tools-call-handler-undefined ()
+  "Test calling a tool whose handler function no longer exists."
+  (mcp-test--with-tools
+      ((#'mcp-test--tool-handler-to-be-undefined
+        :id "undefined-handler-tool"
+        :description "A tool whose handler will be undefined"))
+    ;; Undefine the handler function
+    (fmakunbound 'mcp-test--tool-handler-to-be-undefined)
+
+    ;; Try to call the tool - should return an error
+    (mcp-test--check-jsonrpc-error
+     (mcp-create-tools-call-request "undefined-handler-tool" 16)
+     -32603
+     "Internal error executing tool")))
 
 ;;; prompts/list tests
 
