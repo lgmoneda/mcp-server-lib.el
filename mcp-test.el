@@ -377,6 +377,123 @@ PARAM-DESCRIPTION as the expected description of the parameter."
       ;; Response should not have an error
       (should (null (alist-get 'error resp-obj))))))
 
+(ert-deftest mcp-test-initialize-missing-protocol-version ()
+  "Test initialize request without protocolVersion field."
+  (mcp-test--with-server
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize") ("id" . 17)
+               ("params" .
+                (("capabilities" .
+                  (("tools" . t)
+                   ("resources" . nil)
+                   ("prompts" . nil))))))))
+           (response (mcp-process-jsonrpc init-request))
+           (resp-obj (json-read-from-string response))
+           (result (alist-get 'result resp-obj)))
+      ;; Server should still respond successfully with its version
+      (should (null (alist-get 'error resp-obj)))
+      (should
+       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+
+(ert-deftest mcp-test-initialize-non-string-protocol-version ()
+  "Test initialize request with non-string protocolVersion."
+  (mcp-test--with-server
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize") ("id" . 18)
+               ("params" .
+                (("protocolVersion" . 123) ; Number instead of string
+                 ("capabilities" .
+                  (("tools" . t)
+                   ("resources" . nil)
+                   ("prompts" . nil))))))))
+           (response (mcp-process-jsonrpc init-request))
+           (resp-obj (json-read-from-string response))
+           (result (alist-get 'result resp-obj)))
+      ;; Server should still respond successfully with its version
+      (should (null (alist-get 'error resp-obj)))
+      (should
+       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+
+(ert-deftest mcp-test-initialize-malformed-params ()
+  "Test initialize request with completely malformed params."
+  (mcp-test--with-server
+    ;; Test with params as a string instead of object
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize")
+               ("id" . 19)
+               ("params" . "malformed"))))
+           (response (mcp-process-jsonrpc init-request))
+           (resp-obj (json-read-from-string response))
+           (result (alist-get 'result resp-obj)))
+      ;; Server should still respond successfully
+      (should (null (alist-get 'error resp-obj)))
+      (should
+       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+
+(ert-deftest mcp-test-initialize-missing-params ()
+  "Test initialize request without params field."
+  (mcp-test--with-server
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize")
+               ("id" . 20))))
+           (response (mcp-process-jsonrpc init-request))
+           (resp-obj (json-read-from-string response))
+           (result (alist-get 'result resp-obj)))
+      ;; Server should still respond successfully
+      (should (null (alist-get 'error resp-obj)))
+      (should
+       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+
+(ert-deftest mcp-test-initialize-null-protocol-version ()
+  "Test initialize request with null protocolVersion."
+  (mcp-test--with-server
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize") ("id" . 21)
+               ("params" .
+                (("protocolVersion" . :json-null)
+                 ("capabilities" .
+                  (("tools" . t)
+                   ("resources" . nil)
+                   ("prompts" . nil))))))))
+           (response (mcp-process-jsonrpc init-request))
+           (resp-obj (json-read-from-string response))
+           (result (alist-get 'result resp-obj)))
+      ;; Server should still respond successfully with its version
+      (should (null (alist-get 'error resp-obj)))
+      (should
+       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+
+(ert-deftest mcp-test-initialize-empty-protocol-version ()
+  "Test initialize request with empty string protocolVersion."
+  (mcp-test--with-server
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize") ("id" . 22)
+               ("params" .
+                (("protocolVersion" . "")
+                 ("capabilities" .
+                  (("tools" . t)
+                   ("resources" . nil)
+                   ("prompts" . nil))))))))
+           (response (mcp-process-jsonrpc init-request))
+           (resp-obj (json-read-from-string response))
+           (result (alist-get 'result resp-obj)))
+      ;; Server should still respond successfully with its version
+      (should (null (alist-get 'error resp-obj)))
+      (should
+       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+
 ;;; `mcp-register-tool' tests
 
 (ert-deftest mcp-test-register-tool-error-missing-id ()

@@ -64,6 +64,10 @@ with code in this repository.
 **IMPORTANT: Never use direct byte-compilation commands.**
 **Always use check.sh which runs elisp-lint and includes byte-compilation checks.**
 
+**IMPORTANT: When making edits, especially when adding multiple tests or functions,**
+**add them one at a time. Each edit should be one logical unit (e.g., one test function).**
+**This makes reviews easier and reduces the chance of errors.**
+
 ### Step 1: Understand the feature
 
 Before writing any code:
