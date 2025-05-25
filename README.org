@@ -90,6 +90,7 @@ The =*mcp-log*= buffer will show incoming requests with ="-> (request)"= prefix 
 Tool handler functions should:
 - Return an Elisp string for successful execution
 - Call ~mcp-tool-throw~ for error returns
+- Use ~mcp-with-error-handling~ macro for automatic error handling
 
 *** Tool Parameter Documentation
 
@@ -130,6 +131,22 @@ Example with optional properties:
   :description "Get weather information"
   :title "Weather Forecast"
   :read-only t)
+#+end_src
+
+*** Error Handling
+
+The =mcp-with-error-handling= macro provides automatic error handling. It will catch any errors and call =mcp-tool-throw= on them:
+
+#+begin_src elisp
+(defun my-file-handler (filename)
+  "Read a file and return its contents.
+  
+  MCP Parameters:
+    filename - path to the file to read"
+  (mcp-with-error-handling
+    (with-temp-buffer
+      (insert-file-contents filename)
+      (buffer-string))))
 #+end_src
 
 *** Utility Functions

@@ -325,6 +325,28 @@ This is called after successful initialization to complete the handshake.
 The client sends this notification to acknowledge the server's response
 to the initialize request.")
 
+;;; Error handling helpers
+
+(defmacro mcp-with-error-handling (&rest body)
+  "Execute BODY with consistent error handling for MCP tools.
+
+Any error that occurs during BODY execution is caught and re-thrown as
+an `mcp-tool-error' with a formatted error message.
+
+Arguments:
+  BODY  Forms to execute with error handling
+
+Returns the result of BODY execution if no error occurs.
+
+Example:
+  (mcp-with-error-handling
+    (do-something-that-might-fail)
+    (return-result))"
+  `(condition-case err
+       (progn
+         ,@body)
+     (error (mcp-tool-throw (format "Error: %S" err)))))
+
 ;;; Tool helpers
 
 (defun mcp--extract-param-descriptions (docstring arglist)

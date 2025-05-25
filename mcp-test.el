@@ -1057,5 +1057,35 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   (should (commandp #'mcp-start))
   (should (commandp #'mcp-stop)))
 
+;;; `mcp-with-error-handling' tests
+
+(ert-deftest mcp-test-with-error-handling-success ()
+  "Test that `mcp-with-error-handling' executes BODY normally."
+  (let ((result (mcp-with-error-handling (+ 1 2))))
+    (should (= 3 result))))
+
+(ert-deftest mcp-test-with-error-handling-catches-error ()
+  "Test that `mcp-with-error-handling' catches errors."
+  (should-error
+   (mcp-with-error-handling (error "Test error"))
+   :type 'mcp-tool-error))
+
+(ert-deftest mcp-test-with-error-handling-error-message ()
+  "Test that `mcp-with-error-handling' formats error messages correctly."
+  (condition-case err
+      (mcp-with-error-handling (error "Original error message"))
+    (mcp-tool-error
+     (should
+      (string-match
+       "Error: (error \"Original error message\")" (cadr err))))))
+
+(ert-deftest mcp-test-with-error-handling-multiple-expressions ()
+  "Test that `mcp-with-error-handling' can handle multiple expressions."
+  (let ((result
+         (mcp-with-error-handling
+          (let ((test-var 42))
+            (+ test-var 8)))))
+    (should (= 50 result))))
+
 (provide 'mcp-test)
 ;;; mcp-test.el ends here
