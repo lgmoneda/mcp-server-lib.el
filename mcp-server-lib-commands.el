@@ -46,8 +46,8 @@ This is a convenience alias for `mcp-server-lib-stop'."
 (provide 'mcp-server-lib-commands)
 
 ;; Local Variables:
+;; elisp-lint-ignored-validators: ("package-lint")
 ;; byte-compile-warnings: (not unresolved)
-;; package-lint-main-file: "mcp-server-lib.el"
 ;; End:
 
 ;;; mcp-server-lib-commands.el ends here

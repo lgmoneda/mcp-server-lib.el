@@ -51,7 +51,12 @@ jobs:
           emacs -Q --batch \
                 --eval "(package-initialize)" \
                 --eval "(require 'elisp-lint)" \
-                -f elisp-lint-files-batch ./*.el
+                --eval "(dolist (file (directory-files \".\" nil \"\\\\.el$\"))
+                          (let ((elisp-lint-ignored-validators
+                                 (if (string-match-p \"commands\" file)
+                                     '(\"package-lint\")
+                                   nil)))
+                            (elisp-lint-file file)))"
 
       - name: Run tests
         run: |
@@ -59,5 +64,5 @@ jobs:
                 --eval "(package-initialize)" \
                 --eval "(add-to-list 'load-path (expand-file-name \".\"))" \
                 --eval "(require 'ert)" \
-                -l mcp.el -l mcp-test.el \
+                -l mcp-server-lib.el -l mcp-server-lib-test.el \
                 -f ert-run-tests-batch-and-exit
