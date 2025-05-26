@@ -2,11 +2,7 @@
 
 ;; Copyright (C) 2025 Laurynas Biveinis
 
-;; Author: Laurynas Biveinis <laurynas.biveinis@gmail.com>
-;; Keywords: comm, tools
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1") (mcp-server-lib "0.1.0"))
-;; URL: https://github.com/laurynas-biveinis/mcp-server-lib.el
+;; This file is part of mcp-server-lib.el.
 
 ;; This file is NOT part of GNU Emacs.
 
@@ -51,7 +47,7 @@ This is a convenience alias for `mcp-server-lib-stop'."
 
 ;; Local Variables:
 ;; byte-compile-warnings: (not unresolved)
-;; package-lint-main-file: nil
+;; package-lint-main-file: "mcp-server-lib.el"
 ;; End:
 
 ;;; mcp-server-lib-commands.el ends here
