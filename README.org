@@ -1,11 +1,11 @@
-#+TITLE: mcp.el - Model Context Protocol for Emacs Lisp
+#+TITLE: mcp-server-lib - Model Context Protocol Server Library for Emacs Lisp
 
-[[https://github.com/laurynas-biveinis/mcp.el/actions/workflows/elisp-test.yml][https://github.com/laurynas-biveinis/mcp.el/actions/workflows/elisp-test.yml/badge.svg]]
-[[https://github.com/laurynas-biveinis/mcp.el/actions/workflows/linter.yml][https://github.com/laurynas-biveinis/mcp.el/actions/workflows/linter.yml/badge.svg]]
+[[https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/elisp-test.yml][https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/elisp-test.yml/badge.svg]]
+[[https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/linter.yml][https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/linter.yml/badge.svg]]
 
 * Overview
 
-=mcp.el= is an Emacs Lisp implementation of the [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP), an open standard for communication between AI applications, servers, and language models.
+=mcp-server-lib= is an Emacs Lisp implementation of the [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP), an open standard for communication between AI applications, servers, and language models.
 
 This library enables Emacs users and developers to create MCP servers that can provide context, tools, resources, and prompts to Large Language Models (LLMs).
 
@@ -17,12 +17,12 @@ This library enables Emacs users and developers to create MCP servers that can p
 
 * Installation
 
-=M-x package-vc-install https://github.com/laurynas-biveinis/mcp.el/=
+=M-x package-vc-install https://github.com/laurynas-biveinis/mcp-server-lib/=
 
 * Usage
 
 Start Emacs daemon, then do =M-x mcp-start= to start handling MCP requests and =M-x
-mcp-stop= to stop.
+mcp-stop= to stop. These convenience commands are provided by =mcp-server-lib-commands=.
 
 For an MCP server example that uses this package, see [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]].
 
@@ -31,7 +31,7 @@ server with the arguments to initialize and to clean up specific MCP functionali
 for example, to register [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]] with Claude Code, do
 
 #+BEGIN_EXAMPLE
-claude mcp add -s user -t stdio elisp-dev -- $HOME/.emacs.d/elpa/mcp.el/emacs-mcp-stdio.sh --init-function=elisp-dev-mcp-enable --stop-function=elisp-dev-mcp-disable
+claude mcp add -s user -t stdio elisp-dev -- $HOME/.emacs.d/elpa/mcp-server-lib/emacs-mcp-stdio.sh --init-function=elisp-dev-mcp-enable --stop-function=elisp-dev-mcp-disable
 #+END_EXAMPLE
 
 The script internally communicates with Emacs daemon through =emacsclient= and
@@ -60,26 +60,26 @@ When =EMACS_MCP_DEBUG_LOG= is set to a valid file path, the script will log all 
 
 ** Tracing
 
-The package provides an Elisp variable =mcp-log-io= that, when set to non-nil, enables logging of all JSON-RPC messages to the =*mcp-log*= buffer. This is useful for tracing MCP requests and responses:
+The package provides an Elisp variable =mcp-server-lib-log-io= that, when set to non-nil, enables logging of all JSON-RPC messages to the =*mcp-server-lib-log*= buffer. This is useful for tracing MCP requests and responses:
 
 #+begin_src elisp
 ;; Enable MCP communication tracing
-(setq mcp-log-io t)
+(setq mcp-server-lib-log-io t)
 
 ;; Start the MCP server
-(mcp-start)
+(mcp-server-lib-start)
 #+end_src
 
-The =*mcp-log*= buffer will show incoming requests with ="-> (request)"= prefix and outgoing responses with ="<- (response)"= prefix, along with the full JSON message content. This makes it easy to inspect the communication flow between clients and the MCP server.
+The =*mcp-server-lib-log*= buffer will show incoming requests with ="-> (request)"= prefix and outgoing responses with ="<- (response)"= prefix, along with the full JSON message content. This makes it easy to inspect the communication flow between clients and the MCP server.
 
 * API for dependent packages
 
-=mcp.el= provides a simple API for setting up and using the Model Context Protocol in Emacs.
+=mcp-server-lib= provides a simple API for setting up and using the Model Context Protocol in Emacs.
 
 ** Core Functions
 
 #+begin_src elisp
-(mcp-register-tool #'tool-handler-function
+(mcp-server-lib-register-tool #'tool-handler-function
   :id "tool-name"
   :description "Tool description"
   :title "User-friendly Tool Name")
@@ -89,8 +89,8 @@ The =*mcp-log*= buffer will show incoming requests with ="-> (request)"= prefix 
 
 Tool handler functions should:
 - Return an Elisp string for successful execution
-- Call ~mcp-tool-throw~ for error returns
-- Use ~mcp-with-error-handling~ macro for automatic error handling
+- Call ~mcp-server-lib-tool-throw~ for error returns
+- Use ~mcp-server-lib-with-error-handling~ macro for automatic error handling
 
 *** Tool Parameter Documentation
 
@@ -107,7 +107,7 @@ MCP Parameters:
   ;; Function implementation...
   )
 
-(mcp-register-tool #'my-weather-handler
+(mcp-server-lib-register-tool #'my-weather-handler
   :id "get-weather"
   :description "Get weather information")
 #+end_src
@@ -126,7 +126,7 @@ When registering tools, you can provide optional properties:
 Example with optional properties:
 
 #+begin_src elisp
-(mcp-register-tool #'my-weather-handler
+(mcp-server-lib-register-tool #'my-weather-handler
   :id "get-weather"
   :description "Get weather information"
   :title "Weather Forecast"
@@ -135,7 +135,7 @@ Example with optional properties:
 
 *** Error Handling
 
-The =mcp-with-error-handling= macro provides automatic error handling. It will catch any errors and call =mcp-tool-throw= on them:
+The =mcp-server-lib-with-error-handling= macro provides automatic error handling. It will catch any errors and call =mcp-server-lib-tool-throw= on them:
 
 #+begin_src elisp
 (defun my-file-handler (filename)
@@ -143,7 +143,7 @@ The =mcp-with-error-handling= macro provides automatic error handling. It will c
   
   MCP Parameters:
     filename - path to the file to read"
-  (mcp-with-error-handling
+  (mcp-server-lib-with-error-handling
     (with-temp-buffer
       (insert-file-contents filename)
       (buffer-string))))
@@ -154,11 +154,11 @@ The =mcp-with-error-handling= macro provides automatic error handling. It will c
 MCP provides utility functions for creating standard JSON-RPC requests:
 
 #+begin_src elisp
-(defun mcp-create-tools-list-request (&optional id)
+(defun mcp-server-lib-create-tools-list-request (&optional id)
   "Create a tools/list JSON-RPC request with optional ID.
 If ID is not provided, it defaults to 1.")
 
-(defun mcp-create-tools-call-request (tool-name &optional id args)
+(defun mcp-server-lib-create-tools-call-request (tool-name &optional id args)
   "Create a tools/call JSON-RPC request for TOOL-NAME with optional ID and ARGS.
 TOOL-NAME is the registered identifier of the tool to call.
 ID is the JSON-RPC request ID, defaults to 1 if not provided.
@@ -169,22 +169,22 @@ Example of tool call request with arguments:
 
 #+begin_src elisp
 ;; Call a tool with arguments
-(mcp-create-tools-call-request 
+(mcp-server-lib-create-tools-call-request 
   "get-weather" 
   42 
   '(("location" . "New York")))
 #+end_src
 
-This is primarily useful for writing tests in the packages using mcp.el.
+This is primarily useful for writing tests in the packages using mcp-server-lib.
 
 * Internals
 
 ** Transport
 
-The main entry point for MCP communication is =mcp-process-jsonrpc=:
+The main entry point for MCP communication is =mcp-server-lib-process-jsonrpc=:
 
 #+begin_src elisp
-(defun mcp-process-jsonrpc (json-string)
+(defun mcp-server-lib-process-jsonrpc (json-string)
   "Process a JSON-RPC message JSON-STRING and return the response.
 This is the main entry point for stdio transport in MCP.")
 #+end_src

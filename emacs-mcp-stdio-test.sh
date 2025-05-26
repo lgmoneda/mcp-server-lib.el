@@ -67,7 +67,7 @@ TESTS_RUN=0
 readonly TEST_SERVER_NAME="mcp-test-server-$$"
 readonly STDIO_CMD="./emacs-mcp-stdio.sh --socket=$TEST_SERVER_NAME"
 
-emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp.el" --eval "(mcp-start)" 2>/dev/null &
+emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp-server-lib.el" --load "$(pwd)/mcp-server-lib-commands.el" --eval "(mcp-start)" 2>/dev/null &
 readonly SERVER_PID=$!
 
 # shellcheck disable=SC2317  # Called by trap
@@ -300,7 +300,7 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
     \"Return a test string with a double quote and newline.\"
     \"\\\"\n\")
 
-  (mcp-register-tool #'mcp-test--quote-string
+  (mcp-server-lib-register-tool #'mcp-test--quote-string
     :id \"test-quote-string\"
     :description \"Returns a test string with special characters\")
 )
@@ -328,7 +328,7 @@ emacsclient -s "$TEST_SERVER_NAME" -e "
     \"Return the exact original payload that caused the issue.\"
     \"** aaa bbbbbbbbb ccccccc ddd eeeee ffffff                                :@ggggggggg:\\n   https://hhhhhh.iii/jjjjjjjjjjj/kkkkkkkkk/llllll/387\\n   mmmmmmmmm nnn oooooą pp qqqqq\\n** rr s tt uuuu++ vvvvvv wwww xxxx                                       :@yyyyyyyyy:\\n:zzzzzzz:\\n- aaaaa \\\"bbbb\\\"       cccc \\\"dddd\\\"       [1234-56-78 eee 90:12]\\n- fffff \\\"gggg\\\"       hhhh \\\"iiii\\\"       [1234-56-78 jjj 90:12]\\n- kkkkk \\\"llll\\\"       mmmm              [3456-78-90 nnn 12:34]\\n- nnnnn \\\"oooo\\\"       pppp              [5678-90-12 qqq 34:56]\\nrrrrr: [7890-12-34 sss 56:78]--[9012-34-56 ttt 78:90] =>  1:23\\n:uuu:\\nvvvvvv wwwwww xxxxxx yyyyyyyy zzz ~aaa::bbbbb~\\n\")
 
-  (mcp-register-tool #'mcp-test--original-payload
+  (mcp-server-lib-register-tool #'mcp-test--original-payload
     :id \"test-original-payload\"
     :description \"Returns the exact original payload that caused the issue\")
 )

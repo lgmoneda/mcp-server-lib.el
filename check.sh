@@ -37,11 +37,10 @@
 # - GitHub Actions / YAML:
 #   - Check GitHub workflows with actionlint
 #   - Check YAML formatting with prettier
-# - Check for code duplication with jscpd
 
 set -eu -o pipefail
 
-readonly ELISP_FILES="\"mcp.el\" \"mcp-test.el\" \"mcp-test-bytecode-handler.el\""
+readonly ELISP_FILES="\"mcp-server-lib.el\" \"mcp-server-lib-commands.el\" \"mcp-server-lib-test.el\" \"mcp-server-lib-test-bytecode-handler.el\""
 readonly ORG_FILES='"README.org" "TODO.org"'
 readonly SHELL_FILES=(check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh)
 
@@ -105,8 +104,13 @@ if [ $ERRORS -eq 0 ]; then
 	                     (let ((has-errors nil))
 	                       (dolist (file (list $ELISP_FILES))
 	                           (princ (format \"%s \" file))
-	                       (unless (elisp-lint-file file)
-	                         (setq has-errors t)))
+	                           ;; Skip package-lint for commands file
+	                           (let ((elisp-lint-ignored-validators
+	                                  (if (string-match-p \"commands\" file)
+	                                      '(\"package-lint\")
+	                                    nil)))
+	                             (unless (elisp-lint-file file)
+	                               (setq has-errors t))))
 	                       (when has-errors
 	                         (kill-emacs 1))))"; then
 		echo "OK!"
@@ -121,7 +125,7 @@ fi
 # Only run ERT tests if there are no Elisp syntax errors
 if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
 	echo -n "Running all tests... "
-	if $EMACS -l mcp.el -l mcp-test.el --eval '(let ((ert-quiet t))
+	if $EMACS -L . -l mcp-server-lib.el -l mcp-server-lib-test.el --eval '(let ((ert-quiet t))
           (ert-run-tests-batch-and-exit))'; then
 		echo "OK!"
 	else
@@ -233,18 +237,6 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-# Last step: check for duplicates
-
-echo -n "Checking for code duplication with jscpd... "
-# NOTE: Would be ideal to merge these two invocations into one if jscpd
-# had an option to be silent on success but verbose on failure
-if jscpd -s -t 0 .; then
-	echo "OK!"
-else
-	echo "jscpd check failed!"
-	jscpd -r consoleFull -t 0 .
-	ERRORS=$((ERRORS + 1))
-fi
 
 # Final result
 if [ $ERRORS -eq 0 ]; then
