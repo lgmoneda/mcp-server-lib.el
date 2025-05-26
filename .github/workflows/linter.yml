@@ -29,3 +29,5 @@ jobs:
         uses: super-linter/super-linter/slim@latest
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Until https://github.com/kucherenko/jscpd/issues/737 is fixed
+          VALIDATE_JSCPD: false
