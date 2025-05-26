@@ -237,7 +237,6 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
-
 # Final result
 if [ $ERRORS -eq 0 ]; then
 	echo "All checks passed successfully!"

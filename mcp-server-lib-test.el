@@ -4,7 +4,7 @@
 
 ;; Version: 0.1.0
 ;; Package-Requires: ((emacs "25.1"))
-;; URL: https://github.com/laurynas-biveinis/mcp-server-lib
+;; URL: https://github.com/laurynas-biveinis/mcp-server-lib.el
 
 ;; This file is NOT part of GNU Emacs.
 

@@ -1,11 +1,11 @@
-#+TITLE: mcp-server-lib - Model Context Protocol Server Library for Emacs Lisp
+#+TITLE: mcp-server-lib.el - Model Context Protocol Server Library for Emacs Lisp
 
-[[https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/elisp-test.yml][https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/elisp-test.yml/badge.svg]]
-[[https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/linter.yml][https://github.com/laurynas-biveinis/mcp-server-lib/actions/workflows/linter.yml/badge.svg]]
+[[https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/elisp-test.yml][https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/elisp-test.yml/badge.svg]]
+[[https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/linter.yml][https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/linter.yml/badge.svg]]
 
 * Overview
 
-=mcp-server-lib= is an Emacs Lisp implementation of the [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP), an open standard for communication between AI applications, servers, and language models.
+=mcp-server-lib.el= is an Emacs Lisp implementation of the [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP), an open standard for communication between AI applications, servers, and language models.
 
 This library enables Emacs users and developers to create MCP servers that can provide context, tools, resources, and prompts to Large Language Models (LLMs).
 
@@ -17,12 +17,12 @@ This library enables Emacs users and developers to create MCP servers that can p
 
 * Installation
 
-=M-x package-vc-install https://github.com/laurynas-biveinis/mcp-server-lib/=
+=M-x package-vc-install https://github.com/laurynas-biveinis/mcp-server-lib.el/=
 
 * Usage
 
 Start Emacs daemon, then do =M-x mcp-start= to start handling MCP requests and =M-x
-mcp-stop= to stop. These convenience commands are provided by =mcp-server-lib-commands=.
+mcp-stop= to stop. These convenience commands are provided by =mcp-server-lib-commands.el=.
 
 For an MCP server example that uses this package, see [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]].
 
@@ -31,7 +31,7 @@ server with the arguments to initialize and to clean up specific MCP functionali
 for example, to register [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]] with Claude Code, do
 
 #+BEGIN_EXAMPLE
-claude mcp add -s user -t stdio elisp-dev -- $HOME/.emacs.d/elpa/mcp-server-lib/emacs-mcp-stdio.sh --init-function=elisp-dev-mcp-enable --stop-function=elisp-dev-mcp-disable
+claude mcp add -s user -t stdio elisp-dev -- $HOME/.emacs.d/elpa/mcp-server-lib.el/emacs-mcp-stdio.sh --init-function=elisp-dev-mcp-enable --stop-function=elisp-dev-mcp-disable
 #+END_EXAMPLE
 
 The script internally communicates with Emacs daemon through =emacsclient= and
@@ -74,7 +74,7 @@ The =*mcp-server-lib-log*= buffer will show incoming requests with ="-> (request
 
 * API for dependent packages
 
-=mcp-server-lib= provides a simple API for setting up and using the Model Context Protocol in Emacs.
+=mcp-server-lib.el= provides a simple API for setting up and using the Model Context Protocol in Emacs.
 
 ** Core Functions
 
@@ -89,8 +89,8 @@ The =*mcp-server-lib-log*= buffer will show incoming requests with ="-> (request
 
 Tool handler functions should:
 - Return an Elisp string for successful execution
-- Call ~mcp-server-lib-tool-throw~ for error returns
-- Use ~mcp-server-lib-with-error-handling~ macro for automatic error handling
+- Call ~mcp-server-lib-tool-throw~ for error returns or wrap potentially-failing
+  operations with ~mcp-server-lib-with-error-handling~ macro
 
 *** Tool Parameter Documentation
 
@@ -175,7 +175,7 @@ Example of tool call request with arguments:
   '(("location" . "New York")))
 #+end_src
 
-This is primarily useful for writing tests in the packages using mcp-server-lib.
+This is primarily useful for writing tests in the packages using mcp-server-lib.el.
 
 * Internals
 
