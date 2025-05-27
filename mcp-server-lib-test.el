@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 Laurynas Biveinis
 
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "25.1"))
+;; Package-Requires: ((emacs "26.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp-server-lib.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -1141,6 +1141,92 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
           (let ((test-var 42))
             (+ test-var 8)))))
     (should (= 50 result))))
+
+;;; Script installation tests
+
+(ert-deftest mcp-server-lib-test-install ()
+  "Test script installation to temporary directory."
+  (let* ((temp-dir (make-temp-file "mcp-test-" t))
+         (mcp-server-lib-install-directory temp-dir))
+    (unwind-protect
+        (progn
+          (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_) t)))
+            (mcp-server-lib-install))
+          (should
+           (file-exists-p (mcp-server-lib--installed-script-path)))
+          (should
+           (file-executable-p
+            (mcp-server-lib--installed-script-path))))
+      (delete-directory temp-dir t))))
+
+(ert-deftest mcp-server-lib-test-install-overwrite ()
+  "Test script installation when file already exists."
+  (let* ((temp-dir (make-temp-file "mcp-test-" t))
+         (mcp-server-lib-install-directory temp-dir)
+         (target (mcp-server-lib--installed-script-path)))
+    (unwind-protect
+        (progn
+          (write-region "existing content" nil target)
+          (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_) t)))
+            (mcp-server-lib-install))
+          (should (file-exists-p target))
+          (should (file-executable-p target))
+          (should
+           (> (file-attribute-size (file-attributes target)) 20)))
+      (delete-directory temp-dir t))))
+
+(ert-deftest mcp-server-lib-test-install-cancel ()
+  "Test cancelling installation when file exists."
+  (let* ((temp-dir (make-temp-file "mcp-test-" t))
+         (mcp-server-lib-install-directory temp-dir)
+         (target (mcp-server-lib--installed-script-path)))
+    (unwind-protect
+        (progn
+          (write-region "existing content" nil target)
+          (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_) nil)))
+            (should-error (mcp-server-lib-install) :type 'user-error))
+          (should
+           (string=
+            "existing content"
+            (with-temp-buffer
+              (insert-file-contents target)
+              (buffer-string)))))
+      (delete-directory temp-dir t))))
+
+(ert-deftest mcp-server-lib-test-uninstall ()
+  "Test script removal from temporary directory."
+  (let* ((temp-dir (make-temp-file "mcp-test-" t))
+         (mcp-server-lib-install-directory temp-dir)
+         (target (mcp-server-lib--installed-script-path)))
+    (unwind-protect
+        (progn
+          (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_) t)))
+            (mcp-server-lib-install)
+            (should (file-exists-p target))
+            (mcp-server-lib-uninstall))
+          (should-not (file-exists-p target)))
+      (delete-directory temp-dir t))))
+
+(ert-deftest mcp-server-lib-test-uninstall-missing ()
+  "Test uninstalling when script doesn't exist."
+  (let* ((temp-dir (make-temp-file "mcp-test-" t))
+         (mcp-server-lib-install-directory temp-dir))
+    (unwind-protect
+        (should-error (mcp-server-lib-uninstall) :type 'user-error)
+      (delete-directory temp-dir t))))
+
+(ert-deftest mcp-server-lib-test-uninstall-cancel ()
+  "Test cancelling uninstall."
+  (let* ((temp-dir (make-temp-file "mcp-test-" t))
+         (mcp-server-lib-install-directory temp-dir)
+         (target (mcp-server-lib--installed-script-path)))
+    (unwind-protect
+        (progn
+          (write-region "test content" nil target)
+          (cl-letf (((symbol-function 'yes-or-no-p) (lambda (_) nil)))
+            (mcp-server-lib-uninstall))
+          (should (file-exists-p target)))
+      (delete-directory temp-dir t))))
 
 (provide 'mcp-server-lib-test)
 ;;; mcp-server-lib-test.el ends here
