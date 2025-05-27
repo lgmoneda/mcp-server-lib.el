@@ -21,32 +21,49 @@
 
 ;;; Commentary:
 
-;; This file provides short, convenient command names for interactive use.
-;; The commands intentionally don't follow the package prefix convention
-;; to make them easier to type interactively.
+;; This file provides interactive user commands for the MCP server library.
 
 ;;; Code:
 
 (require 'mcp-server-lib)
 
 ;;;###autoload
-(defun mcp-start ()
+(defun mcp-server-lib-start ()
   "Start the MCP server and begin handling client requests.
-This is a convenience alias for `mcp-server-lib-start'."
+
+This function starts the MCP server that can process JSON-RPC
+requests via `mcp-server-lib-process-jsonrpc'.  Once started, the server
+will dispatch incoming requests to the appropriate tool
+handlers that have been registered with `mcp-server-lib-register-tool'."
   (interactive)
-  (mcp-server-lib-start))
+  (when mcp-server-lib--running
+    (error "MCP server is already running"))
+
+  (when (called-interactively-p 'any)
+    (message "Emacs starting handling MCP requests"))
+  (setq mcp-server-lib--running t))
 
 ;;;###autoload
-(defun mcp-stop ()
+(defun mcp-server-lib-stop ()
   "Stop the MCP server from processing client requests.
-This is a convenience alias for `mcp-server-lib-stop'."
+
+Sets the server state to stopped, which prevents further processing of
+client requests.  Note that this does not release any resources or unregister
+tools, it simply prevents `mcp-server-lib-process-jsonrpc' from accepting new
+requests."
   (interactive)
-  (mcp-server-lib-stop))
+  (unless mcp-server-lib--running
+    (error "MCP server is not running"))
+
+  (when (called-interactively-p 'any)
+    (message "Emacs stopping handling MCP requests"))
+  ;; Mark server as not running
+  (setq mcp-server-lib--running nil)
+  t)
 
 (provide 'mcp-server-lib-commands)
 
 ;; Local Variables:
-;; elisp-lint-ignored-validators: ("package-lint")
 ;; byte-compile-warnings: (not unresolved)
 ;; End:
 

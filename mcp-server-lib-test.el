@@ -115,14 +115,15 @@ MCP Parameters:"
 
 (defmacro mcp-server-lib-test--with-server (&rest body)
   "Run BODY with MCP server active.
-Calls `mcp-start' before BODY and `mcp-stop' after BODY."
+Calls `mcp-server-lib-start' before BODY and
+`mcp-server-lib-stop' after."
   (declare (indent defun) (debug t))
   `(progn
-     (mcp-start)
+     (mcp-server-lib-start)
      (unwind-protect
          (progn
            ,@body)
-       (mcp-stop))))
+       (mcp-server-lib-stop))))
 
 (defmacro mcp-server-lib-test--with-tools (tools &rest body)
   "Run BODY with MCP server active and TOOLS registered.
@@ -1095,8 +1096,8 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       ((#'mcp-server-lib-test--tool-handler-simple
         :id "persistent-tool"
         :description "Test persistence across restarts"))
-    (mcp-stop)
-    (mcp-start)
+    (mcp-server-lib-stop)
+    (mcp-server-lib-start)
 
     (let ((tools (mcp-server-lib-test--get-tool-list)))
       (should (= 1 (length tools)))
@@ -1105,9 +1106,9 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         "persistent-tool" (alist-get 'name (aref tools 0)))))))
 
 (ert-deftest mcp-server-lib-test-interactive-commands ()
-  "Test that `mcp-start' and `mcp-stop' are interactive commands."
-  (should (commandp #'mcp-start))
-  (should (commandp #'mcp-stop)))
+  "Verify that package commands are interactive."
+  (should (commandp #'mcp-server-lib-start))
+  (should (commandp #'mcp-server-lib-stop)))
 
 ;;; `mcp-server-lib-with-error-handling' tests
 

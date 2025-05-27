@@ -67,7 +67,7 @@ TESTS_RUN=0
 readonly TEST_SERVER_NAME="mcp-test-server-$$"
 readonly STDIO_CMD="./emacs-mcp-stdio.sh --socket=$TEST_SERVER_NAME"
 
-emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp-server-lib.el" --load "$(pwd)/mcp-server-lib-commands.el" --eval "(mcp-start)" 2>/dev/null &
+emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp-server-lib.el" --load "$(pwd)/mcp-server-lib-commands.el" --eval "(mcp-server-lib-start)" 2>/dev/null &
 readonly SERVER_PID=$!
 
 # shellcheck disable=SC2317  # Called by trap
@@ -147,11 +147,11 @@ TESTS_RUN=$((TESTS_RUN + 1))
 
 TEST_CASE="Test case 2: Debug logging with init and stop functions"
 
-readonly INIT_FUNCTION="mcp-start"
-readonly STOP_FUNCTION="mcp-stop"
+readonly INIT_FUNCTION="mcp-server-lib-start"
+readonly STOP_FUNCTION="mcp-server-lib-stop"
 
 # Stop MCP for this test as we want to test explicit init/stop functions
-run_emacs_function "mcp-stop" "Failed to stop MCP"
+run_emacs_function "mcp-server-lib-stop" "Failed to stop MCP"
 
 debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
 
@@ -220,7 +220,7 @@ rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Start MCP again after the test
-run_emacs_function "mcp-start" "Failed to restart MCP"
+run_emacs_function "mcp-server-lib-start" "Failed to restart MCP"
 
 TEST_CASE="Test case 3: Debug logging without init and stop functions"
 
@@ -352,7 +352,7 @@ rm -f "stdio-response.txt"
 TESTS_RUN=$((TESTS_RUN + 1))
 
 # Stop the MCP server at the end
-run_emacs_function "mcp-stop" "Failed to stop MCP at end"
+run_emacs_function "mcp-server-lib-stop" "Failed to stop MCP at end"
 
 echo "$TESTS_RUN tests run OK!"
 exit 0

@@ -451,38 +451,6 @@ Extracts parameter descriptions from the docstring if available."
 
 ;;; API - Server
 
-(defun mcp-server-lib-start ()
-  "Start the MCP server and begin handling client requests.
-
-This function starts the MCP server that can process JSON-RPC
-requests via `mcp-server-lib-process-jsonrpc'.  Once started, the server
-will dispatch incoming requests to the appropriate tool
-handlers that have been registered with `mcp-server-lib-register-tool'."
-  (interactive)
-  (when mcp-server-lib--running
-    (error "MCP server is already running"))
-
-  (when (called-interactively-p 'any)
-    (message "Emacs starting handling MCP requests"))
-  (setq mcp-server-lib--running t))
-
-(defun mcp-server-lib-stop ()
-  "Stop the MCP server from processing client requests.
-
-Sets the server state to stopped, which prevents further processing of
-client requests.  Note that this does not release any resources or unregister
-tools, it simply prevents `mcp-server-lib-process-jsonrpc' from accepting new
-requests."
-  (interactive)
-  (unless mcp-server-lib--running
-    (error "MCP server is not running"))
-
-  (when (called-interactively-p 'any)
-    (message "Emacs stopping handling MCP requests"))
-  ;; Mark server as not running
-  (setq mcp-server-lib--running nil)
-  t)
-
 
 ;;; API - Transport
 
