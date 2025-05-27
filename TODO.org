@@ -26,7 +26,7 @@
 
 ** Python SDK Parity (Based on Python SDK)
 - [X] Server creation (`mcp-create-server`)
-- [X] Server start/stop (`mcp-start-server`, `mcp-stop-server`)
+- [X] Server start/stop (`mcp-server-lib-start`, `mcp-server-lib-stop`)
 - [X] Tool registration (`mcp-register-tool`)
 - [ ] Resource registration (`mcp-register-resource`)
 - [ ] Prompt registration (`mcp-register-prompt`)

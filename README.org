@@ -33,8 +33,8 @@ To remove the installed script: =M-x mcp-server-lib-uninstall=
 
 ** Basic Usage
 
-Start Emacs daemon, then do =M-x mcp-start= to start handling MCP requests and =M-x
-mcp-stop= to stop. These convenience commands are provided by =mcp-server-lib-commands.el=.
+Start Emacs daemon, then do =M-x mcp-server-lib-start= to start handling MCP requests and =M-x
+mcp-server-lib-stop= to stop. These commands are provided by =mcp-server-lib-commands.el=.
 
 For an MCP server example that uses this package, see [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]].
 
