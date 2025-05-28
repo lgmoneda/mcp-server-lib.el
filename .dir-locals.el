@@ -2,4 +2,5 @@
                      (indent-tabs-mode . nil)
                      (sentence-end-double-space . t)
                      (elisp-lint-indent-specs . ((mcp-server-lib-test--with-server . defun)
-                                                 (mcp-server-lib-test--with-tools . 1)))))))
+                                                 (mcp-server-lib-test--with-tools . 1)
+                                                 (cl-defstruct . nil)))))))
