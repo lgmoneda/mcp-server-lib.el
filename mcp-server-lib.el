@@ -519,6 +519,13 @@ Example:
       (mcp-server-lib--log-json-rpc "out" response))
     response))
 
+(defun mcp-server-lib-process-jsonrpc-parsed (request)
+  "Send REQUEST to the MCP server and return parsed response.
+REQUEST should be a JSON string containing a valid JSON-RPC 2.0 request.
+
+Call `mcp-server-lib-process-jsonrpc' and return its result as a parsed alist."
+  (json-read-from-string (mcp-server-lib-process-jsonrpc request)))
+
 ;;; API - Utilities
 
 (defun mcp-server-lib-create-tools-list-request (&optional id)

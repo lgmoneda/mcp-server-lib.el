@@ -214,8 +214,7 @@ success."
   (let (result)
     (mcp-server-lib-test--verify-req-success method
       (let ((resp-obj
-             (json-read-from-string
-              (mcp-server-lib-process-jsonrpc request))))
+             (mcp-server-lib-process-jsonrpc-parsed request)))
         (should (null (alist-get 'error resp-obj)))
         (setq result (alist-get 'result resp-obj))))
     result))
@@ -246,8 +245,7 @@ success."
 REQUEST is a string containing the JSON-RPC request.
 EXPECTED-CODE is the expected error code.
 EXPECTED-MESSAGE is a regex pattern to match against the error message."
-  (let* ((resp (mcp-server-lib-process-jsonrpc request))
-         (resp-obj (json-read-from-string resp))
+  (let* ((resp-obj (mcp-server-lib-process-jsonrpc-parsed request))
          (err-obj (alist-get 'error resp-obj))
          (err-code (alist-get 'code err-obj))
          (err-msg (alist-get 'message err-obj)))
@@ -496,8 +494,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
                   (("tools" . t)
                    ("resources" . nil)
                    ("prompts" . nil))))))))
-           (response (mcp-server-lib-process-jsonrpc init-request))
-           (resp-obj (json-read-from-string response))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj))
            (protocol-version (alist-get 'protocolVersion result)))
       ;; Server should respond with its supported version, not client's
@@ -518,8 +516,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
                   (("tools" . t)
                    ("resources" . nil)
                    ("prompts" . nil))))))))
-           (response (mcp-server-lib-process-jsonrpc init-request))
-           (resp-obj (json-read-from-string response))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
       (should (null (alist-get 'error resp-obj)))
@@ -541,8 +539,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
                   (("tools" . t)
                    ("resources" . nil)
                    ("prompts" . nil))))))))
-           (response (mcp-server-lib-process-jsonrpc init-request))
-           (resp-obj (json-read-from-string response))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
       (should (null (alist-get 'error resp-obj)))
@@ -559,8 +557,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
                ("method" . "initialize")
                ("id" . 19)
                ("params" . "malformed"))))
-           (response (mcp-server-lib-process-jsonrpc init-request))
-           (resp-obj (json-read-from-string response))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully
       (should (null (alist-get 'error resp-obj)))
@@ -575,8 +573,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
              `(("jsonrpc" . "2.0")
                ("method" . "initialize")
                ("id" . 20))))
-           (response (mcp-server-lib-process-jsonrpc init-request))
-           (resp-obj (json-read-from-string response))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully
       (should (null (alist-get 'error resp-obj)))
@@ -596,8 +594,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
                   (("tools" . t)
                    ("resources" . nil)
                    ("prompts" . nil))))))))
-           (response (mcp-server-lib-process-jsonrpc init-request))
-           (resp-obj (json-read-from-string response))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
       (should (null (alist-get 'error resp-obj)))
@@ -617,8 +615,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
                   (("tools" . t)
                    ("resources" . nil)
                    ("prompts" . nil))))))))
-           (response (mcp-server-lib-process-jsonrpc init-request))
-           (resp-obj (json-read-from-string response))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
       (should (null (alist-get 'error resp-obj)))
@@ -997,8 +995,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
               (mcp-server-lib-create-tools-call-request
                "failing-tool" 11))
              (resp-obj
-              (json-read-from-string
-               (mcp-server-lib-process-jsonrpc request)))
+              (mcp-server-lib-process-jsonrpc-parsed request))
              (result (alist-get 'result resp-obj)))
         ;; Check no JSON-RPC error
         (should (null (alist-get 'error resp-obj)))
@@ -1174,6 +1171,19 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
      (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
      -32600
      "Invalid Request: Missing required 'method' field")))
+
+;;; `mcp-server-lib-process-jsonrpc-parsed' tests
+
+(ert-deftest mcp-server-lib-test-process-jsonrpc-parsed ()
+  "Test that `mcp-server-lib-process-jsonrpc-parsed' returns parsed response."
+  (mcp-server-lib-test--with-server
+    (let* ((request (mcp-server-lib-create-tools-list-request))
+           (response (mcp-server-lib-process-jsonrpc-parsed request)))
+      ;; Response should be a parsed alist, not a string
+      (should (listp response))
+      (should (alist-get 'result response))
+      (should
+       (arrayp (alist-get 'tools (alist-get 'result response)))))))
 
 ;;; Logging tests
 

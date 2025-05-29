@@ -164,7 +164,7 @@ The =mcp-server-lib-with-error-handling= macro provides automatic error handling
 
 *** Utility Functions
 
-MCP provides utility functions for creating standard JSON-RPC requests:
+MCP provides utility functions for creating JSON-RPC requests and processing responses:
 
 #+begin_src elisp
 (defun mcp-server-lib-create-tools-list-request (&optional id)
@@ -176,16 +176,27 @@ If ID is not provided, it defaults to 1.")
 TOOL-NAME is the registered identifier of the tool to call.
 ID is the JSON-RPC request ID, defaults to 1 if not provided.
 ARGS is an association list of arguments to pass to the tool.")
+
+(defun mcp-server-lib-process-jsonrpc-parsed (request)
+  "Send REQUEST to the MCP server and return parsed response.
+REQUEST should be a JSON string containing a valid JSON-RPC 2.0 request.
+Returns the parsed JSON response as an association list.")
 #+end_src
 
-Example of tool call request with arguments:
+Examples:
 
 #+begin_src elisp
-;; Call a tool with arguments
+;; Create a tool call request with arguments
 (mcp-server-lib-create-tools-call-request 
   "get-weather" 
   42 
   '(("location" . "New York")))
+
+;; Send a request and get parsed response (useful in tests)
+(let* ((request (mcp-server-lib-create-tools-list-request))
+       (response (mcp-server-lib-process-jsonrpc-parsed request)))
+  ;; response is now an alist with 'result, 'error, etc.
+  (alist-get 'tools (alist-get 'result response)))
 #+end_src
 
 This is primarily useful for writing tests in the packages using mcp-server-lib.el.
