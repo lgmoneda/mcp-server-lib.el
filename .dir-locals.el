@@ -3,4 +3,7 @@
                      (sentence-end-double-space . t)
                      (elisp-lint-indent-specs . ((mcp-server-lib-test--with-server . defun)
                                                  (mcp-server-lib-test--with-tools . 1)
+                                                 (mcp-server-lib-test--successful-req . defun)
+                                                 (mcp-server-lib-test--verify-req-success . defun)
+                                                 (mcp-server-lib-test--with-error-tracking . 1)
                                                  (cl-defstruct . nil)))))))

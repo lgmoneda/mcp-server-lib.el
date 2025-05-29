@@ -30,6 +30,7 @@
 (require 'ert)
 (require 'mcp-server-lib)
 (require 'mcp-server-lib-commands)
+(require 'mcp-server-lib-metrics)
 (require 'json)
 
 ;;; Test data
@@ -125,6 +126,39 @@ Calls `mcp-server-lib-start' before BODY and
            ,@body)
        (mcp-server-lib-stop))))
 
+(defmacro mcp-server-lib-test--verify-req-success (method &rest body)
+  "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
+Captures metrics before BODY execution and asserts after that:
+- calls increased by 1
+- errors stayed the same
+
+Note: This macro assumes the MCP server is already running."
+  (declare (indent defun) (debug t))
+  `(let* ((metrics (mcp-server-lib-metrics-get ,method))
+          (calls-before (mcp-server-lib-metrics-calls metrics))
+          (errors-before (mcp-server-lib-metrics-errors metrics)))
+     ,@body
+     (let ((metrics-after (mcp-server-lib-metrics-get ,method)))
+       (should
+        (= (1+ calls-before)
+           (mcp-server-lib-metrics-calls metrics-after)))
+       (should
+        (= errors-before
+           (mcp-server-lib-metrics-errors metrics-after))))))
+
+(defmacro mcp-server-lib-test--successful-req (method &rest body)
+  "Execute BODY with MCP server active and verify METHOD metrics.
+This macro:
+1. Starts the MCP server
+2. Captures metrics before BODY execution
+3. Executes BODY
+4. Verifies the method was called exactly once with no errors
+5. Stops the server"
+  (declare (indent defun) (debug t))
+  `(mcp-server-lib-test--with-server
+     (mcp-server-lib-test--verify-req-success ,method
+       ,@body)))
+
 (defmacro mcp-server-lib-test--with-tools (tools &rest body)
   "Run BODY with MCP server active and TOOLS registered.
 All tools are automatically unregistered after BODY execution.
@@ -172,23 +206,31 @@ Example:
             (lambda (id) `(mcp-server-lib-unregister-tool ,id))
             (nreverse tool-ids)))))))
 
-(defun mcp-server-lib-test--prompts-list-request ()
-  "Create an MCP prompt list request."
-  (json-encode
-   `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . 8))))
-
-(defun mcp-server-lib-test--get-request-result (request)
+(defun mcp-server-lib-test--get-request-result (method request)
   "Process REQUEST via `mcp-server-lib-process-jsonrpc' and return result.
-Verifies that the response contains no error."
-  (let ((resp-obj
-         (json-read-from-string
-          (mcp-server-lib-process-jsonrpc request))))
-    (should (null (alist-get 'error resp-obj)))
-    (alist-get 'result resp-obj)))
+METHOD is the JSON-RPC method name for metrics verification.
+Verifies that the response contains no error and the method metrics show
+success."
+  (let (result)
+    (mcp-server-lib-test--verify-req-success method
+      (let ((resp-obj
+             (json-read-from-string
+              (mcp-server-lib-process-jsonrpc request))))
+        (should (null (alist-get 'error resp-obj)))
+        (setq result (alist-get 'result resp-obj))))
+    result))
+
+(defun mcp-server-lib-test--get-prompts-list ()
+  "Return the result of an MCP prompt list request."
+  (mcp-server-lib-test--get-request-result
+   "prompts/list"
+   (json-encode
+    `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . 8)))))
 
 (defun mcp-server-lib-test--get-initialize-result ()
   "Send an MCP `initialize` request and return its result."
   (mcp-server-lib-test--get-request-result
+   "initialize"
    (json-encode
     `(("jsonrpc" . "2.0")
       ("method" . "initialize") ("id" . 15)
@@ -224,8 +266,26 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
   "Call a tool with TOOL-ID and return its successful result.
 Optional ID is the JSON-RPC request ID (defaults to 1).
 Optional ARGS is the association list of arguments to pass to the tool."
-  (mcp-server-lib-test--get-request-result
-   (mcp-server-lib-create-tools-call-request tool-id id args)))
+  (let* ((tool-metrics-key (format "tools/call:%s" tool-id))
+         (tool-metrics (mcp-server-lib-metrics-get tool-metrics-key))
+         (tool-calls-before
+          (mcp-server-lib-metrics-calls tool-metrics))
+         (tool-errors-before
+          (mcp-server-lib-metrics-errors tool-metrics))
+         (result
+          (mcp-server-lib-test--get-request-result
+           "tools/call"
+           (mcp-server-lib-create-tools-call-request
+            tool-id id args))))
+    (let ((tool-metrics-after
+           (mcp-server-lib-metrics-get tool-metrics-key)))
+      (should
+       (= (1+ tool-calls-before)
+          (mcp-server-lib-metrics-calls tool-metrics-after)))
+      (should
+       (= tool-errors-before
+          (mcp-server-lib-metrics-errors tool-metrics-after))))
+    result))
 
 (defun mcp-server-lib-test--verify-tool-not-found (tool-id)
   "Verify a call to non-existent tool with TOOL-ID returning an error."
@@ -234,19 +294,66 @@ Optional ARGS is the association list of arguments to pass to the tool."
    -32600
    (format "Tool not found: %s" tool-id)))
 
+(defmacro mcp-server-lib-test--with-error-tracking
+    (tool-id &rest body)
+  "Execute BODY and verify both call and error counts increased for TOOL-ID.
+Captures method and tool metrics before execution, executes BODY,
+then verifies that both calls and errors increased by 1 at both levels."
+  (declare (indent 1) (debug t))
+  `(let* ((method-metrics (mcp-server-lib-metrics-get "tools/call"))
+          (method-calls-before
+           (mcp-server-lib-metrics-calls method-metrics))
+          (method-errors-before
+           (mcp-server-lib-metrics-errors method-metrics))
+          (tool-metrics-key (format "tools/call:%s" ,tool-id))
+          (tool-metrics (mcp-server-lib-metrics-get tool-metrics-key))
+          (tool-calls-before
+           (mcp-server-lib-metrics-calls tool-metrics))
+          (tool-errors-before
+           (mcp-server-lib-metrics-errors tool-metrics)))
+
+     ;; Execute the body
+     ,@body
+
+     ;; Verify method metrics
+     (let ((method-metrics-after
+            (mcp-server-lib-metrics-get "tools/call")))
+       (should
+        (= (1+ method-calls-before)
+           (mcp-server-lib-metrics-calls method-metrics-after)))
+       (should
+        (= (1+ method-errors-before)
+           (mcp-server-lib-metrics-errors method-metrics-after))))
+
+     ;; Verify tool metrics
+     (let ((tool-metrics-after
+            (mcp-server-lib-metrics-get tool-metrics-key)))
+       (should
+        (= (1+ tool-calls-before)
+           (mcp-server-lib-metrics-calls tool-metrics-after)))
+       (should
+        (= (1+ tool-errors-before)
+           (mcp-server-lib-metrics-errors tool-metrics-after))))))
+
 (defun mcp-server-lib-test--get-tool-list-for-request (request)
   "Get the tool list from a tools/list REQUEST.
 Return the `tools` array from the result after verifying it is an array."
   (let ((result
          (alist-get
-          'tools (mcp-server-lib-test--get-request-result request))))
+          'tools
+          (mcp-server-lib-test--get-request-result
+           "tools/list" request))))
     (should (arrayp result))
     result))
 
 (defun mcp-server-lib-test--get-tool-list ()
-  "Get the response to a standard `tool/list` request."
-  (mcp-server-lib-test--get-tool-list-for-request
-   (mcp-server-lib-create-tools-list-request)))
+  "Get the successful response to a standard `tool/list` request."
+  (let (result)
+    (mcp-server-lib-test--verify-req-success "tools/list"
+      (setq result
+            (mcp-server-lib-test--get-tool-list-for-request
+             (mcp-server-lib-create-tools-list-request))))
+    result))
 
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
   "Verify a `tools/list` response against EXPECTED-TOOLS.
@@ -365,7 +472,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 
 (ert-deftest mcp-server-lib-test-notifications-initialized ()
   "Test the MCP `notifications/initialized` request handling."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "notifications/initialized"
     (let* ((notifications-initialized
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -378,7 +485,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 
 (ert-deftest mcp-server-lib-test-initialize-old-protocol-version ()
   "Test server responds with its version for older client version."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -401,7 +508,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 (ert-deftest mcp-server-lib-test-initialize-missing-protocol-version
     ()
   "Test initialize request without protocolVersion field."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -423,7 +530,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
     mcp-server-lib-test-initialize-non-string-protocol-version
     ()
   "Test initialize request with non-string protocolVersion."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -444,8 +551,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 
 (ert-deftest mcp-server-lib-test-initialize-malformed-params ()
   "Test initialize request with completely malformed params."
-  (mcp-server-lib-test--with-server
-    ;; Test with params as a string instead of object
+  ;; Test with params as a string instead of object
+  (mcp-server-lib-test--successful-req "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -462,7 +569,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 
 (ert-deftest mcp-server-lib-test-initialize-missing-params ()
   "Test initialize request without params field."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -478,7 +585,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 
 (ert-deftest mcp-server-lib-test-initialize-null-protocol-version ()
   "Test initialize request with null protocolVersion."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -499,7 +606,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 
 (ert-deftest mcp-server-lib-test-initialize-empty-protocol-version ()
   "Test initialize request with empty string protocolVersion."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -667,7 +774,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-notifications-cancelled ()
   "Test the MCP `notifications/cancelled` request handling."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "notifications/cancelled"
     (let* ((notifications-cancelled
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -733,13 +840,14 @@ from a function loaded from bytecode rather than interpreted elisp."
        (#'mcp-server-lib-test--tool-handler-simple
         :id "test-tool-2"
         :description "Second tool for testing"))
-    (mcp-server-lib-test--verify-tool-list-request
-     '(("test-tool-1" .
-        ((description . "First tool for testing")
-         (inputSchema . ((type . "object")))))
-       ("test-tool-2" .
-        ((description . "Second tool for testing")
-         (inputSchema . ((type . "object")))))))))
+    (mcp-server-lib-test--verify-req-success "tools/list"
+      (mcp-server-lib-test--verify-tool-list-request
+       '(("test-tool-1" .
+          ((description . "First tool for testing")
+           (inputSchema . ((type . "object")))))
+         ("test-tool-2" .
+          ((description . "Second tool for testing")
+           (inputSchema . ((type . "object"))))))))))
 
 (ert-deftest mcp-server-lib-test-tools-list-zero ()
   "Test the `tools/list` method returning empty array with no tools."
@@ -752,13 +860,14 @@ from a function loaded from bytecode rather than interpreted elisp."
       ((#'mcp-server-lib-test--tool-handler-string-arg
         :id "requires-arg"
         :description "A tool that requires an argument"))
-    (mcp-server-lib-test--verify-tool-schema-in-single-tool-list
-     "input-string" "string" "test parameter for string input")))
+    (mcp-server-lib-test--verify-req-success "tools/list"
+      (mcp-server-lib-test--verify-tool-schema-in-single-tool-list
+       "input-string" "string" "test parameter for string input"))))
 
 (ert-deftest mcp-server-lib-test-tools-list-extra-key ()
   "Test that `tools/list` request with an extra, unexpected key works correctly.
 Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--successful-req "tools/list"
     ;; Create a tools/list request with an extra key
     (let ((request-with-extra
            (json-encode
@@ -777,11 +886,13 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :id "read-only-tool"
         :description "A tool that doesn't modify its environment"
         :read-only t))
-    (mcp-server-lib-test--verify-tool-list-request
-     '(("read-only-tool" .
-        ((description . "A tool that doesn't modify its environment")
-         (annotations . ((readOnlyHint . t)))
-         (inputSchema . ((type . "object")))))))))
+    (mcp-server-lib-test--verify-req-success "tools/list"
+      (mcp-server-lib-test--verify-tool-list-request
+       '(("read-only-tool" .
+          ((description
+            . "A tool that doesn't modify its environment")
+           (annotations . ((readOnlyHint . t)))
+           (inputSchema . ((type . "object"))))))))))
 
 (ert-deftest mcp-server-lib-test-tools-list-read-only-hint-false ()
   "Test that `tools/list` response includes readOnlyHint=false."
@@ -790,11 +901,12 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :id "non-read-only-tool"
         :description "Tool that modifies its environment"
         :read-only nil))
-    (mcp-server-lib-test--verify-tool-list-request
-     '(("non-read-only-tool" .
-        ((description . "Tool that modifies its environment")
-         (annotations . ((readOnlyHint . :json-false)))
-         (inputSchema . ((type . "object")))))))))
+    (mcp-server-lib-test--verify-req-success "tools/list"
+      (mcp-server-lib-test--verify-tool-list-request
+       '(("non-read-only-tool" .
+          ((description . "Tool that modifies its environment")
+           (annotations . ((readOnlyHint . :json-false)))
+           (inputSchema . ((type . "object"))))))))))
 
 (ert-deftest mcp-server-lib-test-tools-list-multiple-annotations ()
   "Test `tools/list` response including multiple annotations."
@@ -804,12 +916,13 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :description "A tool with multiple annotations"
         :title "Friendly Multi-Tool"
         :read-only t))
-    (mcp-server-lib-test--verify-tool-list-request
-     '(("multi-annotated-tool" .
-        ((description . "A tool with multiple annotations")
-         (annotations
-          . ((title . "Friendly Multi-Tool") (readOnlyHint . t)))
-         (inputSchema . ((type . "object")))))))))
+    (mcp-server-lib-test--verify-req-success "tools/list"
+      (mcp-server-lib-test--verify-tool-list-request
+       '(("multi-annotated-tool" .
+          ((description . "A tool with multiple annotations")
+           (annotations
+            . ((title . "Friendly Multi-Tool") (readOnlyHint . t)))
+           (inputSchema . ((type . "object"))))))))))
 
 ;;; `mcp-server-lib-create-tools-call-request' tests
 
@@ -878,23 +991,33 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       ((#'mcp-server-lib-test--tool-handler-mcp-server-lib-tool-throw
         :id "failing-tool"
         :description "A tool that always fails"))
-    (let ((result (mcp-server-lib-test--call-tool "failing-tool" 11)))
-      ;; Check for proper MCP format
-      (should (alist-get 'content result))
-      (should (arrayp (alist-get 'content result)))
-      (should (= 1 (length (alist-get 'content result))))
-      ;; Check content item
-      (let ((content-item (aref (alist-get 'content result) 0)))
-        (should (alist-get 'type content-item))
-        (should (string= "text" (alist-get 'type content-item)))
-        (should (alist-get 'text content-item))
-        (should
-         (string=
-          "This tool intentionally fails"
-          (alist-get 'text content-item))))
-      ;; Check isError field is true
-      (should (alist-get 'isError result))
-      (should (eq t (alist-get 'isError result))))))
+    (mcp-server-lib-test--with-error-tracking "failing-tool"
+      ;; Call tool directly without verify-req-success wrapper
+      (let* ((request
+              (mcp-server-lib-create-tools-call-request
+               "failing-tool" 11))
+             (resp-obj
+              (json-read-from-string
+               (mcp-server-lib-process-jsonrpc request)))
+             (result (alist-get 'result resp-obj)))
+        ;; Check no JSON-RPC error
+        (should (null (alist-get 'error resp-obj)))
+        ;; Check for proper MCP format
+        (should (alist-get 'content result))
+        (should (arrayp (alist-get 'content result)))
+        (should (= 1 (length (alist-get 'content result))))
+        ;; Check content item
+        (let ((content-item (aref (alist-get 'content result) 0)))
+          (should (alist-get 'type content-item))
+          (should (string= "text" (alist-get 'type content-item)))
+          (should (alist-get 'text content-item))
+          (should
+           (string=
+            "This tool intentionally fails"
+            (alist-get 'text content-item))))
+        ;; Check isError field is true
+        (should (alist-get 'isError result))
+        (should (eq t (alist-get 'isError result)))))))
 
 (ert-deftest mcp-server-lib-test-tools-call-generic-error ()
   "Test that generic errors use standard JSON-RPC error format."
@@ -902,10 +1025,11 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       ((#'mcp-server-lib-test--tool-handler-error
         :id "generic-error-tool"
         :description "A tool that throws a generic error"))
-    (mcp-server-lib-test--check-jsonrpc-error
-     (mcp-server-lib-create-tools-call-request
-      "generic-error-tool" 12)
-     -32603 "Internal error executing tool")))
+    (mcp-server-lib-test--with-error-tracking "generic-error-tool"
+      (mcp-server-lib-test--check-jsonrpc-error
+       (mcp-server-lib-create-tools-call-request
+        "generic-error-tool" 12)
+       -32603 "Internal error executing tool"))))
 
 (ert-deftest mcp-server-lib-test-tools-call-no-args ()
   "Test the `tools/call` request with a tool that takes no arguments."
@@ -926,7 +1050,6 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :description "A tool that returns an empty string"))
     (mcp-server-lib-test--verify-tool-schema-in-single-tool-list)
 
-    ;; Then test the actual tool execution
     (let ((result
            (mcp-server-lib-test--call-tool "empty-string-tool" 10)))
       (mcp-server-lib-test--check-mcp-server-lib-content-format
@@ -939,13 +1062,14 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :id "string-arg-tool"
         :description "A tool that echoes a string argument"))
     (let* ((test-input "Hello, world!")
-           (args `(("input" . ,test-input)))
-           (result
-            (mcp-server-lib-test--call-tool "string-arg-tool"
-                                            13
-                                            args)))
-      (mcp-server-lib-test--check-mcp-server-lib-content-format
-       result (concat "Echo: " test-input)))))
+           (args `(("input" . ,test-input))))
+
+      (let ((result
+             (mcp-server-lib-test--call-tool "string-arg-tool"
+                                             13
+                                             args)))
+        (mcp-server-lib-test--check-mcp-server-lib-content-format
+         result (concat "Echo: " test-input))))))
 
 (ert-deftest mcp-server-lib-test-tools-call-unregistered-tool ()
   "Test the `tools/call` request with a tool that was never registered."
@@ -983,20 +1107,19 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
     ;; Undefine the handler function
     (fmakunbound 'mcp-server-lib-test--tool-handler-to-be-undefined)
 
-    ;; Try to call the tool - should return an error
-    (mcp-server-lib-test--check-jsonrpc-error
-     (mcp-server-lib-create-tools-call-request
-      "undefined-handler-tool" 16)
-     -32603 "Internal error executing tool")))
+    (mcp-server-lib-test--with-error-tracking "undefined-handler-tool"
+      ;; Try to call the tool - should return an error
+      (mcp-server-lib-test--check-jsonrpc-error
+       (mcp-server-lib-create-tools-call-request
+        "undefined-handler-tool" 16)
+       -32603 "Internal error executing tool"))))
 
 ;;; prompts/list tests
 
 (ert-deftest mcp-server-lib-test-prompts-list-zero ()
   "Test the `prompts/list` request returning an empty array with no prompts."
   (mcp-server-lib-test--with-server
-    (let ((result
-           (mcp-server-lib-test--get-request-result
-            (mcp-server-lib-test--prompts-list-request))))
+    (let ((result (mcp-server-lib-test--get-prompts-list)))
       (should (alist-get 'prompts result))
       (should (arrayp (alist-get 'prompts result)))
       (should (= 0 (length (alist-get 'prompts result)))))))
@@ -1228,6 +1351,93 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
             (mcp-server-lib-uninstall))
           (should (file-exists-p target)))
       (delete-directory temp-dir t))))
+
+;;; Metrics tests
+
+(ert-deftest mcp-server-lib-test-metrics ()
+  "Test metrics collection and reset."
+  (mcp-server-lib-test--with-tools
+      ( ;; Register a test tool
+       (#'mcp-server-lib-test--tool-handler-simple
+        :id "metrics-test-tool"
+        :description "Tool for testing metrics"))
+    ;; Make some operations to generate metrics
+    (mcp-server-lib-process-jsonrpc
+     (mcp-server-lib-create-tools-list-request 100))
+    (mcp-server-lib-test--call-tool "metrics-test-tool" 101)
+    (mcp-server-lib-test--call-tool "metrics-test-tool" 102)
+
+    ;; Verify non-zero before reset
+    (let ((summary-before (mcp-server-lib-metrics-summary)))
+      (should (stringp summary-before))
+      (should-not
+       (string-match "^MCP metrics: 0 calls" summary-before)))
+
+    ;; Reset
+    (mcp-server-lib-reset-metrics)
+
+    ;; Verify zero after reset
+    (let ((summary-after (mcp-server-lib-metrics-summary)))
+      (should (stringp summary-after))
+      (should (string-match "^MCP metrics: 0 calls" summary-after)))))
+
+(ert-deftest mcp-server-lib-test-show-metrics ()
+  "Test metrics display command."
+  (mcp-server-lib-test--with-tools
+      ((#'mcp-server-lib-test--tool-handler-simple
+        :id "display-test-tool"
+        :description "Tool for testing display"))
+    ;; Generate some metrics
+    (mcp-server-lib-process-jsonrpc
+     (mcp-server-lib-create-tools-list-request 200))
+    (mcp-server-lib-test--call-tool "display-test-tool" 201)
+
+    ;; Show metrics
+    (mcp-server-lib-show-metrics)
+
+    ;; Verify buffer exists and contains expected content
+    (with-current-buffer "*MCP Metrics*"
+      (let ((content (buffer-string)))
+        ;; Check header
+        (should (string-match "MCP Usage Metrics" content))
+        ;; Check method calls section
+        (should (string-match "Method Calls:" content))
+        ;; Should have at least 1 tools/list call from our test
+        (should (string-match "tools/list\\s-+\\([0-9]+\\)" content))
+        (let ((tools-list-count
+               (string-to-number (match-string 1 content))))
+          (should (>= tools-list-count 1)))
+
+        ;; Check tool usage section
+        (should (string-match "Tool Usage:" content))
+        ;; Should have exactly 1 call to our test tool
+        (should
+         (string-match
+          "display-test-tool\\s-+1\\s-+0\\s-+0\\.0%" content))
+        ;; Check summary
+        (should (string-match "Summary:" content))
+        (should (string-match "Total operations:" content))))))
+
+(ert-deftest mcp-server-lib-test-metrics-on-stop ()
+  "Test metrics display on server stop."
+  ;; Capture messages throughout the entire test
+  (cl-letf* ((messages nil)
+             ((symbol-function 'message)
+              (lambda (fmt &rest args)
+                (push (apply #'format fmt args) messages))))
+    (mcp-server-lib-test--with-tools
+        ((#'mcp-server-lib-test--tool-handler-simple
+          :id "stop-test-tool"
+          :description "Tool for testing stop"))
+      ;; Generate some metrics
+      (mcp-server-lib-test--call-tool "stop-test-tool" 300))
+
+    ;; Check that metrics summary was displayed when server stopped
+    (should
+     (cl-some
+      (lambda (msg)
+        (string-match "MCP metrics:.*calls.*errors" msg))
+      messages))))
 
 (provide 'mcp-server-lib-test)
 ;;; mcp-server-lib-test.el ends here

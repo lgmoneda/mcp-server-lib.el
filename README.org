@@ -200,6 +200,48 @@ To install the script to a different location than =~/.emacs.d/=:
 (setq mcp-server-lib-install-directory "/path/to/directory")
 #+end_src
 
+*** Usage Metrics
+
+=mcp-server-lib.el= collects usage metrics to help understand how MCP tools are being used. This feature tracks the number of calls and errors for each operation.
+
+**** Viewing Metrics
+
+Use =M-x mcp-server-lib-show-metrics= to display detailed metrics in a buffer. The display shows:
+
+- Method-level calls (initialize, tools/list, etc.)
+- Tool-specific usage with call counts and error rates
+- Notifications received
+- Overall summary statistics
+
+**** Resetting Metrics
+
+Use =M-x mcp-server-lib-reset-metrics= to clear all collected metrics.
+
+**** Automatic Display on Stop
+
+A metrics summary is automatically displayed when the server stops if any metrics have been collected.
+
+**** Programmatic Access
+
+The metrics API provides programmatic access to collected statistics:
+
+#+begin_src elisp
+;; Get metrics for a specific operation
+(let ((metrics (mcp-server-lib-metrics-get "tools/call:my-tool")))
+  (when metrics
+    (message "Tool called %d times with %d errors"
+             (mcp-server-lib-metrics-calls metrics)
+             (mcp-server-lib-metrics-errors metrics))))
+#+end_src
+
+The =mcp-server-lib-metrics= structure has two slots:
+- =calls= - Total number of invocations
+- =errors= - Number of failed invocations
+
+Operation names follow these patterns:
+- Method calls: ="initialize"=, ="tools/list"=, ="tools/call"=
+- Tool-specific: ="tools/call:TOOL-NAME"= where TOOL-NAME is the registered tool ID
+
 * Internals
 
 ** Transport

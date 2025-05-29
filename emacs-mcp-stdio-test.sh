@@ -67,7 +67,7 @@ TESTS_RUN=0
 readonly TEST_SERVER_NAME="mcp-test-server-$$"
 readonly STDIO_CMD="./emacs-mcp-stdio.sh --socket=$TEST_SERVER_NAME"
 
-emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp-server-lib.el" --load "$(pwd)/mcp-server-lib-commands.el" --eval "(mcp-server-lib-start)" 2>/dev/null &
+emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp-server-lib-metrics.el" --load "$(pwd)/mcp-server-lib.el" --load "$(pwd)/mcp-server-lib-commands.el" --eval "(mcp-server-lib-start)" 2>/dev/null &
 readonly SERVER_PID=$!
 
 # shellcheck disable=SC2317  # Called by trap

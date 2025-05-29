@@ -33,6 +33,7 @@
 ;;; Code:
 
 (require 'json)
+(require 'mcp-server-lib-metrics)
 
 ;;; Customization variables
 
@@ -197,110 +198,128 @@ ID is the JSON-RPC request ID to use in response.
 METHOD is the JSON-RPC method name to dispatch.
 PARAMS is the JSON-RPC params object from the request.
 Returns a JSON-RPC response string for the request."
-  (cond
-   ;; Initialize handshake
-   ((equal method "initialize")
-    (mcp-server-lib--handle-initialize id))
-   ;; Notifications/initialized format
-   ((equal method "notifications/initialized")
-    (mcp-server-lib--handle-initialized)
-    nil)
-   ;; Notifications/cancelled format
-   ((equal method "notifications/cancelled")
-    nil)
-   ;; List available tools
-   ((equal method "tools/list")
-    (let ((tool-list (vector)))
-      (maphash
-       (lambda (id tool)
-         (let* ((tool-description (plist-get tool :description))
-                (tool-title (plist-get tool :title))
-                (tool-read-only (plist-get tool :read-only))
-                (tool-schema
-                 (or (plist-get tool :schema) '((type . "object"))))
-                (tool-entry
-                 `((name . ,id)
-                   (description . ,tool-description)
-                   (inputSchema . ,tool-schema)))
-                (annotations nil))
-           ;; Collect annotations if present
-           (when tool-title
-             (push (cons 'title tool-title) annotations))
-           ;; Add readOnlyHint when :read-only is explicitly provided (both t
-           ;; and nil)
-           (when (plist-member tool :read-only)
-             (let ((annot-value
-                    (if tool-read-only
-                        t
-                      :json-false)))
-               (push (cons 'readOnlyHint annot-value) annotations)))
-           ;; Add annotations to tool entry if any exist
-           (when annotations
-             (setq tool-entry
-                   (append
-                    tool-entry `((annotations . ,annotations)))))
-           (setq tool-list (vconcat tool-list (vector tool-entry)))))
-       mcp-server-lib--tools)
-      (mcp-server-lib--jsonrpc-response id `((tools . ,tool-list)))))
-   ;; List available prompts
-   ((equal method "prompts/list")
-    (mcp-server-lib--jsonrpc-response id `((prompts . ,(vector)))))
-   ;; Tool invocation
-   ((equal method "tools/call")
-    (let* ((tool-name (alist-get 'name params))
-           (tool (gethash tool-name mcp-server-lib--tools))
-           (tool-args (alist-get 'arguments params)))
-      (if tool
-          (let ((handler (plist-get tool :handler))
-                (context (list :id id)))
-            (condition-case err
-                (let*
-                    ((result
-                      ;; Pass first arg value for single-string-arg tools
-                      ;; when arguments are present
-                      (if (and tool-args (not (equal tool-args '())))
-                          (let ((first-arg-value
-                                 (cdr (car tool-args))))
-                            (funcall handler first-arg-value))
-                        (funcall handler)))
-                     ;; Ensure result is a string, convert nil to empty string
-                     (result-text (or result ""))
-                     ;; Wrap the handler result in the MCP format
-                     (formatted-result
-                      `((content
-                         .
-                         ,(vector
-                           `((type . "text") (text . ,result-text))))
-                        (isError . :json-false))))
-                  (mcp-server-lib--respond-with-result
-                   context formatted-result))
-              ;; Handle tool-specific errors thrown with
-              ;; mcp-server-lib-tool-throw
-              (mcp-server-lib-tool-error
-               (let ((formatted-error
-                      `((content
-                         .
-                         ,(vector
-                           `((type . "text") (text . ,(cadr err)))))
-                        (isError . t))))
-                 (mcp-server-lib--respond-with-result
-                  context formatted-error)))
-              ;; Keep existing handling for all other errors
-              (error
-               (mcp-server-lib--jsonrpc-error
-                id mcp-server-lib--error-internal
-                (format "Internal error executing tool: %s"
-                        (error-message-string err))))))
-        (mcp-server-lib--jsonrpc-error
-         id
-         mcp-server-lib--error-invalid-request
-         (format "Tool not found: %s" tool-name)))))
-   ;; Method not found
-   (t
-    (mcp-server-lib--jsonrpc-error
-     id
-     mcp-server-lib--error-method-not-found
-     (format "Method not found: %s" method)))))
+  ;; Track method-level metrics
+  (let ((method-metrics (mcp-server-lib-metrics--get method)))
+    (cl-incf (mcp-server-lib-metrics-calls method-metrics))
+
+    (cond
+     ;; Initialize handshake
+     ((equal method "initialize")
+      (mcp-server-lib--handle-initialize id))
+     ;; Notifications/initialized format
+     ((equal method "notifications/initialized")
+      (mcp-server-lib--handle-initialized)
+      nil)
+     ;; Notifications/cancelled format
+     ((equal method "notifications/cancelled")
+      nil)
+     ;; List available tools
+     ((equal method "tools/list")
+      (let ((tool-list (vector)))
+        (maphash
+         (lambda (id tool)
+           (let* ((tool-description (plist-get tool :description))
+                  (tool-title (plist-get tool :title))
+                  (tool-read-only (plist-get tool :read-only))
+                  (tool-schema
+                   (or (plist-get tool :schema) '((type . "object"))))
+                  (tool-entry
+                   `((name . ,id)
+                     (description . ,tool-description)
+                     (inputSchema . ,tool-schema)))
+                  (annotations nil))
+             ;; Collect annotations if present
+             (when tool-title
+               (push (cons 'title tool-title) annotations))
+             ;; Add readOnlyHint when :read-only is explicitly provided (both t
+             ;; and nil)
+             (when (plist-member tool :read-only)
+               (let ((annot-value
+                      (if tool-read-only
+                          t
+                        :json-false)))
+                 (push (cons 'readOnlyHint annot-value) annotations)))
+             ;; Add annotations to tool entry if any exist
+             (when annotations
+               (setq tool-entry
+                     (append
+                      tool-entry `((annotations . ,annotations)))))
+             (setq tool-list
+                   (vconcat tool-list (vector tool-entry)))))
+         mcp-server-lib--tools)
+        (mcp-server-lib--jsonrpc-response
+         id `((tools . ,tool-list)))))
+     ;; List available prompts
+     ((equal method "prompts/list")
+      (mcp-server-lib--jsonrpc-response id `((prompts . ,(vector)))))
+     ;; Tool invocation
+     ((equal method "tools/call")
+      (let* ((tool-name (alist-get 'name params))
+             (tool (gethash tool-name mcp-server-lib--tools))
+             (tool-args (alist-get 'arguments params)))
+        (if tool
+            (let ((handler (plist-get tool :handler))
+                  (context (list :id id)))
+              (condition-case err
+                  (let*
+                      ((result
+                        ;; Pass first arg value for single-string-arg tools
+                        ;; when arguments are present
+                        (if (and tool-args
+                                 (not (equal tool-args '())))
+                            (let ((first-arg-value
+                                   (cdr (car tool-args))))
+                              (funcall handler first-arg-value))
+                          (funcall handler)))
+                       ;; Ensure result is a string, convert nil to empty string
+                       (result-text (or result ""))
+                       ;; Wrap the handler result in the MCP format
+                       (formatted-result
+                        `((content
+                           .
+                           ,(vector
+                             `((type . "text")
+                               (text . ,result-text))))
+                          (isError . :json-false))))
+                    (mcp-server-lib-metrics--track-tool-call
+                     tool-name)
+                    (mcp-server-lib--respond-with-result
+                     context formatted-result))
+                ;; Handle tool-specific errors thrown with
+                ;; mcp-server-lib-tool-throw
+                (mcp-server-lib-tool-error
+                 (mcp-server-lib-metrics--track-tool-call tool-name t)
+                 (cl-incf
+                  (mcp-server-lib-metrics-errors method-metrics))
+                 (let ((formatted-error
+                        `((content
+                           .
+                           ,(vector
+                             `((type . "text") (text . ,(cadr err)))))
+                          (isError . t))))
+                   (mcp-server-lib--respond-with-result
+                    context formatted-error)))
+                ;; Keep existing handling for all other errors
+                (error
+                 (mcp-server-lib-metrics--track-tool-call tool-name t)
+                 (cl-incf
+                  (mcp-server-lib-metrics-errors method-metrics))
+                 (mcp-server-lib--jsonrpc-error
+                  id mcp-server-lib--error-internal
+                  (format "Internal error executing tool: %s"
+                          (error-message-string err))))))
+          (mcp-server-lib-metrics--track-tool-call tool-name t)
+          (cl-incf (mcp-server-lib-metrics-errors method-metrics))
+          (mcp-server-lib--jsonrpc-error
+           id
+           mcp-server-lib--error-invalid-request
+           (format "Tool not found: %s" tool-name)))))
+     ;; Method not found
+     (t
+      (mcp-server-lib--jsonrpc-error
+       id
+       mcp-server-lib--error-method-not-found
+       (format "Method not found: %s" method))))))
 
 ;;; Notification handlers
 

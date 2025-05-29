@@ -40,7 +40,7 @@
 
 set -eu -o pipefail
 
-readonly ELISP_FILES="\"mcp-server-lib.el\" \"mcp-server-lib-commands.el\" \"mcp-server-lib-test.el\" \"mcp-server-lib-test-bytecode-handler.el\""
+readonly ELISP_FILES="\"mcp-server-lib.el\" \"mcp-server-lib-commands.el\" \"mcp-server-lib-metrics.el\" \"mcp-server-lib-test.el\" \"mcp-server-lib-test-bytecode-handler.el\""
 readonly ORG_FILES='"README.org" "TODO.org"'
 readonly SHELL_FILES=(check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh)
 
