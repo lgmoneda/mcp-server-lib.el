@@ -31,6 +31,7 @@
 (require 'mcp-server-lib)
 (require 'mcp-server-lib-commands)
 (require 'mcp-server-lib-metrics)
+(require 'mcp-server-lib-ert)
 (require 'json)
 
 ;;; Test data
@@ -424,16 +425,9 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 (defun mcp-server-lib-test--check-mcp-server-lib-content-format
     (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT."
-  ;; Check for proper MCP format
-  (let* ((content (alist-get 'content result))
-         (content-item (aref content 0)))
-    (should (arrayp content))
-    (should (= 1 (length content)))
-    (should (string= "text" (alist-get 'type content-item)))
-    (should (string= expected-text (alist-get 'text content-item))))
-  ;; Check isError field
-  (should (not (null (alist-get 'isError result nil t))))
-  (should (eq :json-false (alist-get 'isError result))))
+  (let ((response `((result . ,result))))
+    (let ((text (mcp-server-lib-ert-check-text-response response)))
+      (should (string= expected-text text)))))
 
 ;;; Initialization and server capabilities tests
 
@@ -995,26 +989,13 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
               (mcp-server-lib-create-tools-call-request
                "failing-tool" 11))
              (resp-obj
-              (mcp-server-lib-process-jsonrpc-parsed request))
-             (result (alist-get 'result resp-obj)))
+              (mcp-server-lib-process-jsonrpc-parsed request)))
         ;; Check no JSON-RPC error
         (should (null (alist-get 'error resp-obj)))
-        ;; Check for proper MCP format
-        (should (alist-get 'content result))
-        (should (arrayp (alist-get 'content result)))
-        (should (= 1 (length (alist-get 'content result))))
-        ;; Check content item
-        (let ((content-item (aref (alist-get 'content result) 0)))
-          (should (alist-get 'type content-item))
-          (should (string= "text" (alist-get 'type content-item)))
-          (should (alist-get 'text content-item))
-          (should
-           (string=
-            "This tool intentionally fails"
-            (alist-get 'text content-item))))
-        ;; Check isError field is true
-        (should (alist-get 'isError result))
-        (should (eq t (alist-get 'isError result)))))))
+        ;; Check error response using helper
+        (let ((text
+               (mcp-server-lib-ert-check-text-response resp-obj t)))
+          (should (string= "This tool intentionally fails" text)))))))
 
 (ert-deftest mcp-server-lib-test-tools-call-generic-error ()
   "Test that generic errors use standard JSON-RPC error format."

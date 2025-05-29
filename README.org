@@ -201,6 +201,41 @@ Examples:
 
 This is primarily useful for writing tests in the packages using mcp-server-lib.el.
 
+**** Test Utilities
+
+The =mcp-server-lib-ert= module provides test utilities:
+
+#+begin_src elisp
+(require 'mcp-server-lib-ert)
+
+(defun mcp-server-lib-ert-check-text-response (response &optional expected-error)
+  "Validate RESPONSE structure and extract text content.
+If EXPECTED-ERROR is non-nil, expects isError to be true.
+Returns the text content string on success.
+Signals test failure if response structure is invalid.")
+#+end_src
+
+This utility helps validate MCP tool responses in tests by:
+- Checking the response has the expected structure
+- Validating the =isError= flag matches expectations
+- Extracting text content from the response
+
+Example usage:
+
+#+begin_src elisp
+;; Test a successful response
+(let* ((request (mcp-server-lib-create-tools-call-request "my-tool"))
+       (response (mcp-server-lib-process-jsonrpc-parsed request))
+       (text (mcp-server-lib-ert-check-text-response response)))
+  (should (string= "Expected output" text)))
+
+;; Test an error response
+(let* ((request (mcp-server-lib-create-tools-call-request "failing-tool"))
+       (response (mcp-server-lib-process-jsonrpc-parsed request))
+       (text (mcp-server-lib-ert-check-text-response response t)))
+  (should (string-match-p "Error message" text)))
+#+end_src
+
 ** Customization
 
 *** Script Installation Directory
