@@ -1063,18 +1063,10 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :description "A tool that returns nil"))
     (let ((result
            (mcp-server-lib-test--call-tool "nil-returning-tool" 14)))
-      ;; Check for proper MCP format with empty string
-      (should (alist-get 'content result))
-      (should (arrayp (alist-get 'content result)))
-      (should (= 1 (length (alist-get 'content result))))
-      ;; Check content item
-      (let ((content-item (aref (alist-get 'content result) 0)))
-        (should (alist-get 'type content-item))
-        (should (string= "text" (alist-get 'type content-item)))
-        ;; When handler returns nil, it should be converted to empty string
-        (should (string= "" (alist-get 'text content-item))))
-      ;; Ensure isError is false
-      (should (eq :json-false (alist-get 'isError result))))))
+      (let ((response `((result . ,result))))
+        (let ((text
+               (mcp-server-lib-ert-check-text-response response)))
+          (should (string= "" text)))))))
 
 (ert-deftest mcp-server-lib-test-tools-call-handler-undefined ()
   "Test calling a tool whose handler function no longer exists."
