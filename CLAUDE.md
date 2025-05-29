@@ -83,6 +83,7 @@ Before writing any code:
 
 1. **Write tests**: Create tests that verify the expected behavior
 
+- **IMPORTANT: Write ONE test at a time, not multiple tests in a single edit**
 - Test only public interfaces, not implementation details
 - Do not depend on internals of the tested component
 - If you see no alternative to testing internals, ask for guidance
