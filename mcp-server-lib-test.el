@@ -23,7 +23,7 @@
 
 ;;; Commentary:
 
-;; ERT tests for mcp-server-lib-server-lib.el.
+;; ERT tests for mcp-server-lib.el.
 
 ;;; Code:
 
