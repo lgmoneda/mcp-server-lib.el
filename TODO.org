@@ -99,9 +99,9 @@
   - [X] Integrate with check.sh quality workflow
   - [X] Ensure script accessibility for external clients
     - [X] Add installation function to place script in user's PATH
-    - [ ] Update documentation with installation instructions
+    - [X] Update documentation with installation instructions
     - [ ] Consider environment variable for script location discovery
-    - [ ] Include script in proper location in package layout
+    - [X] Include script in proper location in package layout
 - [ ] Server synchronization with MCP clients
 - [X] Initialize method implementation
   - [X] Define `mcp--handle-initialize` function for the handshake process
@@ -150,12 +150,12 @@
 - [X] Add markdown linting for documentation files
 - [ ] Simplify Emacs test running in CI:
   - Update GitHub workflow elisp-test.yml to use simpler test command
-  - Use consistent test command in CI and CLAUDE.md: emacs -Q --batch -l mcp.el -l mcp-test.el --eval "(ert-run-tests-batch-and-exit)"
+  - Use consistent test command in CI and CLAUDE.md: emacs -Q --batch -l mcp-server-lib.el -l mcp-server-lib-test.el --eval "(ert-run-tests-batch-and-exit)"
 
 ** Documentation
 - [ ] Complete package documentation (similar to Python SDK's documentation)
-- [ ] Usage examples
-- [ ] API reference documentation
-- [ ] Example server implementations
+- [X] Usage examples
+- [X] API reference documentation
+- [X] Example server implementations
 - [ ] Example integrations with Emacs packages (org-mode, etc.)
 - [ ] Example client applications
