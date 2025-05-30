@@ -1212,9 +1212,13 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         "persistent-tool" (alist-get 'name (aref tools 0)))))))
 
 (ert-deftest mcp-server-lib-test-interactive-commands ()
-  "Verify that package commands are interactive."
+  "Verify that all package commands are interactive."
   (should (commandp #'mcp-server-lib-start))
-  (should (commandp #'mcp-server-lib-stop)))
+  (should (commandp #'mcp-server-lib-stop))
+  (should (commandp #'mcp-server-lib-install))
+  (should (commandp #'mcp-server-lib-uninstall))
+  (should (commandp #'mcp-server-lib-reset-metrics))
+  (should (commandp #'mcp-server-lib-show-metrics)))
 
 ;;; `mcp-server-lib-with-error-handling' tests
 

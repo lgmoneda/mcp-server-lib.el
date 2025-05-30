@@ -117,7 +117,7 @@
   - Track parse errors, invalid JSON-RPC format, etc.
   - These errors occur before method dispatch
   - Would allow monitoring transport-level issues
-- [ ] Test all interactive commands
+- [X] Test all interactive commands
   - The mcp-server-lib-test-interactive-commands test only checks start/stop
   - Should also test mcp-server-lib-install, mcp-server-lib-uninstall,
     mcp-server-lib-reset-metrics, mcp-server-lib-show-metrics
