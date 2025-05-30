@@ -141,7 +141,7 @@
 - [X] Fix long lines exceeding fill-column (70 characters)
 - [X] Fix indentation (use spaces instead of tabs as configured in .dir-locals.el)
 - [X] Remove trailing whitespace
-- [ ] Fix checkdoc issues:
+- [X] Fix checkdoc issues:
   - Add two spaces after periods
   - Quote Lisp symbols properly
   - Remove whitespace at end of lines
