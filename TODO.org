@@ -62,11 +62,11 @@
   - Request/response management
   - Error handling and reporting
 - [X] Adapt MCP-specific message formats to jsonrpc framework
-- [ ] Implement MCP "initialize" method
-  - [ ] Handle protocol version negotiation
-  - [ ] Exchange capability information
+- [X] Implement MCP "initialize" method
+  - [X] Handle protocol version negotiation
+  - [X] Exchange capability information
   - [X] Support "initialized" notification (including "notifications/initialized" format)
-  - [ ] Add version compatibility validation
+  - [X] Add version compatibility validation
 
 ** Configuration Variables
 - [X] Server port configuration (similar to Python SDK's port setting)
@@ -97,18 +97,18 @@
   - [X] Support configurable socket, init and stop functions
   - [X] Add testing script (emacs-mcp-stdio-test.sh)
   - [X] Integrate with check.sh quality workflow
-  - [ ] Ensure script accessibility for external clients
-    - [ ] Add installation function to place script in user's PATH
+  - [X] Ensure script accessibility for external clients
+    - [X] Add installation function to place script in user's PATH
     - [ ] Update documentation with installation instructions
     - [ ] Consider environment variable for script location discovery
     - [ ] Include script in proper location in package layout
 - [ ] Server synchronization with MCP clients
-- [ ] Initialize method implementation
-  - [ ] Define `mcp--handle-initialize` function for the handshake process
+- [X] Initialize method implementation
+  - [X] Define `mcp--handle-initialize` function for the handshake process
   - [ ] Store client capabilities in server state
-  - [ ] Return server capabilities in response
+  - [X] Return server capabilities in response
   - [ ] Add connection lifecycle management
-  - [ ] Support capability-based feature negotiation
+  - [X] Support capability-based feature negotiation
 
 ** Testing
 - [X] Unit tests for basic server lifecycle
