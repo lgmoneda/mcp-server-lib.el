@@ -121,12 +121,12 @@
   - The mcp-server-lib-test-interactive-commands test only checks start/stop
   - Should also test mcp-server-lib-install, mcp-server-lib-uninstall,
     mcp-server-lib-reset-metrics, mcp-server-lib-show-metrics
-- [ ] Unit tests for initialize handshake
-  - [ ] Test valid initialize request handling
-  - [ ] Test protocol version compatibility
-  - [ ] Test capability reporting
+- [X] Unit tests for initialize handshake
+  - [X] Test valid initialize request handling
+  - [X] Test protocol version compatibility
+  - [X] Test capability reporting
   - [X] Test initialized notification handling (including "notifications/initialized" format)
-  - [ ] Test error cases (invalid version, etc.)
+  - [X] Test error cases (invalid version, etc.)
 - [X] Unit tests for tool registration and execution
   - [X] Add test for tools/list method
   - [X] Add test for tools/call method
