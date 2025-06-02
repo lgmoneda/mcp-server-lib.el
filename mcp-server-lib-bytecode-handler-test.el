@@ -1,4 +1,4 @@
-;;; mcp-server-lib-test-bytecode-handler.el --- Bytecode handler test -*- lexical-binding: t; -*-
+;;; mcp-server-lib-bytecode-handler-test.el --- Bytecode handler test -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Laurynas Biveinis
 ;; Author: Laurynas Biveinis
@@ -22,10 +22,10 @@ MCP Parameters:
   input-string - Input string parameter for bytecode testing"
   (format "Bytecode handler result: %s" input-string))
 
-(provide 'mcp-server-lib-test-bytecode-handler)
+(provide 'mcp-server-lib-bytecode-handler-test)
 
 ;; Local Variables:
 ;; package-lint-main-file: "mcp-server-lib.el"
 ;; End:
 
-;;; mcp-server-lib-test-bytecode-handler.el ends here
+;;; mcp-server-lib-bytecode-handler-test.el ends here

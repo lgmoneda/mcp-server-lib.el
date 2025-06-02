@@ -110,7 +110,7 @@ MCP Parameters:"
 
 ;; Bytecode handler function that will be loaded during tests
 (declare-function mcp-server-lib-test-bytecode-handler--handler
-                  "mcp-server-lib-test-bytecode-handler")
+                  "mcp-server-lib-bytecode-handler-test")
 
 ;;; Test helpers
 
@@ -699,7 +699,7 @@ This test verifies that MCP can correctly extract parameter information
 from a function loaded from bytecode rather than interpreted elisp."
   (let* ((source-file
           (expand-file-name
-           "mcp-server-lib-test-bytecode-handler.el"))
+           "mcp-server-lib-bytecode-handler-test.el"))
          (bytecode-file (byte-compile-dest-file source-file)))
     (should (byte-compile-file source-file))
 
