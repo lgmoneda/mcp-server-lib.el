@@ -234,6 +234,7 @@ Optional INDENT adds spaces before the key."
 
 ;; Local Variables:
 ;; byte-compile-warnings: (not unresolved)
+;; package-lint-main-file: "mcp-server-lib.el"
 ;; End:
 
 ;;; mcp-server-lib-commands.el ends here

@@ -4,7 +4,6 @@
 
 ;; Version: 0.1.0
 ;; Homepage: https://github.com/laurynas-biveinis/mcp.el
-;; Package-Requires: ((emacs "24.3"))
 
 ;; This file is part of mcp-server-lib.
 
@@ -116,6 +115,7 @@ to access the metrics values from the returned object."
 (provide 'mcp-server-lib-metrics)
 
 ;; Local Variables:
+;; package-lint-main-file: "mcp-server-lib.el"
 ;; End:
 
 ;;; mcp-server-lib-metrics.el ends here

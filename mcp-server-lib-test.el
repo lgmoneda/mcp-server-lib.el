@@ -3,7 +3,6 @@
 ;; Copyright (C) 2025 Laurynas Biveinis
 
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "26.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp-server-lib.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -1427,4 +1426,9 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       messages))))
 
 (provide 'mcp-server-lib-test)
+
+;; Local Variables:
+;; package-lint-main-file: "mcp-server-lib.el"
+;; End:
+
 ;;; mcp-server-lib-test.el ends here

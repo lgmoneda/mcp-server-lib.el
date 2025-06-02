@@ -5,7 +5,6 @@
 ;; Author: Laurynas Biveinis <laurynas.biveinis@gmail.com>
 ;; Keywords: tools, testing
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp-server-lib.el
 
 ;; This file is NOT part of GNU Emacs.
@@ -55,4 +54,9 @@ Signals test failure if response structure is invalid."
       (alist-get 'text text-item))))
 
 (provide 'mcp-server-lib-ert)
+
+;; Local Variables:
+;; package-lint-main-file: "mcp-server-lib.el"
+;; End:
+
 ;;; mcp-server-lib-ert.el ends here

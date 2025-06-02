@@ -3,7 +3,6 @@
 ;; Copyright (C) 2024 Laurynas Biveinis
 ;; Author: Laurynas Biveinis
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "24.1"))
 ;; URL: https://github.com/laurynas-biveinis/mcp-server-lib.el
 
 ;;; Commentary:
@@ -24,4 +23,9 @@ MCP Parameters:
   (format "Bytecode handler result: %s" input-string))
 
 (provide 'mcp-server-lib-test-bytecode-handler)
+
+;; Local Variables:
+;; package-lint-main-file: "mcp-server-lib.el"
+;; End:
+
 ;;; mcp-server-lib-test-bytecode-handler.el ends here
