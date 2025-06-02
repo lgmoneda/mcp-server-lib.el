@@ -29,7 +29,7 @@ jobs:
           # RECIPE is your recipe as written for MELPA:
           RECIPE: |
             (mcp-server-lib :fetcher github :repo "laurynas-biveinis/mcp-server-lib.el"
-            :files (:defaults "emacs-mcp-stdio.sh" (:exclude "*-test*.el")))
+            :files (:defaults "emacs-mcp-stdio.sh"))
           # set this to false (or remove it) if the package isn't on MELPA:
           EXIST_OK: false
         run: echo "$GITHUB_REF" && make -C ~/melpazoid
