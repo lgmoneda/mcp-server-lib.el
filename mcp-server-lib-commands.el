@@ -143,8 +143,7 @@ Optional INDENT adds spaces before the key."
     (erase-buffer)
     (insert "MCP Usage Metrics\n")
     (insert "=================\n\n")
-    (insert
-     (format-time-string "Session started: %Y-%m-%d %H:%M:%S\n\n"))
+    (insert (format-time-string "Session started: %F %T\n\n"))
 
     ;; Separate into three categories
     (let ((method-metrics nil)

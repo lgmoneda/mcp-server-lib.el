@@ -41,7 +41,7 @@ Signals test failure if response structure is invalid."
     (should (alist-get 'content result))
     (should (arrayp (alist-get 'content result)))
     (should (= 1 (length (alist-get 'content result))))
-    (should (not (null (alist-get 'isError result nil t))))
+    (should (alist-get 'isError result nil t))
     (should
      (eq
       (alist-get 'isError result)
