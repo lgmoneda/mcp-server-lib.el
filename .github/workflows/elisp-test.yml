@@ -60,5 +60,5 @@ jobs:
 
       - name: Run tests
         run: |
-          emacs -Q --batch -l mcp-server-lib.el -l mcp-server-lib-test.el \
+          emacs -Q --batch -L . -l mcp-server-lib.el -l mcp-server-lib-test.el \
                 --eval "(ert-run-tests-batch-and-exit)"
