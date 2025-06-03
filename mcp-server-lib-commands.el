@@ -145,12 +145,18 @@ Optional INDENT adds spaces before the key."
     (insert "=================\n\n")
     (insert (format-time-string "Session started: %F %T\n\n"))
 
-    ;; Separate into three categories
+    ;; Separate into three categories and accumulate totals in one pass
     (let ((method-metrics nil)
           (notification-metrics nil)
-          (tool-metrics nil))
+          (tool-metrics nil)
+          (total-calls 0)
+          (total-errors 0))
       (maphash
        (lambda (key metrics)
+         ;; Accumulate totals while categorizing
+         (cl-incf total-calls (mcp-server-lib-metrics-calls metrics))
+         (cl-incf
+          total-errors (mcp-server-lib-metrics-errors metrics))
          (cond
           ((string-match-p ":" key)
            (push (cons key metrics) tool-metrics))
@@ -207,27 +213,19 @@ Optional INDENT adds spaces before the key."
             (insert
              (mcp-server-lib--format-metrics-with-errors
               display-name metrics
-              t))))))
+              t)))))
 
-    ;; Summary
-    (insert "\nSummary:\n")
-    (insert "--------\n")
-    (let ((total-calls 0)
-          (total-errors 0))
-      (maphash
-       (lambda (_key metrics)
-         (cl-incf total-calls (mcp-server-lib-metrics-calls metrics))
-         (cl-incf
-          total-errors (mcp-server-lib-metrics-errors metrics)))
-       mcp-server-lib-metrics--table)
+      ;; Summary
+      (insert "\nSummary:\n")
+      (insert "--------\n")
       (insert (format "Total operations: %d\n" total-calls))
       (insert (format "Total errors: %d\n" total-errors))
       (insert
        (format "Overall error rate: %.1f%%\n"
                (mcp-server-lib-metrics--error-rate
-                total-calls total-errors))))
+                total-calls total-errors)))))
 
-    (display-buffer (current-buffer))))
+  (display-buffer (current-buffer)))
 
 (provide 'mcp-server-lib-commands)
 
