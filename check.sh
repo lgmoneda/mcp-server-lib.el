@@ -40,14 +40,10 @@
 
 set -eu -o pipefail
 
-readonly ELISP_FILES="\"mcp-server-lib.el\" \"mcp-server-lib-commands.el\" \"mcp-server-lib-metrics.el\" \"mcp-server-lib-ert.el\" \"mcp-server-lib-test.el\" \"mcp-server-lib-bytecode-handler-test.el\""
 readonly ORG_FILES='"README.org" "TODO.org"'
 readonly SHELL_FILES=(check.sh emacs-mcp-stdio.sh emacs-mcp-stdio-test.sh)
 
 readonly EMACS="emacs -Q --batch"
-
-# Elisp packages in ELPA
-readonly ELISP_AUTOFMT="elisp-autofmt-20250421.1112"
 
 ERRORS=0
 ELISP_SYNTAX_FAILED=0
@@ -67,13 +63,7 @@ fi
 # Only run indentation if there are no syntax errors
 if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
 	echo -n "Running elisp-autofmt... "
-	if $EMACS --eval "(add-to-list 'load-path (locate-user-emacs-file \"elpa/$ELISP_AUTOFMT\"))" \
-		--eval "(add-to-list 'load-path (expand-file-name \".\"))" \
-		--eval "(require 'elisp-autofmt)" \
-		--eval "(dolist (file '($ELISP_FILES))
-                   (princ (format \"%s \" file))
-	           (find-file file)
-	           (elisp-autofmt-buffer-to-file))"; then
+	if eask format elisp-autofmt; then
 		echo "OK!"
 	else
 		echo "elisp-autofmt failed!"
