@@ -1,3 +1,7 @@
 **/.claude/settings.local.json
 *.elc
 *-autoloads.el
+
+# Eask
+.eask/
+dist/
