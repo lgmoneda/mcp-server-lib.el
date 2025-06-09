@@ -93,7 +93,7 @@ done
 TEST_CASE="Test case 1: MCP protocol handshake sequence"
 
 # Create a log file for debugging
-debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
+debug_log_file=$(mktemp /tmp/mcp-debug-$$-XXXXXX.log)
 export EMACS_MCP_DEBUG_LOG="$debug_log_file"
 
 # These are the three messages in the MCP protocol handshake
@@ -153,7 +153,7 @@ readonly STOP_FUNCTION="mcp-server-lib-stop"
 # Stop MCP for this test as we want to test explicit init/stop functions
 run_emacs_function "mcp-server-lib-stop" "Failed to stop MCP"
 
-debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
+debug_log_file=$(mktemp /tmp/mcp-debug-$$-XXXXXX.log)
 
 # These are the three messages in the MCP protocol handshake
 INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
@@ -225,7 +225,7 @@ run_emacs_function "mcp-server-lib-start" "Failed to restart MCP"
 TEST_CASE="Test case 3: Debug logging without init and stop functions"
 
 # Test without init and stop functions
-debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
+debug_log_file=$(mktemp /tmp/mcp-debug-$$-XXXXXX.log)
 
 # These are the three messages in the MCP protocol handshake
 INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{"roots":{}},"clientInfo":{"name":"test","version":"1.0"}},"id":1}'
@@ -338,7 +338,7 @@ INIT_REQUEST='{"jsonrpc":"2.0","method":"initialize","params":{"protocolVersion"
 NOTIFICATION='{"jsonrpc":"2.0","method":"notifications/initialized"}'
 TOOLS_CALL="{\"jsonrpc\":\"2.0\",\"method\":\"tools/call\",\"id\":5,\"params\":{\"name\":\"test-original-payload\"}}"
 
-debug_log_file=$(mktemp /tmp/mcp-debug-XXXXXX.log)
+debug_log_file=$(mktemp /tmp/mcp-debug-$$-XXXXXX.log)
 printf "%s\n%s\n%s\n" "$INIT_REQUEST" "$NOTIFICATION" "$TOOLS_CALL" |
 	EMACS_MCP_DEBUG_LOG="$debug_log_file" $STDIO_CMD >stdio-response.txt 2>/dev/null
 
