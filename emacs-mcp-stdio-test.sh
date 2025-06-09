@@ -93,7 +93,7 @@ done
 TEST_CASE="Test case 1: MCP protocol handshake sequence"
 
 # Create a log file for debugging
-debug_log_file=$(mktemp /tmp/mcp-debug-$$-XXXXXX.log)
+debug_log_file=$(mktemp "${TMPDIR:-/tmp}/mcp-debug-$$-XXXXXX.log")
 export EMACS_MCP_DEBUG_LOG="$debug_log_file"
 
 # These are the three messages in the MCP protocol handshake
