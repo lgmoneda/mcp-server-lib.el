@@ -1,19 +1,21 @@
-name: MCP StdIO Adapter Test
+name: MCP stdio Adapter Test
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions: {}
 
 jobs:
   stdio-test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         emacs_version:
           - "snapshot"
           - "30.1"
@@ -33,5 +35,5 @@ jobs:
         with:
           version: ${{ matrix.emacs_version }}
 
-      - name: Run StdIO adapter tests
+      - name: Run stdio adapter tests
         run: ./emacs-mcp-stdio-test.sh
