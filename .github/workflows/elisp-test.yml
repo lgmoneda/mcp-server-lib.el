@@ -44,11 +44,11 @@ jobs:
         with:
           version: "snapshot"
 
-      - name: Install dependencies
-        run: eask install-deps
-
-      - name: Run linters
-        run: eask lint
-
       - name: Run tests
-        run: eask script test
+        run: |
+          eask clean all
+          eask package
+          eask install
+          eask compile
+          eask lint
+          eask script test
