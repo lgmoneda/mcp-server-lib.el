@@ -17,6 +17,22 @@
 
 (script "test" "eask test ert mcp-server-lib-test.el")
 
+(script "org-lint" 
+        (concat "emacs -Q --batch "
+                "--eval \"(require 'org)\" "
+                "--eval \"(require 'org-lint)\" "
+                "--eval \"(let ((all-checks-passed t) "
+                        "(files '(\\\"README.org\\\" \\\"TODO.org\\\"))) "
+                    "(dolist (file files all-checks-passed) "
+                      "(with-temp-buffer "
+                        "(insert-file-contents file) "
+                        "(org-mode) "
+                        "(let ((results (org-lint))) "
+                          "(when results "
+                            "(message \\\"Found issues in %s: %S\\\" file results) "
+                            "(setq all-checks-passed nil))))) "
+                    "(unless all-checks-passed (kill-emacs 1)))\""))
+
 (source "gnu")
 
 (depends-on "emacs" "27.1")
