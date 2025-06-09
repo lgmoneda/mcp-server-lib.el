@@ -22,8 +22,8 @@ jobs:
           - "29.4"
           - "28.2"
         include:
-        - os: ubuntu-latest
-          emacs_version: "27.2"
+          - os: ubuntu-latest
+            emacs_version: "27.2"
 
     permissions:
       contents: read
@@ -39,30 +39,16 @@ jobs:
         with:
           version: ${{ matrix.emacs_version }}
 
-      - name: Install dependencies
-        run: |
-          emacs -Q --batch \
-                --eval "(require 'package)" \
-                --eval "(add-to-list 'package-archives '(\"melpa-stable\" . \"https://stable.melpa.org/packages/\") t)" \
-                --eval "(package-initialize)" \
-                --eval "(package-refresh-contents)" \
-                --eval "(package-install 'elisp-lint)" \
-                --eval "(package-install 'package-lint)" \
-                --eval "(package-install 'dash)"
+      - name: Set up Eask
+        uses: emacs-eask/setup-eask@master
+        with:
+          version: "snapshot"
 
-      - name: elisp-lint
-        run: |
-          emacs -Q --batch \
-                --eval "(package-initialize)" \
-                --eval "(require 'elisp-lint)" \
-                --eval "(dolist (file (directory-files \".\" nil \"\\\\.el$\"))
-                          (let ((elisp-lint-ignored-validators
-                                 (if (string-match-p \"commands\" file)
-                                     '(\"package-lint\")
-                                   nil)))
-                            (elisp-lint-file file)))"
+      - name: Install dependencies
+        run: eask install-deps
+
+      - name: Run linters
+        run: eask lint
 
       - name: Run tests
-        run: |
-          emacs -Q --batch -L . -l mcp-server-lib.el -l mcp-server-lib-test.el \
-                --eval "(ert-run-tests-batch-and-exit)"
+        run: eask script test
