@@ -87,6 +87,15 @@ fi
 
 eask clean elc
 
+# Run Eask keywords lint
+echo -n "Running eask lint keywords... "
+if eask lint keywords; then
+	echo "OK!"
+else
+	echo "eask lint keywords failed"
+	ERRORS=$((ERRORS + 1))
+fi
+
 # Only run ERT tests if there are no Elisp syntax errors
 if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
 	echo -n "Running all tests... "

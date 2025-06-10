@@ -51,4 +51,5 @@ jobs:
           eask install
           eask compile
           eask lint elisp-lint
+          eask lint keywords
           eask run script test
