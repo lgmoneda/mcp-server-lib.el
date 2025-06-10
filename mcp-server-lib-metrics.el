@@ -52,7 +52,7 @@ Slots:
 ;;; Global state
 
 (defvar mcp-server-lib-metrics--table (make-hash-table :test 'equal)
-  "Metrics for all MCP operations.  Key: method or \='method:name\='.")
+  "Metrics for all MCP operations.  Key: method or method:name.")
 
 ;;; Core functions
 

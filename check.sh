@@ -96,6 +96,14 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
+echo -n "Running eask lint regexps... "
+if eask lint regexps; then
+	echo "OK!"
+else
+	echo "eask lint regexps failed"
+	ERRORS=$((ERRORS + 1))
+fi
+
 # Only run ERT tests if there are no Elisp syntax errors
 if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
 	echo -n "Running all tests... "

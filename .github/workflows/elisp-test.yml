@@ -52,4 +52,5 @@ jobs:
           eask compile
           eask lint elisp-lint
           eask lint keywords
+          eask lint regexps
           eask run script test
