@@ -677,21 +677,38 @@ PARAM-DESCRIPTION as the expected description of the parameter."
    :type 'error))
 
 (ert-deftest mcp-server-lib-test-register-tool-error-duplicate-id ()
-  "Test that registering a tool with duplicate ID produces an error."
-  (mcp-server-lib-register-tool
-   #'mcp-server-lib-test--tool-handler-simple
-   :id "duplicate-test"
-   :description "First registration")
-
-  (should-error
-   (mcp-server-lib-register-tool
-    #'mcp-server-lib-test--tool-handler-simple
-    :id "duplicate-test"
-    :description "Second registration")
-   :type 'error)
-
-  ;; Clean up
-  (mcp-server-lib-unregister-tool "duplicate-test"))
+  "Test reference counting behavior when registering a tool with duplicate ID.
+With reference counting, duplicate registrations should succeed and increment
+the reference count, returning the original tool definition."
+  (mcp-server-lib-test--with-server
+    (should (mcp-server-lib-register-tool
+             #'mcp-server-lib-test--tool-handler-simple
+             :id "duplicate-test"
+             :description "First registration"))
+    
+    (should (mcp-server-lib-register-tool
+             #'mcp-server-lib-test--tool-handler-simple
+             :id "duplicate-test"
+             :description "Second registration - should be ignored"))
+    
+    ;; Tool should be callable after registrations
+    (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 1)))
+      (mcp-server-lib-test--check-mcp-server-lib-content-format
+       result "test result"))
+    
+    ;; First unregister should succeed (ref count goes from 2 to 1)
+    (should (mcp-server-lib-unregister-tool "duplicate-test"))
+    
+    ;; Tool should still be callable after first unregister
+    (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 2)))
+      (mcp-server-lib-test--check-mcp-server-lib-content-format
+       result "test result"))
+    
+    ;; Second unregister should succeed (ref count goes from 1 to 0, tool removed)
+    (should (mcp-server-lib-unregister-tool "duplicate-test"))
+    
+    ;; Tool should no longer be callable
+    (mcp-server-lib-test--verify-tool-not-found "duplicate-test")))
 
 (ert-deftest mcp-server-lib-test-register-tool-bytecode ()
   "Test schema generation for a handler loaded as bytecode.
@@ -750,12 +767,14 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-unregister-tool-nonexistent ()
   "Test that `mcp-server-lib-unregister-tool' returns nil for missing tools."
-  (mcp-server-lib-register-tool
-   #'mcp-server-lib-test--tool-handler-simple
-   :id "test-other"
-   :description "Other test tool")
-  (should-not (mcp-server-lib-unregister-tool "nonexistent-tool"))
-  (mcp-server-lib-unregister-tool "test-other"))
+  (unwind-protect
+      (progn
+        (mcp-server-lib-register-tool
+         #'mcp-server-lib-test--tool-handler-simple
+         :id "test-other"
+         :description "Other test tool")
+        (should-not (mcp-server-lib-unregister-tool "nonexistent-tool")))
+    (mcp-server-lib-unregister-tool "test-other")))
 
 (ert-deftest mcp-server-lib-test-unregister-tool-when-no-tools ()
   "Test `mcp-server-lib-unregister-tool' when no tools are registered."

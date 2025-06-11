@@ -595,27 +595,33 @@ With optional properties:
       (error "Tool registration requires :id property"))
     (unless description
       (error "Tool registration requires :description property"))
-    ;; Check for duplicate registration
-    (when (gethash id mcp-server-lib--tools)
-      (error "MCP tool with ID '%s' is already registered" id))
-    ;; Generate schema from handler function
-    (let* ((schema
-            (mcp-server-lib--generate-schema-from-function handler))
-           (tool
-            (list
-             :id id
-             :description description
-             :handler handler
-             :schema schema)))
-      ;; Add optional properties if provided
-      (when title
-        (setq tool (plist-put tool :title title)))
-      ;; Always include :read-only if it was specified, even if nil
-      (when (plist-member properties :read-only)
-        (setq tool (plist-put tool :read-only read-only)))
-      ;; Register the tool
-      (puthash id tool mcp-server-lib--tools)
-      tool)))
+    ;; Check for existing registration
+    (let ((existing (gethash id mcp-server-lib--tools)))
+      (if existing
+          ;; Tool already exists - increment ref count
+          (let ((ref-count (or (plist-get existing :ref-count) 1)))
+            (plist-put existing :ref-count (1+ ref-count))
+            t)
+        ;; New tool - register with ref-count = 1
+        (let* ((schema
+                (mcp-server-lib--generate-schema-from-function
+                 handler))
+               (tool
+                (list
+                 :id id
+                 :description description
+                 :handler handler
+                 :schema schema
+                 :ref-count 1)))
+          ;; Add optional properties if provided
+          (when title
+            (setq tool (plist-put tool :title title)))
+          ;; Always include :read-only if it was specified, even if nil
+          (when (plist-member properties :read-only)
+            (setq tool (plist-put tool :read-only read-only)))
+          ;; Register the tool
+          (puthash id tool mcp-server-lib--tools)
+          t)))))
 
 (defun mcp-server-lib-unregister-tool (tool-id)
   "Unregister a tool with ID TOOL-ID from the MCP server.
@@ -627,9 +633,17 @@ Returns t if the tool was found and removed, nil otherwise.
 
 Example:
   (mcp-server-lib-unregister-tool \"org-list-files\")"
-  (when (gethash tool-id mcp-server-lib--tools)
-    (remhash tool-id mcp-server-lib--tools)
-    t))
+  (let ((tool (gethash tool-id mcp-server-lib--tools)))
+    (when tool
+      (let ((ref-count (or (plist-get tool :ref-count) 1)))
+        (if (> ref-count 1)
+            ;; Decrement ref count
+            (progn
+              (plist-put tool :ref-count (1- ref-count))
+              t)
+          ;; Last reference - remove the tool
+          (remhash tool-id mcp-server-lib--tools)
+          t)))))
 
 ;; Custom error type for tool errors
 (define-error 'mcp-server-lib-tool-error "MCP tool error" 'user-error)
