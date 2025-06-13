@@ -172,6 +172,21 @@
   - Could have generic helpers for ref-counted registration/unregistration
   - Would ensure consistent behavior and reduce duplication
 
+** JSON-RPC Batching Support
+- [ ] Investigate JSON-RPC batch request support
+  - Per MCP spec: "MCP implementations MAY support sending JSON-RPC batches, but MUST support receiving JSON-RPC batches"
+  - Currently we only handle single requests in mcp-server-lib-process-jsonrpc
+  - Need to detect array vs object at top level for batch requests
+  - Batch responses can be returned in any order
+  - Empty response arrays should not be returned (return nothing instead)
+  - Consider parallel processing of batch requests
+- [ ] Add tests for batch request handling
+  - Test array of valid requests
+  - Test mixing requests and notifications in batch
+  - Test error handling for malformed batch
+  - Test response ordering and ID matching
+  - Test empty response array handling
+
 ** CI and Linting
 - [X] Fix package dependency issue (Package json is not installable)
 - [X] Fix long lines exceeding fill-column (70 characters)
