@@ -252,38 +252,28 @@ ID is the JSON-RPC request ID to use in response.
 METHOD is the JSON-RPC method name to dispatch.
 PARAMS is the JSON-RPC params object from the request.
 Returns a JSON-RPC response string for the request."
-  ;; Track method-level metrics
   (let ((method-metrics (mcp-server-lib-metrics--get method)))
     (cl-incf (mcp-server-lib-metrics-calls method-metrics))
 
     (cond
-     ;; Initialize handshake
      ((equal method "initialize")
       (mcp-server-lib--handle-initialize id))
-     ;; Notifications/initialized format
      ((equal method "notifications/initialized")
       (mcp-server-lib--handle-initialized)
       nil)
-     ;; Notifications/cancelled format
      ((equal method "notifications/cancelled")
       nil)
-     ;; List available tools
      ((equal method "tools/list")
       (mcp-server-lib--handle-tools-list id))
-     ;; List available prompts
      ((equal method "prompts/list")
       (mcp-server-lib--jsonrpc-response id `((prompts . ,(vector)))))
-     ;; List available resources
      ((equal method "resources/list")
       (mcp-server-lib--handle-resources-list id))
-     ;; Read resource content
      ((equal method "resources/read")
       (mcp-server-lib--handle-resources-read
        id params method-metrics))
-     ;; Tool invocation
      ((equal method "tools/call")
       (mcp-server-lib--handle-tools-call id params method-metrics))
-     ;; Method not found
      (t
       (mcp-server-lib--jsonrpc-error
        id
