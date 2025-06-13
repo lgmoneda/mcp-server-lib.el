@@ -35,7 +35,9 @@
 This function starts the MCP server that can process JSON-RPC
 requests via `mcp-server-lib-process-jsonrpc'.  Once started, the server
 will dispatch incoming requests to the appropriate tool
-handlers that have been registered with `mcp-server-lib-register-tool'."
+handlers that have been registered with `mcp-server-lib-register-tool'.
+
+See also: `mcp-server-lib-stop'"
   (interactive)
   (when mcp-server-lib--running
     (error "MCP server is already running"))
@@ -51,7 +53,9 @@ handlers that have been registered with `mcp-server-lib-register-tool'."
 Sets the server state to stopped, which prevents further processing of
 client requests.  Note that this does not release any resources or unregister
 tools, it simply prevents `mcp-server-lib-process-jsonrpc' from accepting new
-requests."
+requests.
+
+See also: `mcp-server-lib-start'"
   (interactive)
   (unless mcp-server-lib--running
     (error "MCP server is not running"))

@@ -485,7 +485,9 @@ Example:
       ;; Any errors here will be caught and reported properly
       (with-temp-buffer
         (insert-file-contents path)
-        (process-buffer-contents))))"
+        (process-buffer-contents))))
+
+See also: `mcp-server-lib-tool-throw'"
   `(condition-case err
        (progn
          ,@body)
@@ -599,7 +601,9 @@ emacsclient -e \\='(mcp-server-lib-process-jsonrpc \"[JSON-RPC message]\")\\='
 Example:
   (mcp-server-lib-process-jsonrpc
    \"{\\\"jsonrpc\\\":\\\"2.0\\\",
-     \\\"method\\\":\\\"mcp.server.describe\\\",\\\"id\\\":1}\")"
+     \\\"method\\\":\\\"mcp.server.describe\\\",\\\"id\\\":1}\")
+
+See also: `mcp-server-lib-process-jsonrpc-parsed'"
   (unless mcp-server-lib--running
     (error
      "No active MCP server, start server with `mcp-server-lib-start' first"))
@@ -636,7 +640,9 @@ Example:
   "Send REQUEST to the MCP server and return parsed response.
 REQUEST should be a JSON string containing a valid JSON-RPC 2.0 request.
 
-Call `mcp-server-lib-process-jsonrpc' and return its result as a parsed alist."
+Call `mcp-server-lib-process-jsonrpc' and return its result as a parsed alist.
+
+See also: `mcp-server-lib-process-jsonrpc'"
   (json-read-from-string (mcp-server-lib-process-jsonrpc request)))
 
 ;;; API - Utilities
@@ -704,7 +710,12 @@ With optional properties:
     :id \"org-list-files\"
     :description \"Lists all available Org mode files for task management\"
     :title \"List Org Files\"
-    :read-only t)"
+    :read-only t)
+
+See also:
+  `mcp-server-lib-unregister-tool' - Remove a registered tool
+  `mcp-server-lib-with-error-handling' - Error handling for tool handlers
+  `mcp-server-lib-tool-throw' - Signal errors from tool handlers"
   (let* ((id (plist-get properties :id))
          (description (plist-get properties :description))
          (title (plist-get properties :title))
@@ -747,7 +758,9 @@ Arguments:
 Returns t if the tool was found and removed, nil otherwise.
 
 Example:
-  (mcp-server-lib-unregister-tool \"org-list-files\")"
+  (mcp-server-lib-unregister-tool \"org-list-files\")
+
+See also: `mcp-server-lib-register-tool'"
   (mcp-server-lib--ref-counted-unregister
    tool-id mcp-server-lib--tools))
 
@@ -760,7 +773,9 @@ The error will be properly formatted and sent to the client.
 This should be used within tool handlers to indicate failures.
 
 Arguments:
-  ERROR-MESSAGE  String describing the error"
+  ERROR-MESSAGE  String describing the error
+
+See also: `mcp-server-lib-with-error-handling'"
   (signal 'mcp-server-lib-tool-error (list error-message)))
 
 ;;; Resource management functions
@@ -786,7 +801,9 @@ Example:
    (lambda () (read-file-contents \"~/org/projects.org\"))
    :name \"Projects\"
    :description \"Current project list\"
-   :mime-type \"text/plain\")"
+   :mime-type \"text/plain\")
+
+See also: `mcp-server-lib-unregister-resource'"
   (let ((name (plist-get properties :name))
         (description (plist-get properties :description))
         (mime-type (plist-get properties :mime-type)))
@@ -824,7 +841,9 @@ Arguments:
 Returns t if the resource was found and removed, nil otherwise.
 
 Example:
-  (mcp-server-lib-unregister-resource \"org://projects.org\")"
+  (mcp-server-lib-unregister-resource \"org://projects.org\")
+
+See also: `mcp-server-lib-register-resource'"
   (mcp-server-lib--ref-counted-unregister
    uri mcp-server-lib--resources))
 
