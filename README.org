@@ -5,340 +5,145 @@
 
 * Overview
 
-=mcp-server-lib.el= is an Emacs Lisp implementation of the [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP), an open standard for communication between AI applications, servers, and language models.
-
-This library enables Emacs users and developers to create MCP servers that can provide context, tools, resources, and prompts to Large Language Models (LLMs).
+=mcp-server-lib.el= is a library for building [[https://modelcontextprotocol.io/][Model Context Protocol]] (MCP) servers in Emacs Lisp. It provides the infrastructure for Emacs packages to expose their functionality as tools and resources to Large Language Models.
 
 * Features
 
-- MCP server creation and management in Emacs
-- API for tools to enable LLMs to execute Elisp functions
-- API for resources to expose data and content to LLMs
-- Uses MCP stdio transport layer through an emacsclient-wrapping script
+- Simple API for registering tools (Elisp functions) and resources
+- Handles MCP protocol communication and JSON-RPC messages
+- Stdio transport via emacsclient wrapper script
+- Built-in usage metrics and debugging support
+
+* Requirements
+
+- Emacs 27.1 or later
+- Running Emacs daemon (for stdio transport)
 
 * Installation
 
 =M-x package-vc-install https://github.com/laurynas-biveinis/mcp-server-lib.el/=
 
-* Usage
+* For Users
 
-** Script Installation
+If you're using an MCP server built with this library:
 
-After installing the package from MELPA, the script path will be in a versioned directory. To get a stable path:
+1. Run =M-x mcp-server-lib-install= to install the stdio script
+2. The script will be at =~/.emacs.d/emacs-mcp-stdio.sh=
+3. Follow your MCP server's documentation for client registration
 
-1. Run =M-x mcp-server-lib-install= to copy the script to =~/.emacs.d/=
-2. The script will be available at =~/.emacs.d/emacs-mcp-stdio.sh=
-3. This path remains stable across package updates
+To uninstall: =M-x mcp-server-lib-uninstall=
 
-To remove the installed script: =M-x mcp-server-lib-uninstall=
+* For Developers
 
-** Basic Usage
+To build your own MCP server, see [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]] for a complete example.
 
-Start Emacs daemon, then do =M-x mcp-server-lib-start= to start handling MCP requests and =M-x
-mcp-server-lib-stop= to stop. These commands are provided by =mcp-server-lib-commands.el=.
+** Client Registration
 
-For an MCP server example that uses this package, see [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]].
-
-** MCP Client Registration
-
-To register with an MCP client, use the =emacs-mcp-stdio.sh= script with initialization
-and cleanup functions. For example, to register [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]] with Claude Code:
+Register your MCP server with a client using the stdio script:
 
 #+BEGIN_EXAMPLE
-claude mcp add -s user -t stdio elisp-dev -- ~/.emacs.d/emacs-mcp-stdio.sh --init-function=elisp-dev-mcp-enable --stop-function=elisp-dev-mcp-disable
+claude mcp add -s user -t stdio your-server -- ~/.emacs.d/emacs-mcp-stdio.sh \
+  --init-function=your-init-func --stop-function=your-stop-func
 #+END_EXAMPLE
 
-The script internally communicates with Emacs daemon through =emacsclient= and
-handles serialization and deserialization so that arbitrary data survives transport.
+Script options:
+- =--init-function=NAME= - Emacs function to call on startup
+- =--stop-function=NAME= - Emacs function to call on shutdown
+- =--socket=PATH= - Custom Emacs server socket (optional)
 
-** =emacs-mcp-stdio.sh= Options and Environment Variables
+For debugging, set =EMACS_MCP_DEBUG_LOG= to a file path.
 
-All options and environment variables are optional, although ~--init-function~ and
-~--stop-function~ are very likely to be needed in order for the script to be useful.
+** API Reference
 
-*Script Options:*
-
-| Option              | Description                                            |
-|---------------------+--------------------------------------------------------|
-| --init-function=NAME | Emacs function to call for MCP initialization           |
-| --stop-function=NAME | Emacs function to call when the script exits            |
-| --socket=PATH       | Emacs server socket to connect to                      |
-
-*Environment Variables:*
-
-| Variable            | Description                                            |
-|---------------------+--------------------------------------------------------|
-| EMACS_MCP_DEBUG_LOG | Path to a log file for debug logging                   |
-
-When =EMACS_MCP_DEBUG_LOG= is set to a valid file path, the script will log all requests and responses with timestamps for debugging purposes. If the path is invalid or not writable, the script will exit with an error.
-
-** Tracing
-
-The package provides an Elisp variable =mcp-server-lib-log-io= that, when set to non-nil, enables logging of all JSON-RPC messages to the =*mcp-server-lib-log*= buffer. This is useful for tracing MCP requests and responses:
+*** Registering Tools
 
 #+begin_src elisp
-;; Enable MCP communication tracing
-(setq mcp-server-lib-log-io t)
-
-;; Start the MCP server
-(mcp-server-lib-start)
-#+end_src
-
-The =*mcp-server-lib-log*= buffer will show incoming requests with ="-> (request)"= prefix and outgoing responses with ="<- (response)"= prefix, along with the full JSON message content. This makes it easy to inspect the communication flow between clients and the MCP server.
-
-* API for dependent packages
-
-=mcp-server-lib.el= provides a simple API for setting up and using the Model Context Protocol in Emacs.
-
-** Core Functions
-
-#+begin_src elisp
-(mcp-server-lib-register-tool #'tool-handler-function
+(mcp-server-lib-register-tool #'my-function
   :id "tool-name"
-  :description "Tool description"
-  :title "User-friendly Tool Name")
-#+end_src
+  :description "What this tool does"
+  :title "Display Name"        ; optional
+  :read-only t)                ; optional
 
-** Tool Handlers
-
-Tool handler functions should:
-- Return an Elisp string for successful execution
-- Call ~mcp-server-lib-tool-throw~ for error returns or wrap potentially-failing
-  operations with ~mcp-server-lib-with-error-handling~ macro
-
-*** Tool Parameter Documentation
-
-When registering tools with MCP, you can provide parameter descriptions that will be included in the JSON Schema.
-
-Add an "MCP Parameters:" section to your handler function's docstring. This should be at the end of the docstring with each parameter in the format `parameter-name - description`:
-
-#+begin_src elisp
-(defun my-weather-handler (location)
-  "Get weather information for a LOCATION.
+;; Tool handler with parameters
+(defun my-handler (location)
+  "Get weather for LOCATION.
 
 MCP Parameters:
   location - city, address, or coordinates"
-  ;; Function implementation...
-  )
-
-(mcp-server-lib-register-tool #'my-weather-handler
-  :id "get-weather"
-  :description "Get weather information")
-#+end_src
-
-Note: Do not include the "MCP Parameters:" section if your tool handler doesn't take any arguments.
-
-** Resource Registration
-
-Register resources to expose data to LLMs:
-
-#+begin_src elisp
-(mcp-server-lib-register-resource "org://projects.org"
-  (lambda () (read-file-contents "~/org/projects.org"))
-  :name "Projects"
-  :description "Current project list"
-  :mime-type "text/plain")
-#+end_src
-
-*** Resource Handlers
-
-Resource handler functions should:
-- Take no arguments
-- Return a string containing the resource content
-- Signal regular Emacs errors (using ~error~) for error conditions
-  - Unlike tool handlers, resources don't use ~mcp-server-lib-tool-throw~
-
-*** Example Resource Registration
-
-#+begin_src elisp
-;; Register a dynamic resource that returns current buffer content
-(mcp-server-lib-register-resource "buffer://current"
-  (lambda ()
-    (let ((content (buffer-substring-no-properties (point-min) (point-max))))
-      (if (string-empty-p content)
-          (error "Buffer is empty")
-        content)))
-  :name "Current Buffer"
-  :description "Content of the currently active buffer")
-
-;; Unregister when no longer needed
-(mcp-server-lib-unregister-resource "buffer://current")
-#+end_src
-
-*** Optional Tool Properties
-
-When registering tools, you can provide optional properties:
-
-| Property      | Description                                        | Example                  |
-|--------------+--------------------------------------------------+--------------------------|
-| :title       | User-friendly display name for the tool           | "Get Weather Forecast"   |
-| :read-only   | If true, indicates tool doesn't modify environment | t or nil                 |
-
-Example with optional properties:
-
-#+begin_src elisp
-(mcp-server-lib-register-tool #'my-weather-handler
-  :id "get-weather"
-  :description "Get weather information"
-  :title "Weather Forecast"
-  :read-only t)
-#+end_src
-
-*** Error Handling
-
-The =mcp-server-lib-with-error-handling= macro provides automatic error handling. It will catch any errors and call =mcp-server-lib-tool-throw= on them:
-
-#+begin_src elisp
-(defun my-file-handler (filename)
-  "Read a file and return its contents.
-  
-  MCP Parameters:
-    filename - path to the file to read"
   (mcp-server-lib-with-error-handling
-    (with-temp-buffer
-      (insert-file-contents filename)
-      (buffer-string))))
+    ;; Your implementation
+    ))
 #+end_src
+
+Tool handlers should return strings. Use =mcp-server-lib-tool-throw= for errors or wrap with =mcp-server-lib-with-error-handling=.
+
+Optional properties:
+- =:title= - User-friendly display name
+- =:read-only= - Set to =t= if tool doesn't modify state
+
+*** Registering Resources
+
+#+begin_src elisp
+(mcp-server-lib-register-resource "resource://uri"
+  (lambda () "resource content")
+  :name "Resource Name"
+  :description "What this provides"    ; optional
+  :mime-type "text/plain")             ; optional
+
+;; Dynamic resource example
+(mcp-server-lib-register-resource "buffer://current"
+  (lambda () (buffer-string))
+  :name "Current Buffer")
+#+end_src
+
+Resource handlers take no arguments and return strings. Use regular =error= for failures.
 
 *** Utility Functions
 
-MCP provides utility functions for creating JSON-RPC requests and processing responses:
+For testing and debugging:
 
 #+begin_src elisp
-(defun mcp-server-lib-create-tools-list-request (&optional id)
-  "Create a tools/list JSON-RPC request with optional ID.
-If ID is not provided, it defaults to 1.")
+;; Create JSON-RPC requests
+(mcp-server-lib-create-tools-list-request &optional id)
+(mcp-server-lib-create-tools-call-request tool-name &optional id args)
+(mcp-server-lib-create-resources-list-request &optional id)
 
-(defun mcp-server-lib-create-tools-call-request (tool-name &optional id args)
-  "Create a tools/call JSON-RPC request for TOOL-NAME with optional ID and ARGS.
-TOOL-NAME is the registered identifier of the tool to call.
-ID is the JSON-RPC request ID, defaults to 1 if not provided.
-ARGS is an association list of arguments to pass to the tool.")
+;; Process requests and get parsed response
+(mcp-server-lib-process-jsonrpc-parsed request)
 
-(defun mcp-server-lib-process-jsonrpc-parsed (request)
-  "Send REQUEST to the MCP server and return parsed response.
-REQUEST should be a JSON string containing a valid JSON-RPC 2.0 request.
-Returns the parsed JSON response as an association list.")
+;; Server management
+(mcp-server-lib-start)
+(mcp-server-lib-stop)
 #+end_src
 
-Examples:
+*** Debugging
+
+Enable JSON-RPC message logging:
 
 #+begin_src elisp
-;; Create a tool call request with arguments
-(mcp-server-lib-create-tools-call-request 
-  "get-weather" 
-  42 
-  '(("location" . "New York")))
-
-;; Send a request and get parsed response (useful in tests)
-(let* ((request (mcp-server-lib-create-tools-list-request))
-       (response (mcp-server-lib-process-jsonrpc-parsed request)))
-  ;; response is now an alist with 'result, 'error, etc.
-  (alist-get 'tools (alist-get 'result response)))
+(setq mcp-server-lib-log-io t)  ; Log to *mcp-server-lib-log* buffer
 #+end_src
 
-This is primarily useful for writing tests in the packages using mcp-server-lib.el.
-
-**** Test Utilities
-
-The =mcp-server-lib-ert= module provides test utilities:
+View usage metrics:
 
 #+begin_src elisp
-(require 'mcp-server-lib-ert)
-
-(defun mcp-server-lib-ert-check-text-response (response &optional expected-error)
-  "Validate RESPONSE structure and extract text content.
-If EXPECTED-ERROR is non-nil, expects isError to be true.
-Returns the text content string on success.
-Signals test failure if response structure is invalid.")
-#+end_src
-
-This utility helps validate MCP tool responses in tests by:
-- Checking the response has the expected structure
-- Validating the =isError= flag matches expectations
-- Extracting text content from the response
-
-Example usage:
-
-#+begin_src elisp
-;; Test a successful response
-(let* ((request (mcp-server-lib-create-tools-call-request "my-tool"))
-       (response (mcp-server-lib-process-jsonrpc-parsed request))
-       (text (mcp-server-lib-ert-check-text-response response)))
-  (should (string= "Expected output" text)))
-
-;; Test an error response
-(let* ((request (mcp-server-lib-create-tools-call-request "failing-tool"))
-       (response (mcp-server-lib-process-jsonrpc-parsed request))
-       (text (mcp-server-lib-ert-check-text-response response t)))
-  (should (string-match-p "Error message" text)))
+M-x mcp-server-lib-show-metrics
+M-x mcp-server-lib-reset-metrics
 #+end_src
 
 ** Customization
 
-*** Script Installation Directory
-
-To install the script to a different location than =~/.emacs.d/=:
+To install the script to a different location:
 
 #+begin_src elisp
 (setq mcp-server-lib-install-directory "/path/to/directory")
 #+end_src
 
-*** Usage Metrics
+* Troubleshooting
 
-=mcp-server-lib.el= collects usage metrics to help understand how MCP tools are being used. This feature tracks the number of calls and errors for each operation.
-
-**** Viewing Metrics
-
-Use =M-x mcp-server-lib-show-metrics= to display detailed metrics in a buffer. The display shows:
-
-- Method-level calls (initialize, tools/list, etc.)
-- Tool-specific usage with call counts and error rates
-- Notifications received
-- Overall summary statistics
-
-**** Resetting Metrics
-
-Use =M-x mcp-server-lib-reset-metrics= to clear all collected metrics.
-
-**** Automatic Display on Stop
-
-A metrics summary is automatically displayed when the server stops if any metrics have been collected.
-
-**** Programmatic Access
-
-The metrics API provides programmatic access to collected statistics:
-
-#+begin_src elisp
-;; Get metrics for a specific operation
-(let ((metrics (mcp-server-lib-metrics-get "tools/call:my-tool")))
-  (when metrics
-    (message "Tool called %d times with %d errors"
-             (mcp-server-lib-metrics-calls metrics)
-             (mcp-server-lib-metrics-errors metrics))))
-#+end_src
-
-The =mcp-server-lib-metrics= structure has two slots:
-- =calls= - Total number of invocations
-- =errors= - Number of failed invocations
-
-Operation names follow these patterns:
-- Method calls: ="initialize"=, ="tools/list"=, ="tools/call"=
-- Tool-specific: ="tools/call:TOOL-NAME"= where TOOL-NAME is the registered tool ID
-
-* Internals
-
-** Transport
-
-The main entry point for MCP communication is =mcp-server-lib-process-jsonrpc=:
-
-#+begin_src elisp
-(defun mcp-server-lib-process-jsonrpc (json-string)
-  "Process a JSON-RPC message JSON-STRING and return the response.
-This is the main entry point for stdio transport in MCP.")
-#+end_src
-
-This is what =emacs-mcp-stdio.sh= calls through emacsclient.
+- **Script not found**: Run =M-x mcp-server-lib-install= first
+- **Connection errors**: Ensure Emacs daemon is running
+- **Debugging**: Set =mcp-server-lib-log-io= to =t= and check =*mcp-server-lib-log*= buffer
 
 * License
 
