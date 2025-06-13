@@ -282,66 +282,7 @@ Returns a JSON-RPC response string for the request."
        id params method-metrics))
      ;; Tool invocation
      ((equal method "tools/call")
-      (let* ((tool-name (alist-get 'name params))
-             (tool (gethash tool-name mcp-server-lib--tools))
-             (tool-args (alist-get 'arguments params)))
-        (if tool
-            (let ((handler (plist-get tool :handler))
-                  (context (list :id id)))
-              (condition-case err
-                  (let*
-                      ((result
-                        ;; Pass first arg value for single-string-arg tools
-                        ;; when arguments are present
-                        (if (and tool-args
-                                 (not (equal tool-args '())))
-                            (let ((first-arg-value
-                                   (cdr (car tool-args))))
-                              (funcall handler first-arg-value))
-                          (funcall handler)))
-                       ;; Ensure result is a string, convert nil to empty string
-                       (result-text (or result ""))
-                       ;; Wrap the handler result in the MCP format
-                       (formatted-result
-                        `((content
-                           .
-                           ,(vector
-                             `((type . "text")
-                               (text . ,result-text))))
-                          (isError . :json-false))))
-                    (mcp-server-lib-metrics--track-tool-call
-                     tool-name)
-                    (mcp-server-lib--respond-with-result
-                     context formatted-result))
-                ;; Handle tool-specific errors thrown with
-                ;; mcp-server-lib-tool-throw
-                (mcp-server-lib-tool-error
-                 (mcp-server-lib-metrics--track-tool-call tool-name t)
-                 (cl-incf
-                  (mcp-server-lib-metrics-errors method-metrics))
-                 (let ((formatted-error
-                        `((content
-                           .
-                           ,(vector
-                             `((type . "text") (text . ,(cadr err)))))
-                          (isError . t))))
-                   (mcp-server-lib--respond-with-result
-                    context formatted-error)))
-                ;; Keep existing handling for all other errors
-                (error
-                 (mcp-server-lib-metrics--track-tool-call tool-name t)
-                 (cl-incf
-                  (mcp-server-lib-metrics-errors method-metrics))
-                 (mcp-server-lib--jsonrpc-error
-                  id mcp-server-lib--error-internal
-                  (format "Internal error executing tool: %s"
-                          (error-message-string err))))))
-          (mcp-server-lib-metrics--track-tool-call tool-name t)
-          (cl-incf (mcp-server-lib-metrics-errors method-metrics))
-          (mcp-server-lib--jsonrpc-error
-           id
-           mcp-server-lib--error-invalid-request
-           (format "Tool not found: %s" tool-name)))))
+      (mcp-server-lib--handle-tools-call id params method-metrics))
      ;; Method not found
      (t
       (mcp-server-lib--jsonrpc-error
@@ -439,6 +380,64 @@ Returns a list of all registered resources with their metadata."
      mcp-server-lib--resources)
     (mcp-server-lib--jsonrpc-response
      id `((resources . ,resource-list)))))
+
+(defun mcp-server-lib--handle-tools-call (id params method-metrics)
+  "Handle tools/call request with ID and PARAMS.
+METHOD-METRICS is used to track errors for this method."
+  (let* ((tool-name (alist-get 'name params))
+         (tool (gethash tool-name mcp-server-lib--tools))
+         (tool-args (alist-get 'arguments params)))
+    (if tool
+        (let ((handler (plist-get tool :handler))
+              (context (list :id id)))
+          (condition-case err
+              (let*
+                  ((result
+                    ;; Pass first arg value for single-string-arg tools
+                    ;; when arguments are present
+                    (if (and tool-args (not (equal tool-args '())))
+                        (let ((first-arg-value (cdr (car tool-args))))
+                          (funcall handler first-arg-value))
+                      (funcall handler)))
+                   ;; Ensure result is a string, convert nil to empty string
+                   (result-text (or result ""))
+                   ;; Wrap the handler result in the MCP format
+                   (formatted-result
+                    `((content
+                       .
+                       ,(vector
+                         `((type . "text") (text . ,result-text))))
+                      (isError . :json-false))))
+                (mcp-server-lib-metrics--track-tool-call tool-name)
+                (mcp-server-lib--respond-with-result
+                 context formatted-result))
+            ;; Handle tool-specific errors thrown with
+            ;; mcp-server-lib-tool-throw
+            (mcp-server-lib-tool-error
+             (mcp-server-lib-metrics--track-tool-call tool-name t)
+             (cl-incf (mcp-server-lib-metrics-errors method-metrics))
+             (let ((formatted-error
+                    `((content
+                       .
+                       ,(vector
+                         `((type . "text") (text . ,(cadr err)))))
+                      (isError . t))))
+               (mcp-server-lib--respond-with-result
+                context formatted-error)))
+            ;; Keep existing handling for all other errors
+            (error
+             (mcp-server-lib-metrics--track-tool-call tool-name t)
+             (cl-incf (mcp-server-lib-metrics-errors method-metrics))
+             (mcp-server-lib--jsonrpc-error
+              id mcp-server-lib--error-internal
+              (format "Internal error executing tool: %s"
+                      (error-message-string err))))))
+      (mcp-server-lib-metrics--track-tool-call tool-name t)
+      (cl-incf (mcp-server-lib-metrics-errors method-metrics))
+      (mcp-server-lib--jsonrpc-error
+       id
+       mcp-server-lib--error-invalid-request
+       (format "Tool not found: %s" tool-name)))))
 
 (defun mcp-server-lib--handle-resources-read
     (id params method-metrics)

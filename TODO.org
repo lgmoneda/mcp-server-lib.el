@@ -159,11 +159,11 @@
     - Don't validate that params exists at all
   - Nil handling is implicit through alist-get and gethash
   - No type checking on extracted parameter values
-- [ ] Consider extracting tools/call handler for consistency
+- [X] Consider extracting tools/call handler for consistency
   - Large inline handler in dispatch function
   - Would match pattern of extracted resource handlers
   - Complex error handling logic could be better isolated
-- [ ] Extract common pattern for building entries with optional fields
+- [X] Extract common pattern for building entries with optional fields
   - Both tools/list and resources/list use similar append patterns
   - Could have helper like (mcp-server-lib--build-entry base-alist &rest optional-pairs)
   - Would reduce duplication and make code more maintainable
