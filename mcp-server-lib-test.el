@@ -572,9 +572,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
         :description "A tool for testing"))
     (let* ((result (mcp-server-lib-test--get-initialize-result))
            (capabilities (alist-get 'capabilities result))
-           (tools-capability (alist-get 'tools capabilities))
-           (list-changed (alist-get 'listChanged tools-capability)))
-      (should (eq t list-changed)))))
+           (tools-capability (alist-get 'tools capabilities)))
+      (should (equal nil tools-capability)))))
 
 (ert-deftest mcp-server-lib-test-notifications-initialized ()
   "Test the MCP `notifications/initialized` request handling."

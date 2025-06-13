@@ -91,7 +91,7 @@
 - [X] Tool registry data structure
   - [X] Support parameter descriptions for JSON Schema generation
   - [ ] Add JSON Schema type annotations for parameters
-  - [ ] Remove incorrect listChanged capability from tools initialization
+  - [X] Remove incorrect listChanged capability from tools initialization
     - Currently returns listChanged: true when tools are registered
     - Should only be included if server actually sends notifications/tools/list_changed
     - We don't support sending these notifications yet

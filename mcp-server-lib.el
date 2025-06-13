@@ -285,25 +285,17 @@ Returns a JSON-RPC response string for the request."
 
 This implements the MCP initialize handshake, which negotiates protocol
 version and capabilities between the client and server."
-  ;; Determine if we need to include tools capabilities
-  ;; Include listChanged:true when tools are registered
-  (let ((tools-capability
-         (if (> (hash-table-count mcp-server-lib--tools) 0)
-             '((listChanged . t))
-           (make-hash-table))))
-    ;; Respond with server capabilities
-    (mcp-server-lib--jsonrpc-response
-     id
-     `((protocolVersion . ,mcp-server-lib--protocol-version)
-       (serverInfo
-        .
-        ((name . ,mcp-server-lib--name)
-         (version . ,mcp-server-lib--protocol-version)))
-       ;; Format server capabilities according to MCP spec
-       (capabilities
-        .
-        ((tools . ,tools-capability)
-         (resources . ,(make-hash-table))))))))
+  (mcp-server-lib--jsonrpc-response
+   id
+   `((protocolVersion . ,mcp-server-lib--protocol-version)
+     (serverInfo
+      .
+      ((name . ,mcp-server-lib--name)
+       (version . ,mcp-server-lib--protocol-version)))
+     (capabilities
+      .
+      ((tools . ,(make-hash-table))
+       (resources . ,(make-hash-table)))))))
 
 (defun mcp-server-lib--handle-initialized ()
   "Handle initialized notification from client.
