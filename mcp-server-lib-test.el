@@ -281,12 +281,6 @@ success."
         (setq result (alist-get 'result resp-obj))))
     result))
 
-(defun mcp-server-lib-test--get-prompts-list ()
-  "Return the result of an MCP prompt list request."
-  (mcp-server-lib-test--get-request-result
-   "prompts/list"
-   (json-encode
-    `(("jsonrpc" . "2.0") ("method" . "prompts/list") ("id" . 8)))))
 
 (defun mcp-server-lib-test--get-initialize-result ()
   "Send an MCP `initialize` request and return its result."
@@ -565,7 +559,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
       ;; (empty objects deserialize to nil)
       (should (equal nil (alist-get 'tools capabilities)))
       (should (equal nil (alist-get 'resources capabilities)))
-      (should (equal nil (alist-get 'prompts capabilities)))
+      ;; Verify exactly 2 capabilities are present
+      (should (= 2 (length capabilities)))
       ;; Verify server info
       (should (string= mcp-server-lib--name server-name)))))
 
@@ -1242,15 +1237,6 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         "undefined-handler-tool" 16)
        -32603 "Internal error executing tool"))))
 
-;;; prompts/list tests
-
-(ert-deftest mcp-server-lib-test-prompts-list-zero ()
-  "Test the `prompts/list` request returning an empty array with no prompts."
-  (mcp-server-lib-test--with-server
-    (let ((result (mcp-server-lib-test--get-prompts-list)))
-      (should (alist-get 'prompts result))
-      (should (arrayp (alist-get 'prompts result)))
-      (should (= 0 (length (alist-get 'prompts result)))))))
 
 ;;; `mcp-server-lib-process-jsonrpc' tests
 

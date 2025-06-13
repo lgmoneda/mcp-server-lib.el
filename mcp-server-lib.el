@@ -265,8 +265,6 @@ Returns a JSON-RPC response string for the request."
       nil)
      ((equal method "tools/list")
       (mcp-server-lib--handle-tools-list id))
-     ((equal method "prompts/list")
-      (mcp-server-lib--jsonrpc-response id `((prompts . ,(vector)))))
      ((equal method "resources/list")
       (mcp-server-lib--handle-resources-list id))
      ((equal method "resources/read")
@@ -305,8 +303,7 @@ version and capabilities between the client and server."
        (capabilities
         .
         ((tools . ,tools-capability)
-         (resources . ,(make-hash-table))
-         (prompts . ,(make-hash-table))))))))
+         (resources . ,(make-hash-table))))))))
 
 (defun mcp-server-lib--handle-initialized ()
   "Handle initialized notification from client.
