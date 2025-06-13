@@ -172,7 +172,15 @@ The RESULT-DATA will be automatically converted to JSON-compatible format:
   - Symbols are converted to strings
   - Lists are converted to JSON arrays
   - Alists with string keys are converted to JSON objects
-  - Other Elisp types are stringified appropriately"
+  - Other Elisp types are stringified appropriately
+
+Example:
+  ;; In a tool handler:
+  (mcp-server-lib--respond-with-result
+   context
+   \\='((status . \"success\")
+     (files . [\"file1.txt\" \"file2.txt\"])
+     (count . 2)))"
   (let ((id (plist-get request-context :id)))
     (mcp-server-lib--jsonrpc-response id result-data)))
 
@@ -642,6 +650,14 @@ REQUEST should be a JSON string containing a valid JSON-RPC 2.0 request.
 
 Call `mcp-server-lib-process-jsonrpc' and return its result as a parsed alist.
 
+Example:
+  (let* ((request (mcp-server-lib-create-tools-list-request))
+         (response (mcp-server-lib-process-jsonrpc-parsed request))
+         (tools (alist-get \\='tools (alist-get \\='result response))))
+    ;; tools is now an array of tool definitions
+    (seq-doseq (tool tools)
+      (message \"Tool: %s\" (alist-get \\='name tool))))
+
 See also: `mcp-server-lib-process-jsonrpc'"
   (json-read-from-string (mcp-server-lib-process-jsonrpc request)))
 
@@ -701,16 +717,31 @@ The HANDLER function's signature determines its input schema.
 Currently only no-argument and single-argument handlers are supported.
 
 Example:
+  ;; Simple tool with no arguments
   (mcp-server-lib-register-tool #\\='my-org-files-handler
     :id \"org-list-files\"
     :description \"Lists all available Org mode files for task management\")
 
-With optional properties:
+  ;; With optional properties
   (mcp-server-lib-register-tool #\\='my-org-files-handler
     :id \"org-list-files\"
     :description \"Lists all available Org mode files for task management\"
     :title \"List Org Files\"
     :read-only t)
+
+  ;; Tool with one argument - parameter description in docstring
+  (defun my-file-reader (path)
+    \"Read file at PATH.
+
+MCP Parameters:
+  path - absolute path to the file to read\"
+    (mcp-server-lib-with-error-handling
+      (with-temp-buffer
+        (insert-file-contents path)
+        (buffer-string))))
+  (mcp-server-lib-register-tool #\\='my-file-reader
+    :id \"read-file\"
+    :description \"Read contents of a file\")
 
 See also:
   `mcp-server-lib-unregister-tool' - Remove a registered tool
@@ -775,6 +806,17 @@ This should be used within tool handlers to indicate failures.
 Arguments:
   ERROR-MESSAGE  String describing the error
 
+Example:
+  (defun my-tool-handler (path)
+    \"List files in PATH.
+
+MCP Parameters:
+  path - directory path to list\"
+    (unless (file-directory-p path)
+      (mcp-server-lib-tool-throw
+       (format \"Not a directory: %s\" path)))
+    ;; ... rest of implementation ...)
+
 See also: `mcp-server-lib-with-error-handling'"
   (signal 'mcp-server-lib-tool-error (list error-message)))
 
@@ -798,7 +840,10 @@ Optional properties:
 Example:
   (mcp-server-lib-register-resource
    \"org://projects.org\"
-   (lambda () (read-file-contents \"~/org/projects.org\"))
+   (lambda ()
+     (with-temp-buffer
+       (insert-file-contents \"~/org/projects.org\")
+       (buffer-string)))
    :name \"Projects\"
    :description \"Current project list\"
    :mime-type \"text/plain\")
