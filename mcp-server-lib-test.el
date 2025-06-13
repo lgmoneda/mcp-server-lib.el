@@ -731,6 +731,30 @@ When both are registered, capabilities should include both fields."
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
+(ert-deftest mcp-server-lib-test-initialize-with-valid-client-capabilities ()
+  "Test initialize request with valid client capabilities (roots, sampling, experimental)."
+  (mcp-server-lib-test--successful-req "initialize"
+    (let* ((init-request
+            (json-encode
+             `(("jsonrpc" . "2.0")
+               ("method" . "initialize") ("id" . 23)
+               ("params" .
+                (("protocolVersion" . "2025-03-26")
+                 ("capabilities" .
+                  (("roots" . ,(make-hash-table))
+                   ("sampling" . ,(make-hash-table))
+                   ("experimental" . ,(make-hash-table)))))))))
+           (resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed init-request))
+           (result (alist-get 'result resp-obj)))
+      ;; Server should respond successfully, ignoring client capabilities
+      (should (null (alist-get 'error resp-obj)))
+      (should (string= "2025-03-26" (alist-get 'protocolVersion result)))
+      ;; Server capabilities should not be affected by client capabilities
+      (let ((capabilities (alist-get 'capabilities result)))
+        ;; Since no tools/resources registered in this test, capabilities should be empty
+        (should (= 0 (length capabilities)))))))
+
 ;;; `mcp-server-lib-register-tool' tests
 
 (ert-deftest mcp-server-lib-test-register-tool-error-missing-id ()
