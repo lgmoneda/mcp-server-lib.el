@@ -211,3 +211,30 @@
 - [X] Example server implementations
 - [ ] Example integrations with Emacs packages (org-mode, etc.)
 - [ ] Example client applications
+- [ ] Add "Emacs Way" guidance for MCP servers
+  - How to expose existing Emacs functionality idiomatically
+  - When to wrap interactive commands vs create new functions
+  - How to handle Emacs-specific types (buffers, markers, overlays)
+- [ ] Consolidate stdio transport documentation
+  - Move all script-related content together
+  - Explain emacsclient requirement clearly
+  - Document debugging workflow
+- [ ] Document reference counting behavior
+  - Explain why multiple packages might register same tool
+  - Document ref counting behavior in public API docs
+- [ ] Add "Testing Your MCP Server" section
+  - Document mcp-server-lib-ert.el functionality
+  - How to test tools in isolation
+  - How to test full request/response cycle
+- [ ] Add "Design Decisions" section
+  - Tools limited to 0-1 parameters (MCP constraint)
+  - String return values (for LLM consumption)
+  - Ref counting for multi-package scenarios
+- [ ] Better tool design examples
+  - Show what not to do (exposing Emacs objects)
+  - Show LLM-friendly return values
+  - Patterns for complex inputs (JSON strings, plists)
+- [ ] Document metrics system
+  - What metrics are collected and why
+  - When to use metrics in practice
+  - How to interpret metrics output
