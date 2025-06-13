@@ -25,9 +25,20 @@
 
 ;;; Commentary:
 
-;; An Emacs Lisp implementation of the Model Context Protocol (MCP),
-;; an open standard for communication between AI applications and
-;; language models.
+;; This library provides infrastructure for building Model Context Protocol
+;; (MCP) servers in Emacs Lisp.  MCP is an open standard for communication
+;; between
+;; AI applications and language models.
+;;
+;; Architecture:
+;; - mcp-server-lib.el: Core protocol implementation and tool/resource registry
+;; - mcp-server-lib-commands.el: Interactive commands for users
+;; - mcp-server-lib-metrics.el: Usage tracking and performance monitoring
+;; - mcp-server-lib-ert.el: Test utilities for packages using this library
+;;
+;; The library handles JSON-RPC 2.0 communication, manages tool and resource
+;; registration, and provides error handling suitable for LLM interactions.
+;;
 ;; See https://modelcontextprotocol.io/ for the protocol specification.
 
 ;;; Code:
@@ -456,20 +467,25 @@ METHOD-METRICS is used to track errors for this method."
 ;;; Error handling helpers
 
 (defmacro mcp-server-lib-with-error-handling (&rest body)
-  "Execute BODY with consistent error handling for MCP tools.
+  "Execute BODY with automatic error handling for MCP tools.
 
-Any error that occurs during BODY execution is caught and re-thrown as
-an `mcp-server-lib-tool-error' with a formatted error message.
+Any error that occurs during BODY execution is caught and converted to
+an MCP tool error using `mcp-server-lib-tool-throw'.  This ensures
+consistent error reporting to LLM clients.
 
 Arguments:
   BODY  Forms to execute with error handling
 
-Returns the result of BODY execution if no error occurs.
+Returns the result of BODY execution if successful.
 
 Example:
-  (mcp-server-lib-with-error-handling
-    (do-something-that-might-fail)
-    (return-result))"
+  (defun my-tool-handler (path)
+    \"Read and process a file at PATH.\"
+    (mcp-server-lib-with-error-handling
+      ;; Any errors here will be caught and reported properly
+      (with-temp-buffer
+        (insert-file-contents path)
+        (process-buffer-contents))))"
   `(condition-case err
        (progn
          ,@body)
@@ -741,6 +757,7 @@ Example:
 (defun mcp-server-lib-tool-throw (error-message)
   "Signal a tool error with ERROR-MESSAGE.
 The error will be properly formatted and sent to the client.
+This should be used within tool handlers to indicate failures.
 
 Arguments:
   ERROR-MESSAGE  String describing the error"
