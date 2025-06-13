@@ -97,7 +97,7 @@
     - We don't support sending these notifications yet
 - [X] Resource registry data structure
 - [ ] Prompt registry data structure
-- [ ] Extract tools/list handler to separate function for consistency
+- [X] Extract tools/list handler to separate function for consistency
   - Currently inline in dispatch function while resources handlers are extracted
   - Should follow same pattern as mcp-server-lib--handle-resources-list
 - [X] Check whether prompts capability should be included in initialize response

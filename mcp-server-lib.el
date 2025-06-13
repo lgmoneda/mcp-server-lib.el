@@ -269,40 +269,7 @@ Returns a JSON-RPC response string for the request."
       nil)
      ;; List available tools
      ((equal method "tools/list")
-      (let ((tool-list (vector)))
-        (maphash
-         (lambda (id tool)
-           (let* ((tool-description (plist-get tool :description))
-                  (tool-title (plist-get tool :title))
-                  (tool-read-only (plist-get tool :read-only))
-                  (tool-schema
-                   (or (plist-get tool :schema) '((type . "object"))))
-                  (tool-entry
-                   `((name . ,id)
-                     (description . ,tool-description)
-                     (inputSchema . ,tool-schema)))
-                  (annotations nil))
-             ;; Collect annotations if present
-             (when tool-title
-               (push (cons 'title tool-title) annotations))
-             ;; Add readOnlyHint when :read-only is explicitly provided (both t
-             ;; and nil)
-             (when (plist-member tool :read-only)
-               (let ((annot-value
-                      (if tool-read-only
-                          t
-                        :json-false)))
-                 (push (cons 'readOnlyHint annot-value) annotations)))
-             ;; Add annotations to tool entry if any exist
-             (when annotations
-               (setq tool-entry
-                     (append
-                      tool-entry `((annotations . ,annotations)))))
-             (setq tool-list
-                   (vconcat tool-list (vector tool-entry)))))
-         mcp-server-lib--tools)
-        (mcp-server-lib--jsonrpc-response
-         id `((tools . ,tool-list)))))
+      (mcp-server-lib--handle-tools-list id))
      ;; List available prompts
      ((equal method "prompts/list")
       (mcp-server-lib--jsonrpc-response id `((prompts . ,(vector)))))
@@ -416,6 +383,42 @@ version and capabilities between the client and server."
 This is called after successful initialization to complete the handshake.
 The client sends this notification to acknowledge the server's response
 to the initialize request.")
+
+(defun mcp-server-lib--handle-tools-list (id)
+  "Handle tools/list request with ID.
+
+Returns a list of all registered tools with their metadata."
+  (let ((tool-list (vector)))
+    (maphash
+     (lambda (tool-id tool)
+       (let* ((tool-description (plist-get tool :description))
+              (tool-title (plist-get tool :title))
+              (tool-read-only (plist-get tool :read-only))
+              (tool-schema
+               (or (plist-get tool :schema) '((type . "object"))))
+              (tool-entry
+               `((name . ,tool-id)
+                 (description . ,tool-description)
+                 (inputSchema . ,tool-schema)))
+              (annotations nil))
+         ;; Collect annotations if present
+         (when tool-title
+           (push (cons 'title tool-title) annotations))
+         ;; Add readOnlyHint when :read-only is explicitly provided (both t
+         ;; and nil)
+         (when (plist-member tool :read-only)
+           (let ((annot-value
+                  (if tool-read-only
+                      t
+                    :json-false)))
+             (push (cons 'readOnlyHint annot-value) annotations)))
+         ;; Add annotations to tool entry if any exist
+         (when annotations
+           (setq tool-entry
+                 (append tool-entry `((annotations . ,annotations)))))
+         (setq tool-list (vconcat tool-list (vector tool-entry)))))
+     mcp-server-lib--tools)
+    (mcp-server-lib--jsonrpc-response id `((tools . ,tool-list)))))
 
 (defun mcp-server-lib--handle-resources-list (id)
   "Handle resources/list request with ID.
