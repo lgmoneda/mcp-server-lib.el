@@ -128,15 +128,40 @@ MCP Parameters:"
 
 ;;; Test helpers
 
-(defmacro mcp-server-lib-test--with-server (&rest body)
-  "Run BODY with MCP server active.
-Calls `mcp-server-lib-start' before BODY and
-`mcp-server-lib-stop' after."
+(cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources &allow-other-keys)
+  "Run BODY with MCP server active and initialized.
+Starts the server, sends initialize request, then runs BODY.
+TOOLS and RESOURCES are booleans indicating expected capabilities."
   (declare (indent defun) (debug t))
   `(progn
      (mcp-server-lib-start)
      (unwind-protect
          (progn
+           (let* ((init-result (mcp-server-lib-test--get-initialize-result))
+                  (protocol-version (alist-get 'protocolVersion init-result))
+                  (capabilities (alist-get 'capabilities init-result))
+                  (server-info (alist-get 'serverInfo init-result)))
+             ;; Verify protocol version
+             (should (stringp protocol-version))
+             (should (string= "2025-03-26" protocol-version))
+             ;; Verify server info
+             (should (string= mcp-server-lib--name (alist-get 'name server-info)))
+             ;; Verify capabilities match expectations
+             ,@(when tools
+                 `((should (assoc 'tools capabilities))
+                   ;; Empty objects {} in JSON are parsed as nil in Elisp
+                   (should (null (alist-get 'tools capabilities)))))
+             ,@(when resources
+                 `((should (assoc 'resources capabilities))
+                   ;; Empty objects {} in JSON are parsed as nil in Elisp
+                   (should (null (alist-get 'resources capabilities)))))
+             ;; Verify exact count
+             (should (= (+ (if ,tools 1 0) (if ,resources 1 0))
+                        (length capabilities))))
+           (mcp-server-lib-process-jsonrpc
+            (json-encode
+             '(("jsonrpc" . "2.0")
+               ("method" . "notifications/initialized"))))
            ,@body)
        (mcp-server-lib-stop))))
 
@@ -169,7 +194,7 @@ This macro:
 4. Verifies the method was called exactly once with no errors
 5. Stops the server"
   (declare (indent defun) (debug t))
-  `(mcp-server-lib-test--with-server
+  `(mcp-server-lib-test--with-server :tools nil :resources nil
      (mcp-server-lib-test--verify-req-success ,method
        ,@body)))
 
@@ -210,7 +235,7 @@ Example:
        ,@
        (nreverse tool-registrations)
        ;; Run with server active
-       (mcp-server-lib-test--with-server
+       (mcp-server-lib-test--with-server :tools t :resources nil
          (unwind-protect
              (progn
                ,@body)
@@ -258,7 +283,7 @@ Example:
        ,@
        (nreverse resource-registrations)
        ;; Run with server active
-       (mcp-server-lib-test--with-server
+       (mcp-server-lib-test--with-server :tools nil :resources t
          (unwind-protect
              (progn
                ,@body)
@@ -310,7 +335,7 @@ EXPECTED-MESSAGE is a regex pattern to match against the error message."
 
 (defun mcp-server-lib-test--check-invalid-jsonrpc-version (version)
   "Test that JSON-RPC request with VERSION is rejected properly."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode
       `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
@@ -544,36 +569,29 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 
 ;;; Initialization and server capabilities tests
 
-(ert-deftest mcp-server-lib-test-initialize ()
-  "Test the MCP `initialize` request handling."
-  (mcp-server-lib-test--with-server
-    (let* ((result (mcp-server-lib-test--get-initialize-result))
-           (protocol-version (alist-get 'protocolVersion result))
-           (capabilities (alist-get 'capabilities result))
-           (server-name
-            (alist-get 'name (alist-get 'serverInfo result))))
-      ;; Verify version
-      (should (stringp protocol-version))
-      (should (string= "2025-03-26" protocol-version))
-      ;; Verify capability objects are present and properly formatted
-      ;; (empty objects deserialize to nil)
-      (should (equal nil (alist-get 'tools capabilities)))
-      (should (equal nil (alist-get 'resources capabilities)))
-      ;; Verify exactly 2 capabilities are present
-      (should (= 2 (length capabilities)))
-      ;; Verify server info
-      (should (string= mcp-server-lib--name server-name)))))
+(ert-deftest mcp-server-lib-test-initialize-no-tools-no-resources ()
+  "Test initialize when no tools or resources are registered.
+When no tools or resources are registered, the capabilities object
+should not include tools or resources fields at all."
+  (mcp-server-lib-test--with-server :tools nil :resources nil))
 
-(ert-deftest mcp-server-lib-test-initialize-registered-tool ()
-  "Test that registered tool appears in server capabilities."
-  (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
-        :id "test-tool"
-        :description "A tool for testing"))
-    (let* ((result (mcp-server-lib-test--get-initialize-result))
-           (capabilities (alist-get 'capabilities result))
-           (tools-capability (alist-get 'tools capabilities)))
-      (should (equal nil tools-capability)))))
+(ert-deftest mcp-server-lib-test-initialize-with-tools-and-resources ()
+  "Test initialize when both tools and resources are registered.
+When both are registered, capabilities should include both fields."
+  (mcp-server-lib-register-tool
+   #'mcp-server-lib-test--tool-handler-simple
+   :id "test-tool"
+   :description "Test tool")
+  (unwind-protect
+      (progn
+        (mcp-server-lib-register-resource
+         "test://resource"
+         #'mcp-server-lib-test--resource-handler-simple
+         :name "Test Resource")
+        (unwind-protect
+            (mcp-server-lib-test--with-server :tools t :resources t)
+          (mcp-server-lib-unregister-resource "test://resource")))
+    (mcp-server-lib-unregister-tool "test-tool")))
 
 (ert-deftest mcp-server-lib-test-notifications-initialized ()
   "Test the MCP `notifications/initialized` request handling."
@@ -794,7 +812,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
   "Test reference counting behavior when registering a tool with duplicate ID.
 With reference counting, duplicate registrations should succeed and increment
 the reference count, returning the original tool definition."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (should (mcp-server-lib-register-tool
              #'mcp-server-lib-test--tool-handler-simple
              :id "duplicate-test"
@@ -852,7 +870,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-unregister-tool ()
   "Test that `mcp-server-lib-unregister-tool' removes a tool correctly."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-register-tool
      #'mcp-server-lib-test--tool-handler-simple
      :id mcp-server-lib-test--unregister-tool-id
@@ -995,7 +1013,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-tools-list-zero ()
   "Test the `tools/list` method returning empty array with no tools."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--verify-tool-list-request '())))
 
 (ert-deftest mcp-server-lib-test-tools-list-schema-one-arg-handler ()
@@ -1203,7 +1221,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-server-lib-test-tools-call-unregistered-tool ()
   "Test the `tools/call` request with a tool that was never registered."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--verify-tool-not-found
      mcp-server-lib-test--nonexistent-tool-id)))
 
@@ -1241,13 +1259,13 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-server-lib-test-parse-error ()
   "Test that invalid JSON input returns a parse error."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      "This is not valid JSON" -32700 "Parse error")))
 
 (ert-deftest mcp-server-lib-test-method-not-found ()
   "Test that unknown methods return method-not-found error."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode
       '(("jsonrpc" . "2.0")
@@ -1257,7 +1275,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc ()
   "Test that valid JSON that is not JSON-RPC returns an invalid request error."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("name" . "Test Object") ("value" . 42)))
      -32600
@@ -1274,7 +1292,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc-missing-id ()
   "Test that JSON-RPC request lacking the `id` key is rejected properly."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/list")))
      -32600
@@ -1282,7 +1300,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc-missing-method ()
   "Test that JSON-RPC request lacking the `method` key is rejected properly."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
      -32600
@@ -1292,7 +1310,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest mcp-server-lib-test-process-jsonrpc-parsed ()
   "Test that `mcp-server-lib-process-jsonrpc-parsed' returns parsed response."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (let* ((request (mcp-server-lib-create-tools-list-request))
            (response (mcp-server-lib-process-jsonrpc-parsed request)))
       ;; Response should be a parsed alist, not a string
@@ -1307,7 +1325,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test that when `mcp-server-lib-log-io' is t, JSON-RPC messages are logged."
   (setq mcp-server-lib-log-io t)
 
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (let* ((request (mcp-server-lib-create-tools-list-request))
            (response (mcp-server-lib-process-jsonrpc request)))
 
@@ -1316,7 +1334,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
         (with-current-buffer log-buffer
           (let ((content (buffer-string))
-                (expected-content
+                (expected-suffix
                  (concat
                   "-> (request) ["
                   request
@@ -1324,7 +1342,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
                   "<- (response) ["
                   response
                   "]\n")))
-            (should (equal expected-content content)))))))
+            (should (string-suffix-p expected-suffix content)))))))
 
   (setq mcp-server-lib-log-io nil))
 
@@ -1332,7 +1350,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test that when `mcp-server-lib-log-io' is nil, messages are not logged."
   (setq mcp-server-lib-log-io nil)
 
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (let ((request (mcp-server-lib-create-tools-list-request)))
       (mcp-server-lib-process-jsonrpc request)
       (should-not (get-buffer "*mcp-server-lib-log*")))))
@@ -1573,7 +1591,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest test-mcp-server-lib-resources-list-empty ()
   "Test resources/list with no registered resources."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-resource-count 0)))
 
 (ert-deftest test-mcp-server-lib-register-resource ()
@@ -1639,7 +1657,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest test-mcp-server-lib-resources-read-not-found ()
   "Test reading a non-existent resource returns error."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
    (let ((response (mcp-server-lib-test--read-resource "test://nonexistent")))
      (should (alist-get 'error response))
      (let ((error-obj (alist-get 'error response)))
@@ -1650,7 +1668,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest test-mcp-server-lib-register-resource-duplicate ()
   "Test registering the same resource twice increments ref count."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-test--with-server :tools nil :resources nil
    ;; Register resource first time
    (should (mcp-server-lib-register-resource
             "test://resource1"
