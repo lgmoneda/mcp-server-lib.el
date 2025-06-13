@@ -1,6 +1,7 @@
 **/.claude/settings.local.json
 *.elc
 *-autoloads.el
+*-pkg.el
 
 # Eask
 .eask/

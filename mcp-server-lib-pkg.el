@@ -1,2 +1,0 @@
-;;; Generated package description from mcp-server-lib.el  -*- no-byte-compile: t -*-
-(define-package "mcp-server-lib" "0.1.0" "Model Context Protocol server library" '((emacs "27.1")) :authors '(("Laurynas Biveinis" . "laurynas.biveinis@gmail.com")) :maintainer '("Laurynas Biveinis" . "laurynas.biveinis@gmail.com") :keywords '("comm" "tools") :url "https://github.com/laurynas-biveinis/mcp-server-lib.el")
