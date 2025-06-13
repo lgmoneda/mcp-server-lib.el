@@ -316,9 +316,7 @@ success."
       ("method" . "initialize") ("id" . 15)
       ("params" .
        (("protocolVersion" . "2025-03-26")
-        ("capabilities"
-         .
-         (("tools" . t) ("resources" . nil) ("prompts" . nil)))))))))
+        ("capabilities" . ,(make-hash-table))))))))
 
 (defun mcp-server-lib-test--check-jsonrpc-error
     (request expected-code expected-message)
@@ -615,10 +613,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize") ("id" . 16)
                ("params" .
                 (("protocolVersion" . "2024-11-05")
-                 ("capabilities" .
-                  (("tools" . t)
-                   ("resources" . nil)
-                   ("prompts" . nil))))))))
+                 ("capabilities" . ,(make-hash-table)))))))
            (resp-obj
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj))
@@ -637,10 +632,7 @@ When both are registered, capabilities should include both fields."
              `(("jsonrpc" . "2.0")
                ("method" . "initialize") ("id" . 17)
                ("params" .
-                (("capabilities" .
-                  (("tools" . t)
-                   ("resources" . nil)
-                   ("prompts" . nil))))))))
+                (("capabilities" . ,(make-hash-table)))))))
            (resp-obj
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
@@ -660,10 +652,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize") ("id" . 18)
                ("params" .
                 (("protocolVersion" . 123) ; Number instead of string
-                 ("capabilities" .
-                  (("tools" . t)
-                   ("resources" . nil)
-                   ("prompts" . nil))))))))
+                 ("capabilities" . ,(make-hash-table)))))))
            (resp-obj
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
@@ -715,10 +704,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize") ("id" . 21)
                ("params" .
                 (("protocolVersion" . :json-null)
-                 ("capabilities" .
-                  (("tools" . t)
-                   ("resources" . nil)
-                   ("prompts" . nil))))))))
+                 ("capabilities" . ,(make-hash-table)))))))
            (resp-obj
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
@@ -736,10 +722,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize") ("id" . 22)
                ("params" .
                 (("protocolVersion" . "")
-                 ("capabilities" .
-                  (("tools" . t)
-                   ("resources" . nil)
-                   ("prompts" . nil))))))))
+                 ("capabilities" . ,(make-hash-table)))))))
            (resp-obj
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
