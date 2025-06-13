@@ -13,6 +13,7 @@ This library enables Emacs users and developers to create MCP servers that can p
 
 - MCP server creation and management in Emacs
 - API for tools to enable LLMs to execute Elisp functions
+- API for resources to expose data and content to LLMs
 - Uses MCP stdio transport layer through an emacsclient-wrapping script
 
 * Installation
@@ -126,6 +127,43 @@ MCP Parameters:
 #+end_src
 
 Note: Do not include the "MCP Parameters:" section if your tool handler doesn't take any arguments.
+
+** Resource Registration
+
+Register resources to expose data to LLMs:
+
+#+begin_src elisp
+(mcp-server-lib-register-resource "org://projects.org"
+  (lambda () (read-file-contents "~/org/projects.org"))
+  :name "Projects"
+  :description "Current project list"
+  :mime-type "text/plain")
+#+end_src
+
+*** Resource Handlers
+
+Resource handler functions should:
+- Take no arguments
+- Return a string containing the resource content
+- Signal regular Emacs errors (using ~error~) for error conditions
+  - Unlike tool handlers, resources don't use ~mcp-server-lib-tool-throw~
+
+*** Example Resource Registration
+
+#+begin_src elisp
+;; Register a dynamic resource that returns current buffer content
+(mcp-server-lib-register-resource "buffer://current"
+  (lambda ()
+    (let ((content (buffer-substring-no-properties (point-min) (point-max))))
+      (if (string-empty-p content)
+          (error "Buffer is empty")
+        content)))
+  :name "Current Buffer"
+  :description "Content of the currently active buffer")
+
+;; Unregister when no longer needed
+(mcp-server-lib-unregister-resource "buffer://current")
+#+end_src
 
 *** Optional Tool Properties
 

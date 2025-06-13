@@ -28,7 +28,7 @@
 - [X] Server creation (`mcp-create-server`)
 - [X] Server start/stop (`mcp-server-lib-start`, `mcp-server-lib-stop`)
 - [X] Tool registration (`mcp-register-tool`)
-- [ ] Resource registration (`mcp-register-resource`)
+- [X] Resource registration (`mcp-register-resource`)
 - [ ] Prompt registration (`mcp-register-prompt`)
 - [ ] Server discovery (similar to Python SDK's `mcp.server_discovery`)
 - [ ] LLM integration support (similar to `mcp.llm`)
@@ -38,10 +38,11 @@
 - [ ] Image handling (support for multimodal resources)
 
 ** Resource Registration
-- [ ] `mcp-register-resource` function for exposing data to clients
-- [ ] Resource implementation and data serialization
-- [ ] Resource metadata handling
+- [X] `mcp-register-resource` function for exposing data to clients
+- [X] Resource implementation and data serialization
+- [X] Resource metadata handling
 - [ ] Resource streaming capabilities
+- [ ] Resource templates (URI patterns)
 
 ** Prompt Registration
 - [ ] Prompt template definition API
@@ -90,8 +91,23 @@
 - [X] Tool registry data structure
   - [X] Support parameter descriptions for JSON Schema generation
   - [ ] Add JSON Schema type annotations for parameters
-- [ ] Resource registry data structure
+  - [ ] Remove incorrect listChanged capability from tools initialization
+    - Currently returns listChanged: true when tools are registered
+    - Should only be included if server actually sends notifications/tools/list_changed
+    - We don't support sending these notifications yet
+- [X] Resource registry data structure
 - [ ] Prompt registry data structure
+- [ ] Extract tools/list handler to separate function for consistency
+  - Currently inline in dispatch function while resources handlers are extracted
+  - Should follow same pattern as mcp-server-lib--handle-resources-list
+- [X] Check whether prompts capability should be included in initialize response
+  - Currently returns prompts: {} (empty object) even when prompts not supported
+  - Should verify if MCP spec requires this field or if it can be omitted
+  - Similar question for resources and tools capabilities when not implemented
+- [ ] Fix initialize response to properly report resource capabilities
+  - Currently always returns empty hash table for resources
+  - Should return proper capability object when resources are registered
+  - Similar pattern to tools capability handling
 - [X] Stdio transport adapter script (emacs-mcp-stdio.sh)
   - [X] Handle JSON-RPC requests over stdin/stdout
   - [X] Support configurable socket, init and stop functions
@@ -130,10 +146,31 @@
 - [X] Unit tests for tool registration and execution
   - [X] Add test for tools/list method
   - [X] Add test for tools/call method
-- [ ] Unit tests for resource handling
+- [X] Unit tests for resource handling
 - [ ] Unit tests for prompt templating
 - [ ] Integration tests with actual LLM clients (Claude, OpenAI, etc.)
 - [X] Test fixtures and helper functions (mcp-test-jsonrpc-request)
+- [ ] Protocol compliance improvements (common to tools and resources):
+  - Both tools/call and resources/read use -32600 (Invalid Request) for "not found" errors
+    - Should use -32602 (Invalid params) since request structure is valid
+  - No parameter validation on either endpoint:
+    - Don't validate that params is an object (not string, array, etc.)
+    - Don't validate that required fields (name/uri) are strings
+    - Don't validate that params exists at all
+  - Nil handling is implicit through alist-get and gethash
+  - No type checking on extracted parameter values
+- [ ] Consider extracting tools/call handler for consistency
+  - Large inline handler in dispatch function
+  - Would match pattern of extracted resource handlers
+  - Complex error handling logic could be better isolated
+- [ ] Extract common pattern for building entries with optional fields
+  - Both tools/list and resources/list use similar append patterns
+  - Could have helper like (mcp-server-lib--build-entry base-alist &rest optional-pairs)
+  - Would reduce duplication and make code more maintainable
+- [X] Extract common reference counting logic
+  - Both mcp-server-lib-register-tool and mcp-server-lib-register-resource have identical ref counting
+  - Could have generic helpers for ref-counted registration/unregistration
+  - Would ensure consistent behavior and reduce duplication
 
 ** CI and Linting
 - [X] Fix package dependency issue (Package json is not installable)

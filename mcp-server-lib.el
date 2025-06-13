@@ -81,11 +81,43 @@ Defaults to `user-emacs-directory' but can be customized."
 (defvar mcp-server-lib--tools (make-hash-table :test 'equal)
   "Hash table of registered MCP tools.")
 
+(defvar mcp-server-lib--resources (make-hash-table :test 'equal)
+  "Hash table of registered MCP resources.
+Keys are URIs, values are plists with resource metadata and handlers.")
+
 ;;; Core helpers
 
 (defun mcp-server-lib--jsonrpc-response (id result)
   "Create a JSON-RPC response with ID and RESULT."
   (json-encode `((jsonrpc . "2.0") (id . ,id) (result . ,result))))
+
+(defun mcp-server-lib--ref-counted-register (key item table)
+  "Register ITEM with KEY in TABLE with reference counting.
+If KEY already exists, increment its reference count.
+Otherwise, add ITEM to TABLE with :ref-count 1."
+  (if-let* ((existing (gethash key table)))
+    ;; Item already exists - increment ref count
+    (let ((ref-count (or (plist-get existing :ref-count) 1)))
+      (plist-put existing :ref-count (1+ ref-count)))
+    ;; New item - ensure it has ref-count = 1
+    (plist-put item :ref-count 1)
+    (puthash key item table)))
+
+(defun mcp-server-lib--ref-counted-unregister (key table)
+  "Unregister item with KEY from TABLE using reference counting.
+If reference count > 1, decrement it.
+Otherwise, remove the item from TABLE.
+Returns t if item was found, nil otherwise."
+  (if-let* ((item (gethash key table))
+            (ref-count (or (plist-get item :ref-count) 1)))
+    (if (> ref-count 1)
+        ;; Decrement ref count
+        (progn
+          (plist-put item :ref-count (1- ref-count))
+          t)
+      ;; Last reference - remove the item
+      (remhash key table)
+      t)))
 
 (defun mcp-server-lib--jsonrpc-error (id code message)
   "Create a JSON-RPC error response with ID, error CODE and MESSAGE."
@@ -93,6 +125,28 @@ Defaults to `user-emacs-directory' but can be customized."
    `((jsonrpc . "2.0")
      (id . ,id)
      (error . ((code . ,code) (message . ,message))))))
+
+(defun mcp-server-lib--append-optional-fields (alist &rest pairs)
+  "Append optional field PAIRS to ALIST.
+
+PAIRS should be alternating keys and values.
+Only adds a key-value pair if the value is non-nil.
+
+Example:
+  (mcp-server-lib--append-optional-fields
+   \\='((uri . \"test://resource\") (name . \"Test\"))
+   \\='description description-var
+   \\='mimeType mime-type-var)
+
+This adds description only if description-var is non-nil,
+and mimeType only if mime-type-var is non-nil."
+  (let ((additions nil))
+    (while pairs
+      (let ((key (pop pairs))
+            (value (pop pairs)))
+        (when value
+          (push (cons key value) additions))))
+    (append alist additions)))
 
 (defun mcp-server-lib--respond-with-result
     (request-context result-data)
@@ -252,6 +306,13 @@ Returns a JSON-RPC response string for the request."
      ;; List available prompts
      ((equal method "prompts/list")
       (mcp-server-lib--jsonrpc-response id `((prompts . ,(vector)))))
+     ;; List available resources
+     ((equal method "resources/list")
+      (mcp-server-lib--handle-resources-list id))
+     ;; Read resource content
+     ((equal method "resources/read")
+      (mcp-server-lib--handle-resources-read
+       id params method-metrics))
      ;; Tool invocation
      ((equal method "tools/call")
       (let* ((tool-name (alist-get 'name params))
@@ -355,6 +416,55 @@ version and capabilities between the client and server."
 This is called after successful initialization to complete the handshake.
 The client sends this notification to acknowledge the server's response
 to the initialize request.")
+
+(defun mcp-server-lib--handle-resources-list (id)
+  "Handle resources/list request with ID.
+
+Returns a list of all registered resources with their metadata."
+  (let ((resource-list (vector)))
+    (maphash
+     (lambda (uri resource)
+       (let* ((name (plist-get resource :name))
+              (description (plist-get resource :description))
+              (mime-type (plist-get resource :mime-type))
+              (resource-entry
+               (mcp-server-lib--append-optional-fields
+                `((uri . ,uri) (name . ,name))
+                'description description 'mimeType mime-type)))
+         (setq resource-list
+               (vconcat resource-list (vector resource-entry)))))
+     mcp-server-lib--resources)
+    (mcp-server-lib--jsonrpc-response
+     id `((resources . ,resource-list)))))
+
+(defun mcp-server-lib--handle-resources-read
+    (id params method-metrics)
+  "Handle resources/read request with ID and PARAMS.
+METHOD-METRICS is used to track errors for this method."
+  (let* ((uri (alist-get 'uri params))
+         (resource (gethash uri mcp-server-lib--resources)))
+    (if resource
+        (condition-case err
+            (let* ((handler (plist-get resource :handler))
+                   (mime-type (plist-get resource :mime-type))
+                   (content (funcall handler))
+                   (content-entry
+                    (mcp-server-lib--append-optional-fields
+                     `((uri . ,uri) (text . ,content))
+                     'mimeType mime-type)))
+              (mcp-server-lib--jsonrpc-response
+               id `((contents . ,(vector content-entry)))))
+          ;; Handle any error from the resource handler
+          (error
+           (cl-incf (mcp-server-lib-metrics-errors method-metrics))
+           (mcp-server-lib--jsonrpc-error
+            id mcp-server-lib--error-internal
+            (format "Error reading resource %s: %s"
+                    uri (error-message-string err)))))
+      (mcp-server-lib--jsonrpc-error
+       id
+       mcp-server-lib--error-invalid-request
+       (format "Resource not found: %s" uri)))))
 
 ;;; Error handling helpers
 
@@ -553,6 +663,14 @@ Example:
      ("params" .
       (("name" . ,tool-name) ("arguments" . ,(or args '())))))))
 
+(defun mcp-server-lib-create-resources-list-request (&optional id)
+  "Create a resources/list JSON-RPC request with optional ID.
+If ID is not provided, it defaults to 1."
+  (json-encode
+   `(("jsonrpc" . "2.0")
+     ("method" . "resources/list")
+     ("id" . ,(or id 1)))))
+
 ;;; API - Tools
 
 (defun mcp-server-lib-register-tool (handler &rest properties)
@@ -596,32 +714,26 @@ With optional properties:
     (unless description
       (error "Tool registration requires :description property"))
     ;; Check for existing registration
-    (let ((existing (gethash id mcp-server-lib--tools)))
-      (if existing
-          ;; Tool already exists - increment ref count
-          (let ((ref-count (or (plist-get existing :ref-count) 1)))
-            (plist-put existing :ref-count (1+ ref-count))
-            t)
-        ;; New tool - register with ref-count = 1
-        (let* ((schema
-                (mcp-server-lib--generate-schema-from-function
-                 handler))
-               (tool
-                (list
-                 :id id
-                 :description description
-                 :handler handler
-                 :schema schema
-                 :ref-count 1)))
-          ;; Add optional properties if provided
-          (when title
-            (setq tool (plist-put tool :title title)))
-          ;; Always include :read-only if it was specified, even if nil
-          (when (plist-member properties :read-only)
-            (setq tool (plist-put tool :read-only read-only)))
-          ;; Register the tool
-          (puthash id tool mcp-server-lib--tools)
-          t)))))
+    (if-let* ((existing (gethash id mcp-server-lib--tools)))
+      (mcp-server-lib--ref-counted-register
+       id existing mcp-server-lib--tools)
+      (let* ((schema
+              (mcp-server-lib--generate-schema-from-function handler))
+             (tool
+              (list
+               :id id
+               :description description
+               :handler handler
+               :schema schema)))
+        ;; Add optional properties if provided
+        (when title
+          (setq tool (plist-put tool :title title)))
+        ;; Always include :read-only if it was specified, even if nil
+        (when (plist-member properties :read-only)
+          (setq tool (plist-put tool :read-only read-only)))
+        ;; Register the tool
+        (mcp-server-lib--ref-counted-register
+         id tool mcp-server-lib--tools)))))
 
 (defun mcp-server-lib-unregister-tool (tool-id)
   "Unregister a tool with ID TOOL-ID from the MCP server.
@@ -633,17 +745,8 @@ Returns t if the tool was found and removed, nil otherwise.
 
 Example:
   (mcp-server-lib-unregister-tool \"org-list-files\")"
-  (let ((tool (gethash tool-id mcp-server-lib--tools)))
-    (when tool
-      (let ((ref-count (or (plist-get tool :ref-count) 1)))
-        (if (> ref-count 1)
-            ;; Decrement ref count
-            (progn
-              (plist-put tool :ref-count (1- ref-count))
-              t)
-          ;; Last reference - remove the tool
-          (remhash tool-id mcp-server-lib--tools)
-          t)))))
+  (mcp-server-lib--ref-counted-unregister
+   tool-id mcp-server-lib--tools))
 
 ;; Custom error type for tool errors
 (define-error 'mcp-server-lib-tool-error "MCP tool error" 'user-error)
@@ -655,6 +758,71 @@ The error will be properly formatted and sent to the client.
 Arguments:
   ERROR-MESSAGE  String describing the error"
   (signal 'mcp-server-lib-tool-error (list error-message)))
+
+;;; Resource management functions
+
+(defun mcp-server-lib-register-resource (uri handler &rest properties)
+  "Register a direct resource with the MCP server.
+
+Arguments:
+  URI              Exact URI for the resource (e.g., \"org://projects.org\")
+  HANDLER          Function that takes no arguments and returns the content
+  PROPERTIES       Property list with resource attributes
+
+Required properties:
+  :name            Human-readable name for the resource
+
+Optional properties:
+  :description     Description of the resource
+  :mime-type       MIME type (default: \"text/plain\")
+
+Example:
+  (mcp-server-lib-register-resource
+   \"org://projects.org\"
+   (lambda () (read-file-contents \"~/org/projects.org\"))
+   :name \"Projects\"
+   :description \"Current project list\"
+   :mime-type \"text/plain\")"
+  (let ((name (plist-get properties :name))
+        (description (plist-get properties :description))
+        (mime-type (plist-get properties :mime-type)))
+    ;; Error checking for required properties
+    (unless (functionp handler)
+      (error "Resource registration requires handler function"))
+    (unless uri
+      (error "Resource registration requires URI"))
+    (unless name
+      (error "Resource registration requires :name property"))
+
+    ;; Check for existing registration and use ref-counting
+    (if-let* ((existing (gethash uri mcp-server-lib--resources)))
+      ;; Resource already exists - use ref counting helper
+      (mcp-server-lib--ref-counted-register
+       uri existing mcp-server-lib--resources)
+      ;; New resource - create and register
+      (let ((resource (list :handler handler :name name)))
+        ;; Only add optional properties if they were provided
+        (when description
+          (setq resource
+                (plist-put resource :description description)))
+        (when mime-type
+          (setq resource (plist-put resource :mime-type mime-type)))
+        ;; Register the resource with ref counting
+        (mcp-server-lib--ref-counted-register
+         uri resource mcp-server-lib--resources)))))
+
+(defun mcp-server-lib-unregister-resource (uri)
+  "Unregister a resource by its URI.
+
+Arguments:
+  URI  The URI of the resource to unregister
+
+Returns t if the resource was found and removed, nil otherwise.
+
+Example:
+  (mcp-server-lib-unregister-resource \"org://projects.org\")"
+  (mcp-server-lib--ref-counted-unregister
+   uri mcp-server-lib--resources))
 
 
 (provide 'mcp-server-lib)

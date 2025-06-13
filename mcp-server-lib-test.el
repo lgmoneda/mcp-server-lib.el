@@ -112,6 +112,20 @@ MCP Parameters:"
 (declare-function mcp-server-lib-test-bytecode-handler--handler
                   "mcp-server-lib-bytecode-handler-test")
 
+;;; Test resource handlers
+
+(defun mcp-server-lib-test--resource-handler-simple ()
+  "Simple resource handler that returns static content."
+  "Test content")
+
+(defun mcp-server-lib-test--resource-handler-error ()
+  "Test resource handler that throws an error."
+  (error "Resource handler error"))
+
+(defun mcp-server-lib-test--resource-handler-nil ()
+  "Test resource handler that returns nil."
+  nil)
+
 ;;; Test helpers
 
 (defmacro mcp-server-lib-test--with-server (&rest body)
@@ -206,6 +220,54 @@ Example:
             (lambda (id) `(mcp-server-lib-unregister-tool ,id))
             (nreverse tool-ids)))))))
 
+(defmacro mcp-server-lib-test--with-resources (resources &rest body)
+  "Run BODY with MCP server active and RESOURCES registered.
+All resources are automatically unregistered after BODY execution.
+
+Arguments:
+  RESOURCES  List of resource registration specs, each a list of arguments for
+             `mcp-server-lib-register-resource': (URI HANDLER &rest PROPERTIES)
+  BODY       Forms to execute with server running and resources registered
+
+Example:
+  (mcp-server-lib-test--with-resources
+   ((\"test://resource1\"
+     #\\='mcp-server-lib-test--resource-handler-simple
+     :name \"Test Resource\"
+     :description \"A test resource\")
+    (\"test://resource2\"
+     #\\='mcp-server-lib-test--resource-handler-simple
+     :name \"Another Resource\"
+     :mime-type \"text/plain\"))
+   (let ((resources (mcp-server-lib-test--get-resource-list)))
+     ...))"
+  (declare (indent 1) (debug t))
+  (let ((resource-registrations '())
+        (resource-uris '()))
+    ;; Extract resource URIs and build registration forms
+    (dolist (resource-spec resources)
+      (let* ((uri (car resource-spec))
+             (handler (cadr resource-spec))
+             (props (cddr resource-spec)))
+        (push uri resource-uris)
+        (push `(mcp-server-lib-register-resource ,uri ,handler ,@props)
+              resource-registrations)))
+    ;; Build the macro expansion
+    `(progn
+       ;; Register all resources first
+       ,@
+       (nreverse resource-registrations)
+       ;; Run with server active
+       (mcp-server-lib-test--with-server
+         (unwind-protect
+             (progn
+               ,@body)
+           ;; Unregister all resources
+           ,@
+           (mapcar
+            (lambda (uri) `(mcp-server-lib-unregister-resource ,uri))
+            (nreverse resource-uris)))))))
+
 (defun mcp-server-lib-test--get-request-result (method request)
   "Process REQUEST via `mcp-server-lib-process-jsonrpc' and return result.
 METHOD is the JSON-RPC method name for metrics verification.
@@ -292,46 +354,46 @@ Optional ARGS is the association list of arguments to pass to the tool."
    -32600
    (format "Tool not found: %s" tool-id)))
 
+(defmacro mcp-server-lib-test--with-metrics-tracking
+    (metrics-specs &rest body)
+  "Execute BODY and verify metrics changed as expected.
+METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists."
+  (declare (indent 1) (debug t))
+  (let ((before-bindings '())
+        (after-checks '()))
+    ;; Build bindings and checks for each metric
+    (dolist (spec metrics-specs)
+      (let* ((key (car spec))
+             (expected-calls (cadr spec))
+             (expected-errors (caddr spec))
+             (metrics-var (gensym "metrics"))
+             (calls-var (gensym "calls"))
+             (errors-var (gensym "errors")))
+        ;; Add before bindings
+        (push `(,metrics-var (mcp-server-lib-metrics-get ,key)) before-bindings)
+        (push `(,calls-var (mcp-server-lib-metrics-calls ,metrics-var)) before-bindings)
+        (push `(,errors-var (mcp-server-lib-metrics-errors ,metrics-var)) before-bindings)
+        ;; Add after checks
+        (push `(let ((metrics-after (mcp-server-lib-metrics-get ,key)))
+                 (should (= (+ ,calls-var ,expected-calls)
+                            (mcp-server-lib-metrics-calls metrics-after)))
+                 (should (= (+ ,errors-var ,expected-errors)
+                            (mcp-server-lib-metrics-errors metrics-after))))
+              after-checks)))
+    `(let* ,(nreverse before-bindings)
+       ,@body
+       ,@(nreverse after-checks))))
+
 (defmacro mcp-server-lib-test--with-error-tracking
     (tool-id &rest body)
   "Execute BODY and verify both call and error counts increased for TOOL-ID.
 Captures method and tool metrics before execution, executes BODY,
 then verifies that both calls and errors increased by 1 at both levels."
   (declare (indent 1) (debug t))
-  `(let* ((method-metrics (mcp-server-lib-metrics-get "tools/call"))
-          (method-calls-before
-           (mcp-server-lib-metrics-calls method-metrics))
-          (method-errors-before
-           (mcp-server-lib-metrics-errors method-metrics))
-          (tool-metrics-key (format "tools/call:%s" ,tool-id))
-          (tool-metrics (mcp-server-lib-metrics-get tool-metrics-key))
-          (tool-calls-before
-           (mcp-server-lib-metrics-calls tool-metrics))
-          (tool-errors-before
-           (mcp-server-lib-metrics-errors tool-metrics)))
-
-     ;; Execute the body
-     ,@body
-
-     ;; Verify method metrics
-     (let ((method-metrics-after
-            (mcp-server-lib-metrics-get "tools/call")))
-       (should
-        (= (1+ method-calls-before)
-           (mcp-server-lib-metrics-calls method-metrics-after)))
-       (should
-        (= (1+ method-errors-before)
-           (mcp-server-lib-metrics-errors method-metrics-after))))
-
-     ;; Verify tool metrics
-     (let ((tool-metrics-after
-            (mcp-server-lib-metrics-get tool-metrics-key)))
-       (should
-        (= (1+ tool-calls-before)
-           (mcp-server-lib-metrics-calls tool-metrics-after)))
-       (should
-        (= (1+ tool-errors-before)
-           (mcp-server-lib-metrics-errors tool-metrics-after))))))
+  `(mcp-server-lib-test--with-metrics-tracking
+       (("tools/call" 1 1)
+        ((format "tools/call:%s" ,tool-id) 1 1))
+     ,@body))
 
 (defun mcp-server-lib-test--get-tool-list-for-request (request)
   "Get the tool list from a tools/list REQUEST.
@@ -352,6 +414,64 @@ Return the `tools` array from the result after verifying it is an array."
             (mcp-server-lib-test--get-tool-list-for-request
              (mcp-server-lib-create-tools-list-request))))
     result))
+
+(defun mcp-server-lib-test--get-resource-list-for-request (request)
+  "Get the resource list from a resources/list REQUEST.
+Return the `resources` array from the result after verifying it is an array."
+  (let ((result
+         (alist-get
+          'resources
+          (mcp-server-lib-test--get-request-result
+           "resources/list" request))))
+    (should (arrayp result))
+    result))
+
+(defun mcp-server-lib-test--get-resource-list ()
+  "Get the successful response to a standard `resources/list` request."
+  (let (result)
+    (mcp-server-lib-test--verify-req-success "resources/list"
+      (setq result
+            (mcp-server-lib-test--get-resource-list-for-request
+             (mcp-server-lib-create-resources-list-request))))
+    result))
+
+(defun mcp-server-lib-test--read-resource (uri &optional id)
+  "Send a resources/read request for URI and return the parsed response.
+Optional ID defaults to 1 if not provided."
+  (let ((request (json-encode
+                  `((jsonrpc . "2.0")
+                    (id . ,(or id 1))
+                    (method . "resources/read")
+                    (params . ((uri . ,uri)))))))
+    (mcp-server-lib-process-jsonrpc-parsed request)))
+
+(defun mcp-server-lib-test--check-resource-count (expected-count)
+  "Check that the resource list contains EXPECTED-COUNT resources."
+  (let ((resources (mcp-server-lib-test--get-resource-list)))
+    (should (= expected-count (length resources)))))
+
+(defun mcp-server-lib-test--check-single-resource (expected-fields)
+  "Check that resource list contains exactly one resource with EXPECTED-FIELDS.
+EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
+  (let ((resources (mcp-server-lib-test--get-resource-list)))
+    (should (= 1 (length resources)))
+    (let ((resource (aref resources 0)))
+      (should (= (length expected-fields) (length resource)))
+      (dolist (field expected-fields)
+        (should (equal (alist-get (car field) resource) (cdr field)))))))
+
+(defun mcp-server-lib-test--check-resource-read-response (uri expected-fields)
+  "Read resource at URI and verify response contains expected fields.
+EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
+  (let ((response (mcp-server-lib-test--read-resource uri)))
+    (should-not (alist-get 'error response))
+    (let* ((result (alist-get 'result response))
+           (contents (alist-get 'contents result)))
+      (should (arrayp contents))
+      (should (= 1 (length contents)))
+      (let ((content (aref contents 0)))
+        (dolist (field expected-fields)
+          (should (equal (alist-get (car field) content) (cdr field))))))))
 
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
   "Verify a `tools/list` response against EXPECTED-TOOLS.
@@ -813,6 +933,26 @@ from a function loaded from bytecode rather than interpreted elisp."
          (parsed (json-read-from-string request)))
     (should (equal "2.0" (alist-get 'jsonrpc parsed)))
     (should (equal "tools/list" (alist-get 'method parsed)))
+    (should (equal 1 (alist-get 'id parsed)))))
+
+;;; `mcp-server-lib-create-resources-list-request' tests
+
+(ert-deftest mcp-server-lib-test-create-resources-list-request-with-id ()
+  "Test `mcp-server-lib-create-resources-list-request' with a specified ID."
+  (let* ((id 42)
+         (request (mcp-server-lib-create-resources-list-request id))
+         (parsed (json-read-from-string request)))
+    ;; Verify basic JSON-RPC structure
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "resources/list" (alist-get 'method parsed)))
+    (should (equal id (alist-get 'id parsed)))))
+
+(ert-deftest mcp-server-lib-test-create-resources-list-request-default-id ()
+  "Test `mcp-server-lib-create-resources-list-request' with default ID."
+  (let* ((request (mcp-server-lib-create-resources-list-request))
+         (parsed (json-read-from-string request)))
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "resources/list" (alist-get 'method parsed)))
     (should (equal 1 (alist-get 'id parsed)))))
 
 ;;; tools/list tests
@@ -1443,6 +1583,191 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       (lambda (msg)
         (string-match "MCP metrics:.*calls.*errors" msg))
       messages))))
+
+;;; Resource tests
+
+(ert-deftest test-mcp-server-lib-resources-list-empty ()
+  "Test resources/list with no registered resources."
+  (mcp-server-lib-test--with-server
+    (mcp-server-lib-test--check-resource-count 0)))
+
+(ert-deftest test-mcp-server-lib-register-resource ()
+  "Test registering a direct resource."
+  (mcp-server-lib-test--with-resources
+      (("test://resource1"
+        #'mcp-server-lib-test--resource-handler-simple
+        :name "Test Resource"
+        :description "A test resource"
+        :mime-type "text/plain"))
+    ;; Verify it was registered by checking resources/list
+    (mcp-server-lib-test--check-single-resource
+     '((uri . "test://resource1")
+       (name . "Test Resource")
+       (description . "A test resource")
+       (mimeType . "text/plain")))))
+
+(ert-deftest test-mcp-server-lib-register-resource-minimal ()
+  "Test registering a resource with only required fields."
+  (mcp-server-lib-test--with-resources
+   (("test://minimal"
+     #'mcp-server-lib-test--resource-handler-simple
+     :name "Minimal Resource"))
+   ;; Verify it was registered correctly
+   (mcp-server-lib-test--check-single-resource
+    '((uri . "test://minimal")
+      (name . "Minimal Resource")))
+   ;; Verify resource can be read without mime-type
+   (mcp-server-lib-test--check-resource-read-response
+    "test://minimal"
+    '((uri . "test://minimal")
+      (text . "Test content")))))
+
+(ert-deftest test-mcp-server-lib-resources-read ()
+  "Test reading a resource."
+  (mcp-server-lib-test--with-resources
+   (("test://resource1"
+     #'mcp-server-lib-test--resource-handler-simple
+     :name "Test Resource"
+     :mime-type "text/plain"))
+   ;; Read the resource
+   (mcp-server-lib-test--verify-req-success
+    "resources/read"
+    (mcp-server-lib-test--check-resource-read-response
+     "test://resource1"
+     '((uri . "test://resource1")
+       (mimeType . "text/plain")
+       (text . "Test content"))))))
+
+(ert-deftest test-mcp-server-lib-resources-read-handler-nil ()
+  "Test that resource handler returning nil produces valid response with empty text."
+  (mcp-server-lib-test--with-resources
+   (("test://nil-resource"
+     #'mcp-server-lib-test--resource-handler-nil
+     :name "Nil Resource"))
+   ;; Read the resource
+   (mcp-server-lib-test--verify-req-success
+    "resources/read"
+    (mcp-server-lib-test--check-resource-read-response
+     "test://nil-resource"
+     '((uri . "test://nil-resource")
+       (text . nil))))))
+
+(ert-deftest test-mcp-server-lib-resources-read-not-found ()
+  "Test reading a non-existent resource returns error."
+  (mcp-server-lib-test--with-server
+   (let ((response (mcp-server-lib-test--read-resource "test://nonexistent")))
+     (should (alist-get 'error response))
+     (let ((error-obj (alist-get 'error response)))
+       (should (equal (alist-get 'code error-obj)
+                      mcp-server-lib--error-invalid-request))
+       (should (string-match "Resource not found: test://nonexistent"
+                             (alist-get 'message error-obj)))))))
+
+(ert-deftest test-mcp-server-lib-register-resource-duplicate ()
+  "Test registering the same resource twice increments ref count."
+  (mcp-server-lib-test--with-server
+   ;; Register resource first time
+   (should (mcp-server-lib-register-resource
+            "test://resource1"
+            #'mcp-server-lib-test--resource-handler-simple
+            :name "Test Resource"))
+   (unwind-protect
+       (progn
+         ;; Register same resource again
+         (should (mcp-server-lib-register-resource
+                  "test://resource1"
+                  #'mcp-server-lib-test--resource-handler-simple
+                  :name "Test Resource"))
+         (unwind-protect
+             (progn
+               ;; Verify it's still listed only once
+               (mcp-server-lib-test--check-resource-count 1))
+           ;; Clean up second registration
+           (should (mcp-server-lib-unregister-resource "test://resource1")))
+         ;; After first unregister, resource should still exist
+         (mcp-server-lib-test--check-resource-count 1))
+     ;; Clean up first registration
+     (should (mcp-server-lib-unregister-resource "test://resource1")))
+   ;; Verify resource is gone
+   (mcp-server-lib-test--check-resource-count 0)))
+
+(ert-deftest test-mcp-server-lib-register-resource-error-missing-name ()
+  "Test that resource registration with missing :name produces an error."
+  (should-error
+   (mcp-server-lib-register-resource
+    "test://resource"
+    #'mcp-server-lib-test--resource-handler-simple
+    :description "Resource without name")
+   :type 'error))
+
+(ert-deftest test-mcp-server-lib-register-resource-error-missing-handler ()
+  "Test that resource registration with non-function handler produces an error."
+  (should-error
+   (mcp-server-lib-register-resource
+    "test://resource"
+    "not-a-function"
+    :name "Test Resource")
+   :type 'error))
+
+(ert-deftest test-mcp-server-lib-register-resource-error-missing-uri ()
+  "Test that resource registration with nil URI produces an error."
+  (should-error
+   (mcp-server-lib-register-resource
+    nil
+    #'mcp-server-lib-test--resource-handler-simple
+    :name "Test Resource")
+   :type 'error))
+
+(ert-deftest test-mcp-server-lib-unregister-resource-nonexistent ()
+  "Test that `mcp-server-lib-unregister-resource` returns nil for missing resources."
+  (should-not (mcp-server-lib-unregister-resource "test://nonexistent")))
+
+(ert-deftest test-mcp-server-lib-resources-list-multiple ()
+  "Test listing multiple registered resources."
+  (mcp-server-lib-test--with-resources
+      (("test://resource1"
+        #'mcp-server-lib-test--resource-handler-simple
+        :name "First Resource"
+        :description "The first test resource")
+       ("test://resource2"
+        #'mcp-server-lib-test--resource-handler-simple
+        :name "Second Resource"
+        :mime-type "text/markdown"))
+    ;; Verify both resources are listed
+    (let ((resources (mcp-server-lib-test--get-resource-list)))
+      (should (= 2 (length resources)))
+      ;; Check each resource
+      (let ((resource1 (seq-find (lambda (r) (equal (alist-get 'uri r) "test://resource1")) resources))
+            (resource2 (seq-find (lambda (r) (equal (alist-get 'uri r) "test://resource2")) resources)))
+        ;; Verify first resource
+        (should resource1)
+        (should (equal (alist-get 'name resource1) "First Resource"))
+        (should (equal (alist-get 'description resource1) "The first test resource"))
+        (should (null (alist-get 'mimeType resource1)))
+        ;; Verify second resource
+        (should resource2)
+        (should (equal (alist-get 'name resource2) "Second Resource"))
+        (should (null (alist-get 'description resource2)))
+        (should (equal (alist-get 'mimeType resource2) "text/markdown"))))))
+
+(ert-deftest test-mcp-server-lib-resources-read-handler-error ()
+  "Test that resource handler errors return JSON-RPC error and increment error metrics."
+  (mcp-server-lib-test--with-resources
+   (("test://error-resource"
+     #'mcp-server-lib-test--resource-handler-error
+     :name "Error Resource"))
+   (mcp-server-lib-test--with-metrics-tracking
+    (("resources/read" 1 1))
+    ;; Try to read the resource
+    (let ((response (mcp-server-lib-test--read-resource "test://error-resource")))
+      (should (alist-get 'error response))
+      (let ((error-obj (alist-get 'error response)))
+        (should (equal (alist-get 'code error-obj)
+                       mcp-server-lib--error-internal))
+        (should (string-match "Error reading resource test://error-resource"
+                              (alist-get 'message error-obj)))
+        (should (string-match "Resource handler error"
+                              (alist-get 'message error-obj))))))))
 
 (provide 'mcp-server-lib-test)
 
