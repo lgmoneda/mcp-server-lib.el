@@ -37,7 +37,7 @@ To uninstall: =M-x mcp-server-lib-uninstall=
 
 * For Developers
 
-To build your own MCP server, see [[https://github.com/laurynas-biveinis/elisp-mcp-dev][elisp-mcp-dev]] for a complete example.
+To build your own MCP server, see [[https://github.com/laurynas-biveinis/elisp-dev-mcp][elisp-dev-mcp]] for a complete example.
 
 ** Client Registration
 
