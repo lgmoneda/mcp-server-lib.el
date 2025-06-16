@@ -21,7 +21,9 @@
 
 * Installation
 
-=M-x package-vc-install https://github.com/laurynas-biveinis/mcp-server-lib.el/=
+From MELPA:
+
+=M-x package-install RET mcp-server-lib RET=
 
 * For Users
 
