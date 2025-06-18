@@ -499,7 +499,8 @@ See also: `mcp-server-lib-tool-throw'"
   `(condition-case err
        (progn
          ,@body)
-     (error (mcp-server-lib-tool-throw (format "Error: %S" err)))))
+     (error
+      (mcp-server-lib-tool-throw (format "Error: %S" err)))))
 
 ;;; Tool helpers
 
@@ -637,7 +638,8 @@ See also: `mcp-server-lib-process-jsonrpc-parsed'"
           (setq response
                 (mcp-server-lib--validate-and-dispatch-request
                  json-object))
-        (error (setq response (mcp-server-lib--handle-error err)))))
+        (error
+         (setq response (mcp-server-lib--handle-error err)))))
 
     ;; Only log and return responses when they exist (not for notifications)
     (when response
