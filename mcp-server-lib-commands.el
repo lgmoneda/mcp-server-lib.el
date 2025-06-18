@@ -37,11 +37,14 @@ requests via `mcp-server-lib-process-jsonrpc'.  Once started, the server
 will dispatch incoming requests to the appropriate tool
 handlers that have been registered with `mcp-server-lib-register-tool'.
 
+Resets all metrics when starting.
+
 See also: `mcp-server-lib-stop'"
   (interactive)
   (when mcp-server-lib--running
     (error "MCP server is already running"))
 
+  (clrhash mcp-server-lib-metrics--table)
   (when (called-interactively-p 'any)
     (message "Emacs starting handling MCP requests"))
   (setq mcp-server-lib--running t))

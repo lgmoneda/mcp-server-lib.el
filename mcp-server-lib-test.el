@@ -134,6 +134,7 @@ Starts the server, sends initialize request, then runs BODY.
 TOOLS and RESOURCES are booleans indicating expected capabilities."
   (declare (indent defun) (debug t))
   `(progn
+     (should-not mcp-server-lib--running)
      (mcp-server-lib-start)
      (unwind-protect
          (progn
@@ -1539,39 +1540,55 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-show-metrics ()
   "Test metrics display command."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
-        :id "display-test-tool"
-        :description "Tool for testing display"))
-    ;; Generate some metrics
-    (mcp-server-lib-process-jsonrpc
-     (mcp-server-lib-create-tools-list-request 200))
-    (mcp-server-lib-test--call-tool "display-test-tool" 201)
+   ((#'mcp-server-lib-test--tool-handler-simple
+     :id "display-test-tool"
+     :description "Tool for testing display"))
+   ;; Generate some metrics
+   (mcp-server-lib-process-jsonrpc
+    (mcp-server-lib-create-tools-list-request 200))
+   (mcp-server-lib-test--call-tool "display-test-tool" 201)
 
-    ;; Show metrics
-    (mcp-server-lib-show-metrics)
+   ;; Show metrics
+   (mcp-server-lib-show-metrics)
 
-    ;; Verify buffer exists and contains expected content
-    (with-current-buffer "*MCP Metrics*"
-      (let ((content (buffer-string)))
-        ;; Check header
-        (should (string-match "MCP Usage Metrics" content))
-        ;; Check method calls section
-        (should (string-match "Method Calls:" content))
-        ;; Should have at least 1 tools/list call from our test
-        (should (string-match "tools/list\\s-+\\([0-9]+\\)" content))
-        (let ((tools-list-count
-               (string-to-number (match-string 1 content))))
-          (should (>= tools-list-count 1)))
+   ;; Verify buffer exists and contains expected content
+   (with-current-buffer "*MCP Metrics*"
+     (let ((content (buffer-string)))
+       (should (string-match "MCP Usage Metrics" content))
+       (should (string-match "Method Calls:" content))
+       ;; Should have at least 1 tools/list call from our test
+       (should (string-match "tools/list\\s-+\\([0-9]+\\)" content))
+       (let ((tools-list-count
+              (string-to-number (match-string 1 content))))
+         (should (>= tools-list-count 1)))
 
-        ;; Check tool usage section
-        (should (string-match "Tool Usage:" content))
-        ;; Should have exactly 1 call to our test tool
-        (should
-         (string-match
-          "display-test-tool\\s-+1\\s-+0\\s-+0\\.0%" content))
-        ;; Check summary
-        (should (string-match "Summary:" content))
-        (should (string-match "Total operations:" content))))))
+       (should (string-match "Tool Usage:" content))
+       ;; Should have exactly 1 call to our test tool
+       (should
+        (string-match
+         "display-test-tool\\s-+1\\s-+0\\s-+0\\.0%" content))
+       (should (string-match "Summary:" content))
+       (should (string-match "Methods: [0-9]+ calls" content))
+       (should (string-match "Tools: [0-9]+ calls" content))))))
+
+(ert-deftest mcp-server-lib-test-metrics-reset-on-start ()
+  "Test that starting the server resets metrics."
+  ;; First part: generate metrics and verify they exist
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+                                    (mcp-server-lib-process-jsonrpc
+                                     (mcp-server-lib-create-tools-list-request 100))
+                                    
+                                    ;; Verify metrics exist
+                                    (let ((summary (mcp-server-lib-metrics-summary)))
+                                      (should (stringp summary))
+                                      ;; Should show at least 2 calls (initialize + tools/list)
+                                      (should (string-match "[2-9][0-9]* calls\\|[0-9][0-9]+ calls" summary))))
+  
+  ;; Second part: start server again and verify metrics were reset
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+                                    ;; After server restart, only the initialize call should be counted
+                                    (let ((summary (mcp-server-lib-metrics-summary)))
+                                      (should (string-match "^MCP metrics: [12] calls" summary)))))
 
 (ert-deftest mcp-server-lib-test-metrics-on-stop ()
   "Test metrics display on server stop."
