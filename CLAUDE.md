@@ -131,7 +131,7 @@ Before writing any code:
 - **Naming**: Use `mcp-` prefix for public functions, `mcp--` for internal/private
   functions
 - **Documentation**: Provide docstrings for all functions with Arguments and Examples
-  sections
+  sections (but exclude Examples from internal/private symbol docstrings)
 - **Quoting**: Use `\\='` for quoted symbols instead of single quotes
 - **Function Parameters**: Prefix unused parameters with underscore (e.g., `_path`)
 - **Whitespace**: Avoid trailing whitespace; two spaces after period in docstrings
