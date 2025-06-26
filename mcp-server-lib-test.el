@@ -1727,34 +1727,38 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-name ()
   "Test that resource registration with missing :name produces an error."
-  (should-error
-   (mcp-server-lib-register-resource
-    "test://resource"
-    #'mcp-server-lib-test--resource-handler-simple
-    :description "Resource without name")
-   :type 'error))
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (should-error
+     (mcp-server-lib-register-resource
+      "test://resource"
+      #'mcp-server-lib-test--resource-handler-simple
+      :description "Resource without name")
+     :type 'error)))
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-handler ()
   "Test that resource registration with non-function handler produces an error."
-  (should-error
-   (mcp-server-lib-register-resource
-    "test://resource"
-    "not-a-function"
-    :name "Test Resource")
-   :type 'error))
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (should-error
+     (mcp-server-lib-register-resource
+      "test://resource"
+      "not-a-function"
+      :name "Test Resource")
+     :type 'error)))
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-uri ()
   "Test that resource registration with nil URI produces an error."
-  (should-error
-   (mcp-server-lib-register-resource
-    nil
-    #'mcp-server-lib-test--resource-handler-simple
-    :name "Test Resource")
-   :type 'error))
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (should-error
+     (mcp-server-lib-register-resource
+      nil
+      #'mcp-server-lib-test--resource-handler-simple
+      :name "Test Resource")
+     :type 'error)))
 
 (ert-deftest test-mcp-server-lib-unregister-resource-nonexistent ()
   "Test that `mcp-server-lib-unregister-resource` returns nil for missing resources."
-  (should-not (mcp-server-lib-unregister-resource "test://nonexistent")))
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (should-not (mcp-server-lib-unregister-resource "test://nonexistent"))))
 
 (ert-deftest test-mcp-server-lib-resources-list-multiple ()
   "Test listing multiple registered resources."
