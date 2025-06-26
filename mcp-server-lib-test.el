@@ -577,20 +577,27 @@ should not include tools or resources fields at all."
 (ert-deftest mcp-server-lib-test-initialize-with-tools-and-resources ()
   "Test initialize when both tools and resources are registered.
 When both are registered, capabilities should include both fields."
-  (mcp-server-lib-register-tool
-   #'mcp-server-lib-test--tool-handler-simple
-   :id "test-tool"
-   :description "Test tool")
-  (unwind-protect
-      (progn
-        (mcp-server-lib-register-resource
-         "test://resource"
-         #'mcp-server-lib-test--resource-handler-simple
-         :name "Test Resource")
-        (unwind-protect
-            (mcp-server-lib-test--with-server :tools t :resources t)
-          (mcp-server-lib-unregister-resource "test://resource")))
-    (mcp-server-lib-unregister-tool "test-tool")))
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Register tool and resource
+    (mcp-server-lib-register-tool
+     #'mcp-server-lib-test--tool-handler-simple
+     :id "test-tool"
+     :description "Test tool")
+    (mcp-server-lib-register-resource
+     "test://resource"
+     #'mcp-server-lib-test--resource-handler-simple
+     :name "Test Resource")
+    (unwind-protect
+        (progn
+          ;; Test initialization
+          (let* ((init-result (mcp-server-lib-test--get-initialize-result))
+                 (capabilities (alist-get 'capabilities init-result)))
+            (should (= 2 (length capabilities)))
+            (should (assoc 'tools capabilities))
+            (should (assoc 'resources capabilities))))
+      ;; Clean up
+      (mcp-server-lib-unregister-tool "test-tool")
+      (mcp-server-lib-unregister-resource "test://resource"))))
 
 (ert-deftest mcp-server-lib-test-notifications-initialized ()
   "Test the MCP `notifications/initialized` request handling."
