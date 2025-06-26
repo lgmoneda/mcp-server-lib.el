@@ -1693,7 +1693,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
      (should (alist-get 'error response))
      (let ((error-obj (alist-get 'error response)))
        (should (equal (alist-get 'code error-obj)
-                      mcp-server-lib--error-invalid-request))
+                      mcp-server-lib--error-invalid-params))
        (should (string-match "Resource not found: test://nonexistent"
                              (alist-get 'message error-obj)))))))
 

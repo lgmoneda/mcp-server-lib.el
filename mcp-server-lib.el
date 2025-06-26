@@ -78,6 +78,9 @@ Defaults to `user-emacs-directory' but can be customized."
 (defconst mcp-server-lib--error-method-not-found -32601
   "Error code for Method Not Found.")
 
+(defconst mcp-server-lib--error-invalid-params -32602
+  "Error code for Invalid Params.")
+
 (defconst mcp-server-lib--error-internal -32603
   "Error code for Internal Error.")
 
@@ -472,7 +475,7 @@ METHOD-METRICS is used to track errors for this method."
                     uri (error-message-string err)))))
       (mcp-server-lib--jsonrpc-error
        id
-       mcp-server-lib--error-invalid-request
+       mcp-server-lib--error-invalid-params
        (format "Resource not found: %s" uri)))))
 
 ;;; Error handling helpers
