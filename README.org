@@ -151,6 +151,10 @@ To install the script to a different location:
 - **Connection errors**: Ensure Emacs daemon is running
 - **Debugging**: Set =mcp-server-lib-log-io= to =t= and check =*mcp-server-lib-log*= buffer
 
+* Similar packages
+
+- https://github.com/utsahi/mcp-server.el
+
 * License
 
 This project is licensed under the GNU General Public License v3.0 (GPLv3) - see the LICENSE file for details.
