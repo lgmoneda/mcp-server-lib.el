@@ -19,6 +19,10 @@
 - Emacs 27.1 or later
 - Running Emacs daemon (for stdio transport)
 
+* MCP servers built on this library
+
+- [[https://github.com/laurynas-biveinis/elisp-dev-mcp][elisp-dev-mcp]] - Elisp development support tools
+
 * Installation
 
 From MELPA:
