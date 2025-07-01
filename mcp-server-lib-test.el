@@ -44,11 +44,14 @@
 (defconst mcp-server-lib-test--unregister-tool-id "test-unregister"
   "Tool ID used for testing tool unregistration.")
 
-;;; Test tool handlers
+;;; Generic test handlers
 
-(defun mcp-server-lib-test--tool-handler-simple ()
-  "Test tool handler function for MCP tool testing."
+(defun mcp-server-lib-test--return-string ()
+  "Generic handler that returns a test string.
+Can be used for both tool and resource testing."
   "test result")
+
+;;; Test tool handlers
 
 (defun mcp-server-lib-test--tool-handler-mcp-server-lib-tool-throw ()
   "Test tool handler that always fails with `mcp-server-lib-tool-throw'."
@@ -113,10 +116,6 @@ MCP Parameters:"
                   "mcp-server-lib-bytecode-handler-test")
 
 ;;; Test resource handlers
-
-(defun mcp-server-lib-test--resource-handler-simple ()
-  "Simple resource handler that returns static content."
-  "Test content")
 
 (defun mcp-server-lib-test--resource-handler-error ()
   "Test resource handler that throws an error."
@@ -210,10 +209,10 @@ Arguments:
 
 Example:
   (mcp-server-lib-test--with-tools
-   ((#\\='mcp-server-lib-test--tool-handler-simple
+   ((#\\='mcp-server-lib-test--return-string
      :id \"test-tool-1\"
      :description \"First tool\")
-    (#\\='mcp-server-lib-test--tool-handler-simple
+    (#\\='mcp-server-lib-test--return-string
      :id \"test-tool-2\"
      :description \"Second tool\"))
    (let ((response (mcp-server-lib-process-jsonrpc
@@ -258,11 +257,11 @@ Arguments:
 Example:
   (mcp-server-lib-test--with-resources
    ((\"test://resource1\"
-     #\\='mcp-server-lib-test--resource-handler-simple
+     #\\='mcp-server-lib-test--return-string
      :name \"Test Resource\"
      :description \"A test resource\")
     (\"test://resource2\"
-     #\\='mcp-server-lib-test--resource-handler-simple
+     #\\='mcp-server-lib-test--return-string
      :name \"Another Resource\"
      :mime-type \"text/plain\"))
    (let ((resources (mcp-server-lib-test--get-resource-list)))
@@ -580,12 +579,12 @@ When both are registered, capabilities should include both fields."
   (mcp-server-lib-test--with-server :tools nil :resources nil
     ;; Register tool and resource
     (mcp-server-lib-register-tool
-     #'mcp-server-lib-test--tool-handler-simple
+     #'mcp-server-lib-test--return-string
      :id "test-tool"
      :description "Test tool")
     (mcp-server-lib-register-resource
      "test://resource"
-     #'mcp-server-lib-test--resource-handler-simple
+     #'mcp-server-lib-test--return-string
      :name "Test Resource")
     (unwind-protect
         (progn
@@ -769,7 +768,7 @@ When both are registered, capabilities should include both fields."
   "Test that tool registration with missing :id produces an error."
   (should-error
    (mcp-server-lib-register-tool
-    #'mcp-server-lib-test--tool-handler-simple
+    #'mcp-server-lib-test--return-string
     :description "Test tool without ID")
    :type 'error))
 
@@ -779,7 +778,7 @@ When both are registered, capabilities should include both fields."
   "Test that tool registration with missing :description produces an error."
   (should-error
    (mcp-server-lib-register-tool
-    #'mcp-server-lib-test--tool-handler-simple
+    #'mcp-server-lib-test--return-string
     :id "test-tool-no-desc")
    :type 'error))
 
@@ -829,12 +828,12 @@ With reference counting, duplicate registrations should succeed and increment
 the reference count, returning the original tool definition."
   (mcp-server-lib-test--with-server :tools nil :resources nil
     (should (mcp-server-lib-register-tool
-             #'mcp-server-lib-test--tool-handler-simple
+             #'mcp-server-lib-test--return-string
              :id "duplicate-test"
              :description "First registration"))
     
     (should (mcp-server-lib-register-tool
-             #'mcp-server-lib-test--tool-handler-simple
+             #'mcp-server-lib-test--return-string
              :id "duplicate-test"
              :description "Second registration - should be ignored"))
     
@@ -887,7 +886,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   "Test that `mcp-server-lib-unregister-tool' removes a tool correctly."
   (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-register-tool
-     #'mcp-server-lib-test--tool-handler-simple
+     #'mcp-server-lib-test--return-string
      :id mcp-server-lib-test--unregister-tool-id
      :description "Tool for unregister test")
 
@@ -917,7 +916,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (unwind-protect
       (progn
         (mcp-server-lib-register-tool
-         #'mcp-server-lib-test--tool-handler-simple
+         #'mcp-server-lib-test--return-string
          :id "test-other"
          :description "Other test tool")
         (should-not (mcp-server-lib-unregister-tool "nonexistent-tool")))
@@ -987,7 +986,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-server-lib-test-tools-list-one ()
   "Test `tools/list` returning one tool with correct fields and schema."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
+      ((#'mcp-server-lib-test--return-string
         :id "test-tool"
         :description "A tool for testing"))
     (mcp-server-lib-test--verify-tool-list-request
@@ -998,7 +997,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-server-lib-test-tools-list-with-title ()
   "Test that `tools/list` includes title in response."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
+      ((#'mcp-server-lib-test--return-string
         :id "tool-with-title"
         :description "A tool for testing titles"
         :title "Friendly Tool Name"))
@@ -1011,10 +1010,10 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-server-lib-test-tools-list-two ()
   "Test the `tools/list` method returning multiple tools with correct fields."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
+      ((#'mcp-server-lib-test--return-string
         :id "test-tool-1"
         :description "First tool for testing")
-       (#'mcp-server-lib-test--tool-handler-simple
+       (#'mcp-server-lib-test--return-string
         :id "test-tool-2"
         :description "Second tool for testing"))
     (mcp-server-lib-test--verify-req-success "tools/list"
@@ -1059,7 +1058,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-tools-list-read-only-hint ()
   "Test that `tools/list` response includes readOnlyHint=true."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
+      ((#'mcp-server-lib-test--return-string
         :id "read-only-tool"
         :description "A tool that doesn't modify its environment"
         :read-only t))
@@ -1074,7 +1073,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-tools-list-read-only-hint-false ()
   "Test that `tools/list` response includes readOnlyHint=false."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
+      ((#'mcp-server-lib-test--return-string
         :id "non-read-only-tool"
         :description "Tool that modifies its environment"
         :read-only nil))
@@ -1088,7 +1087,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-tools-list-multiple-annotations ()
   "Test `tools/list` response including multiple annotations."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
+      ((#'mcp-server-lib-test--return-string
         :id "multi-annotated-tool"
         :description "A tool with multiple annotations"
         :title "Friendly Multi-Tool"
@@ -1375,7 +1374,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-server-restart-preserves-tools ()
   "Test that server restart preserves registered tools."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-simple
+      ((#'mcp-server-lib-test--return-string
         :id "persistent-tool"
         :description "Test persistence across restarts"))
     (mcp-server-lib-stop)
@@ -1521,7 +1520,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test metrics collection and reset."
   (mcp-server-lib-test--with-tools
       ( ;; Register a test tool
-       (#'mcp-server-lib-test--tool-handler-simple
+       (#'mcp-server-lib-test--return-string
         :id "metrics-test-tool"
         :description "Tool for testing metrics"))
     ;; Make some operations to generate metrics
@@ -1547,7 +1546,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-show-metrics ()
   "Test metrics display command."
   (mcp-server-lib-test--with-tools
-   ((#'mcp-server-lib-test--tool-handler-simple
+   ((#'mcp-server-lib-test--return-string
      :id "display-test-tool"
      :description "Tool for testing display"))
    ;; Generate some metrics
@@ -1605,7 +1604,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
               (lambda (fmt &rest args)
                 (push (apply #'format fmt args) messages))))
     (mcp-server-lib-test--with-tools
-        ((#'mcp-server-lib-test--tool-handler-simple
+        ((#'mcp-server-lib-test--return-string
           :id "stop-test-tool"
           :description "Tool for testing stop"))
       ;; Generate some metrics
@@ -1629,7 +1628,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test registering a direct resource."
   (mcp-server-lib-test--with-resources
       (("test://resource1"
-        #'mcp-server-lib-test--resource-handler-simple
+        #'mcp-server-lib-test--return-string
         :name "Test Resource"
         :description "A test resource"
         :mime-type "text/plain"))
@@ -1644,7 +1643,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test registering a resource with only required fields."
   (mcp-server-lib-test--with-resources
    (("test://minimal"
-     #'mcp-server-lib-test--resource-handler-simple
+     #'mcp-server-lib-test--return-string
      :name "Minimal Resource"))
    ;; Verify it was registered correctly
    (mcp-server-lib-test--check-single-resource
@@ -1654,13 +1653,13 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
    (mcp-server-lib-test--check-resource-read-response
     "test://minimal"
     '((uri . "test://minimal")
-      (text . "Test content")))))
+      (text . "test result")))))
 
 (ert-deftest test-mcp-server-lib-resources-read ()
   "Test reading a resource."
   (mcp-server-lib-test--with-resources
    (("test://resource1"
-     #'mcp-server-lib-test--resource-handler-simple
+     #'mcp-server-lib-test--return-string
      :name "Test Resource"
      :mime-type "text/plain"))
    ;; Read the resource
@@ -1670,7 +1669,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
      "test://resource1"
      '((uri . "test://resource1")
        (mimeType . "text/plain")
-       (text . "Test content"))))))
+       (text . "test result"))))))
 
 (ert-deftest test-mcp-server-lib-resources-read-handler-nil ()
   "Test that resource handler returning nil produces valid response with empty text."
@@ -1703,14 +1702,14 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
    ;; Register resource first time
    (should (mcp-server-lib-register-resource
             "test://resource1"
-            #'mcp-server-lib-test--resource-handler-simple
+            #'mcp-server-lib-test--return-string
             :name "Test Resource"))
    (unwind-protect
        (progn
          ;; Register same resource again
          (should (mcp-server-lib-register-resource
                   "test://resource1"
-                  #'mcp-server-lib-test--resource-handler-simple
+                  #'mcp-server-lib-test--return-string
                   :name "Test Resource"))
          (unwind-protect
              (progn
@@ -1731,7 +1730,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
     (should-error
      (mcp-server-lib-register-resource
       "test://resource"
-      #'mcp-server-lib-test--resource-handler-simple
+      #'mcp-server-lib-test--return-string
       :description "Resource without name")
      :type 'error)))
 
@@ -1751,7 +1750,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
     (should-error
      (mcp-server-lib-register-resource
       nil
-      #'mcp-server-lib-test--resource-handler-simple
+      #'mcp-server-lib-test--return-string
       :name "Test Resource")
      :type 'error)))
 
@@ -1764,11 +1763,11 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test listing multiple registered resources."
   (mcp-server-lib-test--with-resources
       (("test://resource1"
-        #'mcp-server-lib-test--resource-handler-simple
+        #'mcp-server-lib-test--return-string
         :name "First Resource"
         :description "The first test resource")
        ("test://resource2"
-        #'mcp-server-lib-test--resource-handler-simple
+        #'mcp-server-lib-test--return-string
         :name "Second Resource"
         :mime-type "text/markdown"))
     ;; Verify both resources are listed
