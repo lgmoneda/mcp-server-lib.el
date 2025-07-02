@@ -490,6 +490,15 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
         (dolist (field expected-fields)
           (should (equal (alist-get (car field) content) (cdr field))))))))
 
+(defun mcp-server-lib-test--verify-resource-read (uri expected-fields)
+  "Verify that reading resource at URI succeeds with EXPECTED-FIELDS.
+This is a convenience wrapper that combines verify-req-success
+with check-resource-read-response for the common pattern."
+  (mcp-server-lib-test--verify-req-success
+   "resources/read"
+   (mcp-server-lib-test--check-resource-read-response
+    uri expected-fields)))
+
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
   "Verify a `tools/list` response against EXPECTED-TOOLS.
 EXPECTED-TOOLS should be an alist of (tool-name . tool-properties)."
@@ -1663,13 +1672,11 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
      :name "Test Resource"
      :mime-type "text/plain"))
    ;; Read the resource
-   (mcp-server-lib-test--verify-req-success
-    "resources/read"
-    (mcp-server-lib-test--check-resource-read-response
-     "test://resource1"
-     '((uri . "test://resource1")
-       (mimeType . "text/plain")
-       (text . "test result"))))))
+   (mcp-server-lib-test--verify-resource-read
+    "test://resource1"
+    '((uri . "test://resource1")
+      (mimeType . "text/plain")
+      (text . "test result")))))
 
 (ert-deftest test-mcp-server-lib-resources-read-handler-nil ()
   "Test that resource handler returning nil produces valid response with empty text."
@@ -1678,12 +1685,10 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
      #'mcp-server-lib-test--resource-handler-nil
      :name "Nil Resource"))
    ;; Read the resource
-   (mcp-server-lib-test--verify-req-success
-    "resources/read"
-    (mcp-server-lib-test--check-resource-read-response
-     "test://nil-resource"
-     '((uri . "test://nil-resource")
-       (text . nil))))))
+   (mcp-server-lib-test--verify-resource-read
+    "test://nil-resource"
+    '((uri . "test://nil-resource")
+      (text . nil)))))
 
 (ert-deftest test-mcp-server-lib-resources-read-not-found ()
   "Test reading a non-existent resource returns error."
