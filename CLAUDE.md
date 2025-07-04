@@ -89,6 +89,7 @@ Before writing any code:
 - If you see no alternative to testing internals, ask for guidance
 - Consider both positive and negative test cases (error conditions)
 - When adding new features, update existing tests if necessary
+- **IMPORTANT: Tests can NEVER call internal package functions**
 
 1. **Run linters with check.sh**
 
@@ -169,3 +170,7 @@ For implementation details and roadmap, refer to the `TODO.org` file which conta
 - Transport implementation plans
 - Testing requirements
 - Future features
+
+## Coding Principles
+
+- Prefer named functions to lambdas
