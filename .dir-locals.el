@@ -5,6 +5,7 @@
                      (elisp-lint-indent-specs . ((if-let* . 1)
                                                  (mcp-server-lib-test--with-server . defun)
                                                  (mcp-server-lib-test--with-tools . 1)
+                                                 (mcp-server-lib-test--with-undefined-function . 1)
                                                  (mcp-server-lib-test--successful-req . defun)
                                                  (mcp-server-lib-test--verify-req-success . defun)
                                                  (mcp-server-lib-test--with-error-tracking . 1)

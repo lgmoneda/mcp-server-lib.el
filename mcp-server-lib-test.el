@@ -55,6 +55,11 @@ Can be used for both tool and resource testing."
   "Generic handler that throws an error for testing error handling."
   (error "Generic error occurred"))
 
+(defun mcp-server-lib-test--handler-to-be-undefined ()
+  "Generic handler that will be undefined after registration.
+Used for testing behavior when handlers no longer exist."
+  "Handler was defined when called")
+
 ;;; Test tool handlers
 
 (defun mcp-server-lib-test--tool-handler-mcp-server-lib-tool-throw ()
@@ -72,10 +77,6 @@ Can be used for both tool and resource testing."
 (defun mcp-server-lib-test--tool-handler-returns-nil ()
   "Test tool handler function returning nil."
   nil)
-
-(defun mcp-server-lib-test--tool-handler-to-be-undefined ()
-  "Test tool handler function that will be undefined after registration."
-  "Handler was defined when called")
 
 (defun mcp-server-lib-test--tool-handler-string-arg (input-string)
   "Test tool handler that accepts a string argument.
@@ -123,6 +124,18 @@ MCP Parameters:"
   nil)
 
 ;;; Test helpers
+
+(defmacro mcp-server-lib-test--with-undefined-function (function-symbol &rest body)
+  "Execute BODY with FUNCTION-SYMBOL undefined, then restore it.
+FUNCTION-SYMBOL should be a quoted symbol.
+The original function definition is saved and restored after BODY executes."
+  (declare (indent 1) (debug (symbolp body)))
+  `(let ((original-def (symbol-function ,function-symbol)))
+     (unwind-protect
+         (progn
+           (fmakunbound ,function-symbol)
+           ,@body)
+       (fset ,function-symbol original-def))))
 
 (cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources &allow-other-keys)
   "Run BODY with MCP server active and initialized.
@@ -1261,18 +1274,16 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-tools-call-handler-undefined ()
   "Test calling a tool whose handler function no longer exists."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-to-be-undefined
+      ((#'mcp-server-lib-test--handler-to-be-undefined
         :id "undefined-handler-tool"
         :description "A tool whose handler will be undefined"))
-    ;; Undefine the handler function
-    (fmakunbound 'mcp-server-lib-test--tool-handler-to-be-undefined)
-
-    (mcp-server-lib-test--with-error-tracking "undefined-handler-tool"
-      ;; Try to call the tool - should return an error
-      (mcp-server-lib-test--check-jsonrpc-error
-       (mcp-server-lib-create-tools-call-request
-        "undefined-handler-tool" 16)
-       -32603 "Internal error executing tool"))))
+    (mcp-server-lib-test--with-undefined-function 'mcp-server-lib-test--handler-to-be-undefined
+      (mcp-server-lib-test--with-error-tracking "undefined-handler-tool"
+        ;; Try to call the tool - should return an error
+        (mcp-server-lib-test--check-jsonrpc-error
+         (mcp-server-lib-create-tools-call-request
+          "undefined-handler-tool" 16)
+         -32603 "Internal error executing tool")))))
 
 
 ;;; `mcp-server-lib-process-jsonrpc' tests
@@ -1807,6 +1818,24 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
                               (alist-get 'message error-obj)))
         (should (string-match "Generic error occurred"
                               (alist-get 'message error-obj))))))))
+
+(ert-deftest mcp-server-lib-test-resources-read-handler-undefined ()
+  "Test reading a resource whose handler function no longer exists."
+  (mcp-server-lib-test--with-resources
+   (("test://undefined-handler"
+     #'mcp-server-lib-test--handler-to-be-undefined
+     :name "Undefined Handler Resource"))
+   (mcp-server-lib-test--with-undefined-function 'mcp-server-lib-test--handler-to-be-undefined
+     (mcp-server-lib-test--with-metrics-tracking
+      (("resources/read" 1 1))
+      ;; Try to read the resource - should return an error
+      (let ((response (mcp-server-lib-test--read-resource "test://undefined-handler")))
+        (should (alist-get 'error response))
+        (let ((error-obj (alist-get 'error response)))
+          (should (equal (alist-get 'code error-obj)
+                         mcp-server-lib--error-internal))
+          (should (string-match "Error reading resource test://undefined-handler"
+                                (alist-get 'message error-obj)))))))))
 
 (provide 'mcp-server-lib-test)
 
