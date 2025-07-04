@@ -57,8 +57,8 @@ Can be used for both tool and resource testing."
   "Test tool handler that always fails with `mcp-server-lib-tool-throw'."
   (mcp-server-lib-tool-throw "This tool intentionally fails"))
 
-(defun mcp-server-lib-test--tool-handler-error ()
-  "Test tool handler that throws a generic error."
+(defun mcp-server-lib-test--generic-error-handler ()
+  "Generic handler that throws an error for testing error handling."
   (error "Generic error occurred"))
 
 (defun mcp-server-lib-test--tool-handler-string-list ()
@@ -117,9 +117,6 @@ MCP Parameters:"
 
 ;;; Test resource handlers
 
-(defun mcp-server-lib-test--resource-handler-error ()
-  "Test resource handler that throws an error."
-  (error "Resource handler error"))
 
 (defun mcp-server-lib-test--resource-handler-nil ()
   "Test resource handler that returns nil."
@@ -1193,7 +1190,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-tools-call-generic-error ()
   "Test that generic errors use standard JSON-RPC error format."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-error
+      ((#'mcp-server-lib-test--generic-error-handler
         :id "generic-error-tool"
         :description "A tool that throws a generic error"))
     (mcp-server-lib-test--with-error-tracking "generic-error-tool"
@@ -1796,7 +1793,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test that resource handler errors return JSON-RPC error and increment error metrics."
   (mcp-server-lib-test--with-resources
    (("test://error-resource"
-     #'mcp-server-lib-test--resource-handler-error
+     #'mcp-server-lib-test--generic-error-handler
      :name "Error Resource"))
    (mcp-server-lib-test--with-metrics-tracking
     (("resources/read" 1 1))
@@ -1808,7 +1805,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
                        mcp-server-lib--error-internal))
         (should (string-match "Error reading resource test://error-resource"
                               (alist-get 'message error-obj)))
-        (should (string-match "Resource handler error"
+        (should (string-match "Generic error occurred"
                               (alist-get 'message error-obj))))))))
 
 (provide 'mcp-server-lib-test)
