@@ -47,7 +47,7 @@
 ;;; Generic test handlers
 
 (defun mcp-server-lib-test--return-string ()
-  "Generic handler that returns a test string.
+  "Generic handler to return a test string.
 Can be used for both tool and resource testing."
   "test result")
 
