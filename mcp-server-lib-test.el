@@ -60,6 +60,11 @@ Can be used for both tool and resource testing."
 Used for testing behavior when handlers no longer exist."
   "Handler was defined when called")
 
+(defun mcp-server-lib-test--return-nil ()
+  "Generic handler that returns nil.
+Can be used for both tool and resource testing."
+  nil)
+
 ;;; Test tool handlers
 
 (defun mcp-server-lib-test--tool-handler-mcp-server-lib-tool-throw ()
@@ -73,10 +78,6 @@ Used for testing behavior when handlers no longer exist."
 (defun mcp-server-lib-test--tool-handler-empty-string ()
   "Test tool handler function to return an empty string."
   "")
-
-(defun mcp-server-lib-test--tool-handler-returns-nil ()
-  "Test tool handler function returning nil."
-  nil)
 
 (defun mcp-server-lib-test--tool-handler-string-arg (input-string)
   "Test tool handler that accepts a string argument.
@@ -117,11 +118,6 @@ MCP Parameters:"
                   "mcp-server-lib-bytecode-handler-test")
 
 ;;; Test resource handlers
-
-
-(defun mcp-server-lib-test--resource-handler-nil ()
-  "Test resource handler that returns nil."
-  nil)
 
 ;;; Test helpers
 
@@ -1261,7 +1257,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest mcp-server-lib-test-tools-call-handler-returns-nil ()
   "Test tool handler that returns nil value."
   (mcp-server-lib-test--with-tools
-      ((#'mcp-server-lib-test--tool-handler-returns-nil
+      ((#'mcp-server-lib-test--return-nil
         :id "nil-returning-tool"
         :description "A tool that returns nil"))
     (let ((result
@@ -1690,7 +1686,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
   "Test that resource handler returning nil produces valid response with empty text."
   (mcp-server-lib-test--with-resources
    (("test://nil-resource"
-     #'mcp-server-lib-test--resource-handler-nil
+     #'mcp-server-lib-test--return-nil
      :name "Nil Resource"))
    ;; Read the resource
    (mcp-server-lib-test--verify-resource-read
