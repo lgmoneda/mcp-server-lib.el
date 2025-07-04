@@ -51,15 +51,15 @@
 Can be used for both tool and resource testing."
   "test result")
 
+(defun mcp-server-lib-test--generic-error-handler ()
+  "Generic handler that throws an error for testing error handling."
+  (error "Generic error occurred"))
+
 ;;; Test tool handlers
 
 (defun mcp-server-lib-test--tool-handler-mcp-server-lib-tool-throw ()
   "Test tool handler that always fails with `mcp-server-lib-tool-throw'."
   (mcp-server-lib-tool-throw "This tool intentionally fails"))
-
-(defun mcp-server-lib-test--generic-error-handler ()
-  "Generic handler that throws an error for testing error handling."
-  (error "Generic error occurred"))
 
 (defun mcp-server-lib-test--tool-handler-string-list ()
   "Test tool handler function to return a string with items."
