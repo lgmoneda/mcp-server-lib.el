@@ -70,7 +70,7 @@ else
 	echo "Skipping indentation due to syntax errors"
 fi
 
-eask clean elc
+eask clean elc >/dev/null 2>&1 || true
 
 # Only run elisp-lint if there are no errors so far
 if [ $ERRORS -eq 0 ]; then
@@ -85,7 +85,7 @@ else
 	echo "Skipping elisp-lint due to previous errors"
 fi
 
-eask clean elc
+eask clean elc >/dev/null 2>&1 || true
 
 # Run Eask keywords lint
 echo -n "Running eask lint keywords... "
