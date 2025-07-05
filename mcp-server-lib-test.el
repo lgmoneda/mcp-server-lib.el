@@ -179,7 +179,10 @@ Captures metrics before BODY execution and asserts after that:
 - calls increased by 1
 - errors stayed the same
 
-Note: This macro assumes the MCP server is already running."
+Note: This macro assumes the MCP server is already running.
+
+IMPORTANT: Any request-issuing test MUST use this macro to ensure proper
+metric tracking and verification."
   (declare (indent defun) (debug t))
   `(let* ((metrics (mcp-server-lib-metrics-get ,method))
           (calls-before (mcp-server-lib-metrics-calls metrics))
