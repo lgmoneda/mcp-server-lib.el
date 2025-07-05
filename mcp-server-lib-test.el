@@ -279,20 +279,17 @@ Example:
         (push `(mcp-server-lib-register-resource ,uri ,handler ,@props)
               resource-registrations)))
     ;; Build the macro expansion
-    `(progn
-       ;; Register all resources first
-       ,@
-       (nreverse resource-registrations)
-       ;; Run with server active
-       (mcp-server-lib-test--with-server :tools nil :resources t
-         (unwind-protect
-             (progn
-               ,@body)
-           ;; Unregister all resources
-           ,@
-           (mapcar
-            (lambda (uri) `(mcp-server-lib-unregister-resource ,uri))
-            (nreverse resource-uris)))))))
+    `(unwind-protect
+         (progn
+           ;; Register all resources before starting server
+           ,@(nreverse resource-registrations)
+           ;; Now start server with resources already registered
+           (mcp-server-lib-test--with-server :tools nil :resources t
+             ,@body))
+       ;; Unregister all resources
+       ,@(mapcar
+          (lambda (uri) `(mcp-server-lib-unregister-resource ,uri))
+          (nreverse resource-uris)))))
 
 (defun mcp-server-lib-test--get-request-result (method request)
   "Process REQUEST via `mcp-server-lib-process-jsonrpc' and return result.
