@@ -584,26 +584,30 @@ should not include tools or resources fields at all."
   "Test initialize when both tools and resources are registered.
 When both are registered, capabilities should include both fields."
   (mcp-server-lib-test--with-server :tools nil :resources nil
-    ;; Register tool and resource
-    (mcp-server-lib-register-tool
-     #'mcp-server-lib-test--return-string
-     :id "test-tool"
-     :description "Test tool")
-    (mcp-server-lib-register-resource
-     "test://resource"
-     #'mcp-server-lib-test--return-string
-     :name "Test Resource")
     (unwind-protect
         (progn
-          ;; Test initialization
-          (let* ((init-result (mcp-server-lib-test--get-initialize-result))
-                 (capabilities (alist-get 'capabilities init-result)))
-            (should (= 2 (length capabilities)))
-            (should (assoc 'tools capabilities))
-            (should (assoc 'resources capabilities))))
-      ;; Clean up
-      (mcp-server-lib-unregister-tool "test-tool")
-      (mcp-server-lib-unregister-resource "test://resource"))))
+          ;; Register tool inside unwind-protect
+          (mcp-server-lib-register-tool
+           #'mcp-server-lib-test--return-string
+           :id "test-tool"
+           :description "Test tool")
+          (unwind-protect
+              (progn
+                ;; Register resource inside unwind-protect
+                (mcp-server-lib-register-resource
+                 "test://resource"
+                 #'mcp-server-lib-test--return-string
+                 :name "Test Resource")
+                ;; Test initialization
+                (let* ((init-result (mcp-server-lib-test--get-initialize-result))
+                       (capabilities (alist-get 'capabilities init-result)))
+                  (should (= 2 (length capabilities)))
+                  (should (assoc 'tools capabilities))
+                  (should (assoc 'resources capabilities))))
+            ;; Clean up resource
+            (mcp-server-lib-unregister-resource "test://resource")))
+      ;; Clean up tool
+      (mcp-server-lib-unregister-tool "test-tool"))))
 
 (ert-deftest mcp-server-lib-test-notifications-initialized ()
   "Test the MCP `notifications/initialized` request handling."
