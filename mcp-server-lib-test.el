@@ -138,38 +138,36 @@ The original function definition is saved and restored after BODY executes."
 Starts the server, sends initialize request, then runs BODY.
 TOOLS and RESOURCES are booleans indicating expected capabilities."
   (declare (indent defun) (debug t))
-  `(progn
-     (should-not mcp-server-lib--running)
-     (mcp-server-lib-start)
-     (unwind-protect
-         (progn
-           (let* ((init-result (mcp-server-lib-test--get-initialize-result))
-                  (protocol-version (alist-get 'protocolVersion init-result))
-                  (capabilities (alist-get 'capabilities init-result))
-                  (server-info (alist-get 'serverInfo init-result)))
-             ;; Verify protocol version
-             (should (stringp protocol-version))
-             (should (string= "2025-03-26" protocol-version))
-             ;; Verify server info
-             (should (string= mcp-server-lib--name (alist-get 'name server-info)))
-             ;; Verify capabilities match expectations
-             ,@(when tools
-                 `((should (assoc 'tools capabilities))
-                   ;; Empty objects {} in JSON are parsed as nil in Elisp
-                   (should (null (alist-get 'tools capabilities)))))
-             ,@(when resources
-                 `((should (assoc 'resources capabilities))
-                   ;; Empty objects {} in JSON are parsed as nil in Elisp
-                   (should (null (alist-get 'resources capabilities)))))
-             ;; Verify exact count
-             (should (= (+ (if ,tools 1 0) (if ,resources 1 0))
-                        (length capabilities))))
-           (mcp-server-lib-process-jsonrpc
-            (json-encode
-             '(("jsonrpc" . "2.0")
-               ("method" . "notifications/initialized"))))
-           ,@body)
-       (mcp-server-lib-stop))))
+  `(unwind-protect
+       (progn
+         (mcp-server-lib-start)
+         (let* ((init-result (mcp-server-lib-test--get-initialize-result))
+                (protocol-version (alist-get 'protocolVersion init-result))
+                (capabilities (alist-get 'capabilities init-result))
+                (server-info (alist-get 'serverInfo init-result)))
+           ;; Verify protocol version
+           (should (stringp protocol-version))
+           (should (string= "2025-03-26" protocol-version))
+           ;; Verify server info
+           (should (string= mcp-server-lib--name (alist-get 'name server-info)))
+           ;; Verify capabilities match expectations
+           ,@(when tools
+               `((should (assoc 'tools capabilities))
+                 ;; Empty objects {} in JSON are parsed as nil in Elisp
+                 (should (null (alist-get 'tools capabilities)))))
+           ,@(when resources
+               `((should (assoc 'resources capabilities))
+                 ;; Empty objects {} in JSON are parsed as nil in Elisp
+                 (should (null (alist-get 'resources capabilities)))))
+           ;; Verify exact count
+           (should (= (+ (if ,tools 1 0) (if ,resources 1 0))
+                      (length capabilities))))
+         (mcp-server-lib-process-jsonrpc
+          (json-encode
+           '(("jsonrpc" . "2.0")
+             ("method" . "notifications/initialized"))))
+         ,@body)
+     (mcp-server-lib-stop)))
 
 (defmacro mcp-server-lib-test--verify-req-success (method &rest body)
   "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
