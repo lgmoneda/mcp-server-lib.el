@@ -838,34 +838,39 @@ When both are registered, capabilities should include both fields."
 With reference counting, duplicate registrations should succeed and increment
 the reference count, returning the original tool definition."
   (mcp-server-lib-test--with-server :tools nil :resources nil
-    (should (mcp-server-lib-register-tool
-             #'mcp-server-lib-test--return-string
-             :id "duplicate-test"
-             :description "First registration"))
-    
-    (should (mcp-server-lib-register-tool
-             #'mcp-server-lib-test--return-string
-             :id "duplicate-test"
-             :description "Second registration - should be ignored"))
-    
-    ;; Tool should be callable after registrations
-    (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 1)))
-      (mcp-server-lib-test--check-mcp-server-lib-content-format
-       result "test result"))
-    
-    ;; First unregister should succeed (ref count goes from 2 to 1)
-    (should (mcp-server-lib-unregister-tool "duplicate-test"))
-    
-    ;; Tool should still be callable after first unregister
-    (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 2)))
-      (mcp-server-lib-test--check-mcp-server-lib-content-format
-       result "test result"))
-    
-    ;; Second unregister should succeed (ref count goes from 1 to 0, tool removed)
-    (should (mcp-server-lib-unregister-tool "duplicate-test"))
+    (unwind-protect
+        (progn
+          ;; First registration inside unwind-protect
+          (should (mcp-server-lib-register-tool
+                   #'mcp-server-lib-test--return-string
+                   :id "duplicate-test"
+                   :description "First registration"))
+          (unwind-protect
+              (progn
+                ;; Second registration inside nested unwind-protect
+                (should (mcp-server-lib-register-tool
+                         #'mcp-server-lib-test--return-string
+                         :id "duplicate-test"
+                         :description "Second registration - should be ignored"))
+                ;; Tool should be callable after registrations
+                (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 1)))
+                  (mcp-server-lib-test--check-mcp-server-lib-content-format
+                   result "test result"))
+                
+                ;; First unregister should succeed (ref count goes from 2 to 1)
+                (should (mcp-server-lib-unregister-tool "duplicate-test"))
+                
+                ;; Tool should still be callable after first unregister
+                (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 2)))
+                  (mcp-server-lib-test--check-mcp-server-lib-content-format
+                   result "test result")))
+            ;; Clean up second registration
+            (mcp-server-lib-unregister-tool "duplicate-test"))
+      ;; Clean up first registration
+      (mcp-server-lib-unregister-tool "duplicate-test"))
     
     ;; Tool should no longer be callable
-    (mcp-server-lib-test--verify-tool-not-found "duplicate-test")))
+    (mcp-server-lib-test--verify-tool-not-found "duplicate-test"))))
 
 (ert-deftest mcp-server-lib-test-register-tool-bytecode ()
   "Test schema generation for a handler loaded as bytecode.
