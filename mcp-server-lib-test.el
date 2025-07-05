@@ -234,20 +234,17 @@ Example:
         (push `(mcp-server-lib-register-tool ,handler ,@props)
               tool-registrations)))
     ;; Build the macro expansion
-    `(progn
-       ;; Register all tools first
-       ,@
-       (nreverse tool-registrations)
-       ;; Run with server active
-       (mcp-server-lib-test--with-server :tools t :resources nil
-         (unwind-protect
-             (progn
-               ,@body)
-           ;; Unregister all tools
-           ,@
-           (mapcar
-            (lambda (id) `(mcp-server-lib-unregister-tool ,id))
-            (nreverse tool-ids)))))))
+    `(unwind-protect
+         (progn
+           ;; Register all tools before starting server
+           ,@(nreverse tool-registrations)
+           ;; Now start server with tools already registered
+           (mcp-server-lib-test--with-server :tools t :resources nil
+             ,@body))
+       ;; Unregister all tools
+       ,@(mapcar
+          (lambda (id) `(mcp-server-lib-unregister-tool ,id))
+          (nreverse tool-ids)))))
 
 (defmacro mcp-server-lib-test--with-resources (resources &rest body)
   "Run BODY with MCP server active and RESOURCES registered.
