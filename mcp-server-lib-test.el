@@ -136,7 +136,11 @@ The original function definition is saved and restored after BODY executes."
 (cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources &allow-other-keys)
   "Run BODY with MCP server active and initialized.
 Starts the server, sends initialize request, then runs BODY.
-TOOLS and RESOURCES are booleans indicating expected capabilities."
+TOOLS and RESOURCES are booleans indicating expected capabilities.
+
+IMPORTANT: Any test wishing to call `mcp-server-lib-start' MUST use this
+macro instead, with very few exceptions - such as stopping and restarting
+the server in the middle of a test."
   (declare (indent defun) (debug t))
   `(unwind-protect
        (progn
