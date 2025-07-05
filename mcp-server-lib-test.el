@@ -61,7 +61,7 @@ Used for testing behavior when handlers no longer exist."
   "Handler was defined when called")
 
 (defun mcp-server-lib-test--return-nil ()
-  "Generic handler that returns nil.
+  "Generic handler to return nil.
 Can be used for both tool and resource testing."
   nil)
 
