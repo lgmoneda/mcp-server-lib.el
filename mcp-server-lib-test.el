@@ -1709,20 +1709,20 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 (ert-deftest test-mcp-server-lib-register-resource-duplicate ()
   "Test registering the same resource twice increments ref count."
   (mcp-server-lib-test--with-server :tools nil :resources nil
-   ;; Register resource first time
-   (should (mcp-server-lib-register-resource
-            "test://resource1"
-            #'mcp-server-lib-test--return-string
-            :name "Test Resource"))
    (unwind-protect
        (progn
-         ;; Register same resource again
+         ;; Register resource first time inside unwind-protect
          (should (mcp-server-lib-register-resource
                   "test://resource1"
                   #'mcp-server-lib-test--return-string
                   :name "Test Resource"))
          (unwind-protect
              (progn
+               ;; Register same resource again inside nested unwind-protect
+               (should (mcp-server-lib-register-resource
+                        "test://resource1"
+                        #'mcp-server-lib-test--return-string
+                        :name "Test Resource"))
                ;; Verify it's still listed only once
                (mcp-server-lib-test--check-resource-count 1))
            ;; Clean up second registration
