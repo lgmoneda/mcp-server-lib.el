@@ -179,10 +179,12 @@ Captures metrics before BODY execution and asserts after that:
 - calls increased by 1
 - errors stayed the same
 
-Note: This macro assumes the MCP server is already running.
+Note: This macro assumes the MCP server is already running.  If server
+start/stop is required, use `mcp-server-lib-test--with-request' instead.
 
-IMPORTANT: Any request-issuing test MUST use this macro to ensure proper
-metric tracking and verification."
+IMPORTANT: Any request-issuing test MUST use this macro or
+`mcp-server-lib-test--with-request' to ensure proper metric tracking and
+verification."
   (declare (indent defun) (debug t))
   `(let* ((metrics (mcp-server-lib-metrics-get ,method))
           (calls-before (mcp-server-lib-metrics-calls metrics))
@@ -196,107 +198,140 @@ metric tracking and verification."
         (= errors-before
            (mcp-server-lib-metrics-errors metrics-after))))))
 
-(defmacro mcp-server-lib-test--successful-req (method &rest body)
+(defmacro mcp-server-lib-test--with-request (method &rest body)
   "Execute BODY with MCP server active and verify METHOD metrics.
 This macro:
 1. Starts the MCP server
 2. Captures metrics before BODY execution
 3. Executes BODY
 4. Verifies the method was called exactly once with no errors
-5. Stops the server"
+5. Stops the server
+
+IMPORTANT: This macro or `mcp-server-lib-test--verify-req-success' MUST be used
+for any successful request testing to ensure proper metric tracking."
   (declare (indent defun) (debug t))
   `(mcp-server-lib-test--with-server :tools nil :resources nil
      (mcp-server-lib-test--verify-req-success ,method
        ,@body)))
 
+(defmacro mcp-server-lib-test--register-tool (handler &rest props-and-body)
+  "Register a tool with HANDLER and properties, execute body, then unregister.
+This is a simpler alternative to `mcp-server-lib-test--with-tools' for cases
+where you need just one tool registered without starting the server.
+
+The macro separates PROPS-AND-BODY into the tool properties (keywords) and
+the body forms (everything after the last keyword-value pair).
+
+IMPORTANT: Tests should use this macro instead of calling
+`mcp-server-lib-register-tool' directly, except when testing registration
+failures or error conditions.
+
+Arguments:
+  HANDLER         Function to handle tool invocations
+  PROPS-AND-BODY  Tool properties followed by body forms"
+  (declare (indent 1) (debug t))
+  ;; Separate properties from body
+  (let ((props '())
+        (body props-and-body))
+    ;; Extract properties (keyword-value pairs)
+    (while (and body (keywordp (car body)))
+      (push (pop body) props)
+      (push (pop body) props))
+    (setq props (nreverse props))
+    ;; Extract tool ID for unregistration
+    (let ((tool-id (plist-get props :id)))
+      `(unwind-protect
+           (progn
+             (mcp-server-lib-register-tool ,handler ,@props)
+             ,@body)
+         (mcp-server-lib-unregister-tool ,tool-id)))))
+
 (defmacro mcp-server-lib-test--with-tools (tools &rest body)
   "Run BODY with MCP server active and TOOLS registered.
 All tools are automatically unregistered after BODY execution.
 
+IMPORTANT: Tests should use this macro instead of calling
+`mcp-server-lib-register-tool' directly, except when testing registration
+failures or error conditions.
+
 Arguments:
   TOOLS  List of tool registration specs, each a list of arguments for
          `mcp-server-lib-register-tool': (HANDLER &rest PROPERTIES)
-  BODY   Forms to execute with server running and tools registered
-
-Example:
-  (mcp-server-lib-test--with-tools
-   ((#\\='mcp-server-lib-test--return-string
-     :id \"test-tool-1\"
-     :description \"First tool\")
-    (#\\='mcp-server-lib-test--return-string
-     :id \"test-tool-2\"
-     :description \"Second tool\"))
-   (let ((response (mcp-server-lib-process-jsonrpc
-                    (mcp-server-lib-create-tools-list-request))))
-     ...))"
+  BODY   Forms to execute with server running and tools registered"
   (declare (indent 1) (debug t))
-  (let ((tool-registrations '())
-        (tool-ids '()))
-    ;; Extract tool IDs and build registration forms
-    (dolist (tool-spec tools)
+  ;; Build nested mcp-server-lib-test--register-tool calls
+  ;; wrapping server start and body execution
+  (let ((server-and-body
+         `(mcp-server-lib-test--with-server :tools t :resources nil
+            ,@body)))
+    ;; Process tools in reverse order to build proper nesting
+    (dolist (tool-spec (reverse tools))
       (let* ((handler (car tool-spec))
-             (props (cdr tool-spec))
-             (id-prop (plist-get props :id)))
-        (push id-prop tool-ids)
-        (push `(mcp-server-lib-register-tool ,handler ,@props)
-              tool-registrations)))
-    ;; Build the macro expansion
+             (props (cdr tool-spec)))
+        (setq server-and-body
+              `(mcp-server-lib-test--register-tool ,handler ,@props
+                 ,server-and-body))))
+    server-and-body))
+
+(defmacro mcp-server-lib-test--register-resource (uri handler &rest props-and-body)
+  "Register a resource, execute body, then unregister.
+Register a resource at URI with HANDLER and properties.
+This is a simpler alternative to `mcp-server-lib-test--with-resources' for cases
+where you need just one resource registered without starting the server.
+
+The macro separates PROPS-AND-BODY into the resource properties (keywords) and
+the body forms (everything after the last keyword-value pair).
+
+IMPORTANT: Tests should use this macro instead of calling
+`mcp-server-lib-register-resource' directly, except when testing registration
+failures or error conditions.
+
+Arguments:
+  URI             Exact URI for the resource
+  HANDLER         Function that returns the resource content
+  PROPS-AND-BODY  Resource properties followed by body forms"
+  (declare (indent 2) (debug t))
+  ;; Separate properties from body
+  (let ((props '())
+        (body props-and-body))
+    ;; Extract properties (keyword-value pairs)
+    (while (and body (keywordp (car body)))
+      (push (pop body) props)
+      (push (pop body) props))
+    (setq props (nreverse props))
     `(unwind-protect
          (progn
-           ;; Register all tools before starting server
-           ,@(nreverse tool-registrations)
-           ;; Now start server with tools already registered
-           (mcp-server-lib-test--with-server :tools t :resources nil
-             ,@body))
-       ;; Unregister all tools
-       ,@(mapcar
-          (lambda (id) `(mcp-server-lib-unregister-tool ,id))
-          (nreverse tool-ids)))))
+           (mcp-server-lib-register-resource ,uri ,handler ,@props)
+           ,@body)
+       (mcp-server-lib-unregister-resource ,uri))))
 
 (defmacro mcp-server-lib-test--with-resources (resources &rest body)
   "Run BODY with MCP server active and RESOURCES registered.
 All resources are automatically unregistered after BODY execution.
 
+IMPORTANT: Tests should use this macro instead of calling
+`mcp-server-lib-register-resource' directly, except when testing registration
+failures or error conditions.
+
 Arguments:
   RESOURCES  List of resource registration specs, each a list of arguments for
              `mcp-server-lib-register-resource': (URI HANDLER &rest PROPERTIES)
-  BODY       Forms to execute with server running and resources registered
-
-Example:
-  (mcp-server-lib-test--with-resources
-   ((\"test://resource1\"
-     #\\='mcp-server-lib-test--return-string
-     :name \"Test Resource\"
-     :description \"A test resource\")
-    (\"test://resource2\"
-     #\\='mcp-server-lib-test--return-string
-     :name \"Another Resource\"
-     :mime-type \"text/plain\"))
-   (let ((resources (mcp-server-lib-test--get-resource-list)))
-     ...))"
+  BODY       Forms to execute with server running and resources registered"
   (declare (indent 1) (debug t))
-  (let ((resource-registrations '())
-        (resource-uris '()))
-    ;; Extract resource URIs and build registration forms
-    (dolist (resource-spec resources)
+  ;; Build nested mcp-server-lib-test--register-resource calls
+  ;; wrapping server start and body execution
+  (let ((server-and-body
+         `(mcp-server-lib-test--with-server :tools nil :resources t
+            ,@body)))
+    ;; Process resources in reverse order to build proper nesting
+    (dolist (resource-spec (reverse resources))
       (let* ((uri (car resource-spec))
              (handler (cadr resource-spec))
              (props (cddr resource-spec)))
-        (push uri resource-uris)
-        (push `(mcp-server-lib-register-resource ,uri ,handler ,@props)
-              resource-registrations)))
-    ;; Build the macro expansion
-    `(unwind-protect
-         (progn
-           ;; Register all resources before starting server
-           ,@(nreverse resource-registrations)
-           ;; Now start server with resources already registered
-           (mcp-server-lib-test--with-server :tools nil :resources t
-             ,@body))
-       ;; Unregister all resources
-       ,@(mapcar
-          (lambda (uri) `(mcp-server-lib-unregister-resource ,uri))
-          (nreverse resource-uris)))))
+        (setq server-and-body
+              `(mcp-server-lib-test--register-resource ,uri ,handler ,@props
+                 ,server-and-body))))
+    server-and-body))
 
 (defun mcp-server-lib-test--get-request-result (method request)
   "Process REQUEST via `mcp-server-lib-process-jsonrpc' and return result.
@@ -590,35 +625,20 @@ should not include tools or resources fields at all."
 (ert-deftest mcp-server-lib-test-initialize-with-tools-and-resources ()
   "Test initialize when both tools and resources are registered.
 When both are registered, capabilities should include both fields."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
-    (unwind-protect
-        (progn
-          ;; Register tool inside unwind-protect
-          (mcp-server-lib-register-tool
-           #'mcp-server-lib-test--return-string
-           :id "test-tool"
-           :description "Test tool")
-          (unwind-protect
-              (progn
-                ;; Register resource inside unwind-protect
-                (mcp-server-lib-register-resource
-                 "test://resource"
-                 #'mcp-server-lib-test--return-string
-                 :name "Test Resource")
-                ;; Test initialization
-                (let* ((init-result (mcp-server-lib-test--get-initialize-result))
-                       (capabilities (alist-get 'capabilities init-result)))
-                  (should (= 2 (length capabilities)))
-                  (should (assoc 'tools capabilities))
-                  (should (assoc 'resources capabilities))))
-            ;; Clean up resource
-            (mcp-server-lib-unregister-resource "test://resource")))
-      ;; Clean up tool
-      (mcp-server-lib-unregister-tool "test-tool"))))
+  (mcp-server-lib-test--register-tool
+   #'mcp-server-lib-test--return-string
+   :id "test-tool"
+   :description "Test tool"
+
+   (mcp-server-lib-test--register-resource
+    "test://resource"
+    #'mcp-server-lib-test--return-string
+    :name "Test Resource"
+    (mcp-server-lib-test--with-server :tools t :resources t))))
 
 (ert-deftest mcp-server-lib-test-notifications-initialized ()
   "Test the MCP `notifications/initialized` request handling."
-  (mcp-server-lib-test--successful-req "notifications/initialized"
+  (mcp-server-lib-test--with-request "notifications/initialized"
     (let* ((notifications-initialized
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -631,7 +651,7 @@ When both are registered, capabilities should include both fields."
 
 (ert-deftest mcp-server-lib-test-initialize-old-protocol-version ()
   "Test server responds with its version for older client version."
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -651,7 +671,7 @@ When both are registered, capabilities should include both fields."
 (ert-deftest mcp-server-lib-test-initialize-missing-protocol-version
     ()
   "Test initialize request without protocolVersion field."
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -670,7 +690,7 @@ When both are registered, capabilities should include both fields."
     mcp-server-lib-test-initialize-non-string-protocol-version
     ()
   "Test initialize request with non-string protocolVersion."
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -689,7 +709,7 @@ When both are registered, capabilities should include both fields."
 (ert-deftest mcp-server-lib-test-initialize-malformed-params ()
   "Test initialize request with completely malformed params."
   ;; Test with params as a string instead of object
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -706,7 +726,7 @@ When both are registered, capabilities should include both fields."
 
 (ert-deftest mcp-server-lib-test-initialize-missing-params ()
   "Test initialize request without params field."
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -722,7 +742,7 @@ When both are registered, capabilities should include both fields."
 
 (ert-deftest mcp-server-lib-test-initialize-null-protocol-version ()
   "Test initialize request with null protocolVersion."
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -740,7 +760,7 @@ When both are registered, capabilities should include both fields."
 
 (ert-deftest mcp-server-lib-test-initialize-empty-protocol-version ()
   "Test initialize request with empty string protocolVersion."
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -758,7 +778,7 @@ When both are registered, capabilities should include both fields."
 
 (ert-deftest mcp-server-lib-test-initialize-with-valid-client-capabilities ()
   "Test initialize request with valid client capabilities (roots, sampling, experimental)."
-  (mcp-server-lib-test--successful-req "initialize"
+  (mcp-server-lib-test--with-request "initialize"
     (let* ((init-request
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -844,40 +864,31 @@ When both are registered, capabilities should include both fields."
   "Test reference counting behavior when registering a tool with duplicate ID.
 With reference counting, duplicate registrations should succeed and increment
 the reference count, returning the original tool definition."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
-    (unwind-protect
-        (progn
-          ;; First registration inside unwind-protect
-          (should (mcp-server-lib-register-tool
-                   #'mcp-server-lib-test--return-string
-                   :id "duplicate-test"
-                   :description "First registration"))
-          (unwind-protect
-              (progn
-                ;; Second registration inside nested unwind-protect
-                (should (mcp-server-lib-register-tool
-                         #'mcp-server-lib-test--return-string
-                         :id "duplicate-test"
-                         :description "Second registration - should be ignored"))
-                ;; Tool should be callable after registrations
-                (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 1)))
-                  (mcp-server-lib-test--check-mcp-server-lib-content-format
-                   result "test result"))
-                
-                ;; First unregister should succeed (ref count goes from 2 to 1)
-                (should (mcp-server-lib-unregister-tool "duplicate-test"))
-                
-                ;; Tool should still be callable after first unregister
-                (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 2)))
-                  (mcp-server-lib-test--check-mcp-server-lib-content-format
-                   result "test result")))
-            ;; Clean up second registration
-            (mcp-server-lib-unregister-tool "duplicate-test"))
-      ;; Clean up first registration
-      (mcp-server-lib-unregister-tool "duplicate-test"))
+  (mcp-server-lib-test--with-server
+   :tools nil :resources nil
+   (mcp-server-lib-test--register-tool
+    #'mcp-server-lib-test--return-string
+    :id "duplicate-test"
+    :description "First registration"
+
+    (mcp-server-lib-test--register-tool
+     #'mcp-server-lib-test--return-string
+     :id "duplicate-test"
+     :description "Second registration - should be ignored"
+     ;; Tool should be callable after registrations (ref count = 2)
+     (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 1)))
+       (mcp-server-lib-test--check-mcp-server-lib-content-format
+        result "test result")))
     
-    ;; Tool should no longer be callable
-    (mcp-server-lib-test--verify-tool-not-found "duplicate-test"))))
+    ;; After inner macro completes, it unregisters once (ref count goes from 2 to 1)
+    ;; Tool should still be callable because outer registration is still active
+    (let ((result (mcp-server-lib-test--call-tool "duplicate-test" 2)))
+      (mcp-server-lib-test--check-mcp-server-lib-content-format
+       result "test result")))
+   
+   ;; After outer macro completes, it unregisters again (ref count = 0)
+   ;; Tool should no longer be callable
+   (mcp-server-lib-test--verify-tool-not-found "duplicate-test")))
 
 (ert-deftest mcp-server-lib-test-register-tool-bytecode ()
   "Test schema generation for a handler loaded as bytecode.
@@ -907,11 +918,12 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-unregister-tool ()
   "Test that `mcp-server-lib-unregister-tool' removes a tool correctly."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
-    (mcp-server-lib-register-tool
-     #'mcp-server-lib-test--return-string
-     :id mcp-server-lib-test--unregister-tool-id
-     :description "Tool for unregister test")
+  (mcp-server-lib-test--with-server
+   :tools nil :resources nil
+   (mcp-server-lib-test--register-tool
+    #'mcp-server-lib-test--return-string
+    :id mcp-server-lib-test--unregister-tool-id
+    :description "Tool for unregister test"
 
     (mcp-server-lib-test--verify-tool-list-request
      `((,mcp-server-lib-test--unregister-tool-id
@@ -924,26 +936,20 @@ from a function loaded from bytecode rather than interpreted elisp."
             mcp-server-lib-test--unregister-tool-id
             44)))
       (mcp-server-lib-test--check-mcp-server-lib-content-format
-       result "test result"))
+       result "test result")))
 
-    (should
-     (mcp-server-lib-unregister-tool
-      mcp-server-lib-test--unregister-tool-id))
-
-    (mcp-server-lib-test--verify-tool-list-request '())
-    (mcp-server-lib-test--verify-tool-not-found
-     mcp-server-lib-test--unregister-tool-id)))
+   ;; After macro cleanup, verify tool is gone
+   (mcp-server-lib-test--verify-tool-list-request '())
+   (mcp-server-lib-test--verify-tool-not-found
+    mcp-server-lib-test--unregister-tool-id)))
 
 (ert-deftest mcp-server-lib-test-unregister-tool-nonexistent ()
   "Test that `mcp-server-lib-unregister-tool' returns nil for missing tools."
-  (unwind-protect
-      (progn
-        (mcp-server-lib-register-tool
-         #'mcp-server-lib-test--return-string
-         :id "test-other"
-         :description "Other test tool")
-        (should-not (mcp-server-lib-unregister-tool "nonexistent-tool")))
-    (mcp-server-lib-unregister-tool "test-other")))
+  (mcp-server-lib-test--register-tool
+   #'mcp-server-lib-test--return-string
+   :id "test-other"
+   :description "Other test tool"
+   (should-not (mcp-server-lib-unregister-tool "nonexistent-tool"))))
 
 (ert-deftest mcp-server-lib-test-unregister-tool-when-no-tools ()
   "Test `mcp-server-lib-unregister-tool' when no tools are registered."
@@ -953,7 +959,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-notifications-cancelled ()
   "Test the MCP `notifications/cancelled` request handling."
-  (mcp-server-lib-test--successful-req "notifications/cancelled"
+  (mcp-server-lib-test--with-request "notifications/cancelled"
     (let* ((notifications-cancelled
             (json-encode
              `(("jsonrpc" . "2.0")
@@ -1066,7 +1072,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-server-lib-test-tools-list-extra-key ()
   "Test that `tools/list` request with an extra, unexpected key works correctly.
 Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
-  (mcp-server-lib-test--successful-req "tools/list"
+  (mcp-server-lib-test--with-request "tools/list"
     ;; Create a tools/list request with an extra key
     (let ((request-with-extra
            (json-encode
@@ -1715,30 +1721,25 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
 
 (ert-deftest test-mcp-server-lib-register-resource-duplicate ()
   "Test registering the same resource twice increments ref count."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
-   (unwind-protect
-       (progn
-         ;; Register resource first time inside unwind-protect
-         (should (mcp-server-lib-register-resource
-                  "test://resource1"
-                  #'mcp-server-lib-test--return-string
-                  :name "Test Resource"))
-         (unwind-protect
-             (progn
-               ;; Register same resource again inside nested unwind-protect
-               (should (mcp-server-lib-register-resource
-                        "test://resource1"
-                        #'mcp-server-lib-test--return-string
-                        :name "Test Resource"))
-               ;; Verify it's still listed only once
-               (mcp-server-lib-test--check-resource-count 1))
-           ;; Clean up second registration
-           (should (mcp-server-lib-unregister-resource "test://resource1")))
-         ;; After first unregister, resource should still exist
-         (mcp-server-lib-test--check-resource-count 1))
-     ;; Clean up first registration
-     (should (mcp-server-lib-unregister-resource "test://resource1")))
-   ;; Verify resource is gone
+  (mcp-server-lib-test--with-server
+   :tools nil :resources nil
+   (mcp-server-lib-test--register-resource
+    "test://resource1"
+    #'mcp-server-lib-test--return-string
+    :name "Test Resource"
+    (mcp-server-lib-test--register-resource
+     "test://resource1"
+     #'mcp-server-lib-test--return-string
+     :name "Test Resource"
+     ;; Verify it's still listed only once
+     (mcp-server-lib-test--check-resource-count 1))
+    
+    ;; After inner macro completes, it unregisters once (ref count goes from 2 to 1)
+    ;; Resource should still exist because outer registration is still active
+    (mcp-server-lib-test--check-resource-count 1))
+   
+   ;; After outer macro completes, it unregisters again (ref count = 0)
+   ;; Resource should no longer be listed
    (mcp-server-lib-test--check-resource-count 0)))
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-name ()
