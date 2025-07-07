@@ -133,7 +133,8 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
-(cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources &allow-other-keys)
+(cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources
+                                                     &allow-other-keys)
   "Run BODY with MCP server active and initialized.
 Starts the server, sends initialize request, then runs BODY.
 TOOLS and RESOURCES are booleans indicating expected capabilities.
@@ -173,30 +174,6 @@ the server in the middle of a test."
          ,@body)
      (mcp-server-lib-stop)))
 
-(defmacro mcp-server-lib-test--verify-req-success (method &rest body)
-  "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
-Captures metrics before BODY execution and asserts after that:
-- calls increased by 1
-- errors stayed the same
-
-Note: This macro assumes the MCP server is already running.  If server
-start/stop is required, use `mcp-server-lib-test--with-request' instead.
-
-IMPORTANT: Any request-issuing test MUST use this macro or
-`mcp-server-lib-test--with-request' to ensure proper metric tracking and
-verification."
-  (declare (indent defun) (debug t))
-  `(let* ((metrics (mcp-server-lib-metrics-get ,method))
-          (calls-before (mcp-server-lib-metrics-calls metrics))
-          (errors-before (mcp-server-lib-metrics-errors metrics)))
-     ,@body
-     (let ((metrics-after (mcp-server-lib-metrics-get ,method)))
-       (should
-        (= (1+ calls-before)
-           (mcp-server-lib-metrics-calls metrics-after)))
-       (should
-        (= errors-before
-           (mcp-server-lib-metrics-errors metrics-after))))))
 
 (defmacro mcp-server-lib-test--with-request (method &rest body)
   "Execute BODY with MCP server active and verify METHOD metrics.
@@ -440,6 +417,23 @@ METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists."
     `(let* ,(nreverse before-bindings)
        ,@body
        ,@(nreverse after-checks))))
+
+(defmacro mcp-server-lib-test--verify-req-success (method &rest body)
+  "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
+Captures metrics before BODY execution and asserts after that:
+- calls increased by 1
+- errors stayed the same
+
+Note: This macro assumes the MCP server is already running.  If server
+start/stop is required, use `mcp-server-lib-test--with-request' instead.
+
+IMPORTANT: Any request-issuing test MUST use this macro or
+`mcp-server-lib-test--with-request' to ensure proper metric tracking and
+verification."
+  (declare (indent defun) (debug t))
+  `(mcp-server-lib-test--with-metrics-tracking
+       ((,method 1 0))
+     ,@body))
 
 (defmacro mcp-server-lib-test--with-error-tracking
     (tool-id &rest body)
