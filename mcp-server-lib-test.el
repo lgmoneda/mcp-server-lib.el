@@ -174,7 +174,6 @@ the server in the middle of a test."
          ,@body)
      (mcp-server-lib-stop)))
 
-
 (defmacro mcp-server-lib-test--with-request (method &rest body)
   "Execute BODY with MCP server active and verify METHOD metrics.
 This macro:
@@ -316,13 +315,13 @@ METHOD is the JSON-RPC method name for metrics verification.
 Verifies that the response contains no error and the method metrics show
 success."
   (let (result)
-    (mcp-server-lib-test--verify-req-success method
-      (let ((resp-obj
-             (mcp-server-lib-process-jsonrpc-parsed request)))
-        (should (null (alist-get 'error resp-obj)))
-        (setq result (alist-get 'result resp-obj))))
+    (mcp-server-lib-test--verify-req-success
+     method
+     (let ((resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed request)))
+       (should (null (alist-get 'error resp-obj)))
+       (setq result (alist-get 'result resp-obj))))
     result))
-
 
 (defun mcp-server-lib-test--get-initialize-result ()
   "Send an MCP `initialize` request and return its result."
