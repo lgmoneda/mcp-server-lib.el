@@ -159,11 +159,11 @@ the server in the middle of a test."
            ,@(when tools
                `((should (assoc 'tools capabilities))
                  ;; Empty objects {} in JSON are parsed as nil in Elisp
-                 (should (null (alist-get 'tools capabilities)))))
+                 (should-not (alist-get 'tools capabilities))))
            ,@(when resources
                `((should (assoc 'resources capabilities))
                  ;; Empty objects {} in JSON are parsed as nil in Elisp
-                 (should (null (alist-get 'resources capabilities)))))
+                 (should-not (alist-get 'resources capabilities))))
            ;; Verify exact count
            (should (= (+ (if ,tools 1 0) (if ,resources 1 0))
                       (length capabilities))))
@@ -319,7 +319,7 @@ success."
      method
      (let ((resp-obj
             (mcp-server-lib-process-jsonrpc-parsed request)))
-       (should (null (alist-get 'error resp-obj)))
+       (should-not (alist-get 'error resp-obj))
        (setq result (alist-get 'result resp-obj))))
     result))
 
@@ -597,8 +597,8 @@ PARAM-DESCRIPTION as the expected description of the parameter."
               (alist-get 'description param-schema)))))
 
       ;; Zero parameter case - schema should be just {type: "object"}
-      (should (null (alist-get 'required schema)))
-      (should (null (alist-get 'properties schema))))))
+      (should-not (alist-get 'required schema))
+      (should-not (alist-get 'properties schema)))))
 
 (defun mcp-server-lib-test--check-mcp-server-lib-content-format
     (result expected-text)
@@ -640,7 +640,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc
              notifications-initialized)))
       ;; Notifications are one-way, should return nil
-      (should (null response)))))
+      (should-not response))))
 
 (ert-deftest mcp-server-lib-test-initialize-old-protocol-version ()
   "Test server responds with its version for older client version."
@@ -659,7 +659,7 @@ When both are registered, capabilities should include both fields."
       ;; Server should respond with its supported version, not client's
       (should (string= "2025-03-26" protocol-version))
       ;; Response should not have an error
-      (should (null (alist-get 'error resp-obj))))))
+      (should-not (alist-get 'error resp-obj)))))
 
 (ert-deftest mcp-server-lib-test-initialize-missing-protocol-version
     ()
@@ -675,7 +675,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
-      (should (null (alist-get 'error resp-obj)))
+      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -695,7 +695,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
-      (should (null (alist-get 'error resp-obj)))
+      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -713,7 +713,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully
-      (should (null (alist-get 'error resp-obj)))
+      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -729,7 +729,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully
-      (should (null (alist-get 'error resp-obj)))
+      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -747,7 +747,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
-      (should (null (alist-get 'error resp-obj)))
+      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -765,7 +765,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should still respond successfully with its version
-      (should (null (alist-get 'error resp-obj)))
+      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -786,7 +786,7 @@ When both are registered, capabilities should include both fields."
             (mcp-server-lib-process-jsonrpc-parsed init-request))
            (result (alist-get 'result resp-obj)))
       ;; Server should respond successfully, ignoring client capabilities
-      (should (null (alist-get 'error resp-obj)))
+      (should-not (alist-get 'error resp-obj))
       (should (string= "2025-03-26" (alist-get 'protocolVersion result)))
       ;; Server capabilities should not be affected by client capabilities
       (let ((capabilities (alist-get 'capabilities result)))
@@ -960,7 +960,7 @@ from a function loaded from bytecode rather than interpreted elisp."
            (response
             (mcp-server-lib-process-jsonrpc notifications-cancelled)))
       ;; Notifications are one-way, should return nil
-      (should (null response)))))
+      (should-not response))))
 
 ;;; `mcp-server-lib-create-tools-list-request' tests
 
@@ -1197,7 +1197,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
              (resp-obj
               (mcp-server-lib-process-jsonrpc-parsed request)))
         ;; Check no JSON-RPC error
-        (should (null (alist-get 'error resp-obj)))
+        (should-not (alist-get 'error resp-obj))
         ;; Check error response using helper
         (let ((text
                (mcp-server-lib-ert-check-text-response resp-obj t)))
@@ -1791,11 +1791,11 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         (should resource1)
         (should (equal (alist-get 'name resource1) "First Resource"))
         (should (equal (alist-get 'description resource1) "The first test resource"))
-        (should (null (alist-get 'mimeType resource1)))
+        (should-not (alist-get 'mimeType resource1))
         ;; Verify second resource
         (should resource2)
         (should (equal (alist-get 'name resource2) "Second Resource"))
-        (should (null (alist-get 'description resource2)))
+        (should-not (alist-get 'description resource2))
         (should (equal (alist-get 'mimeType resource2) "text/markdown"))))))
 
 (ert-deftest test-mcp-server-lib-resources-read-handler-error ()
