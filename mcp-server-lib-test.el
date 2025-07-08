@@ -511,7 +511,7 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
         (should (equal (alist-get (car field) resource) (cdr field)))))))
 
 (defun mcp-server-lib-test--check-resource-read-response (uri expected-fields)
-  "Read resource at URI and verify response contains expected fields.
+  "Read resource at URI and verify response to contain expected fields.
 EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
   (let ((response (mcp-server-lib-test--read-resource uri)))
     (should-not (alist-get 'error response))
