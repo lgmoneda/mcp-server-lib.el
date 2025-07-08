@@ -496,12 +496,12 @@ Optional ID defaults to 1 if not provided."
     (mcp-server-lib-process-jsonrpc-parsed request)))
 
 (defun mcp-server-lib-test--check-resource-count (expected-count)
-  "Check that the resource list contains EXPECTED-COUNT resources."
+  "Check the resource list to contain EXPECTED-COUNT resources."
   (let ((resources (mcp-server-lib-test--get-resource-list)))
     (should (= expected-count (length resources)))))
 
 (defun mcp-server-lib-test--check-single-resource (expected-fields)
-  "Check that resource list contains exactly one resource with EXPECTED-FIELDS.
+  "Check the resource list to contain exactly one resource with EXPECTED-FIELDS.
 EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
   (let ((resources (mcp-server-lib-test--get-resource-list)))
     (should (= 1 (length resources)))
