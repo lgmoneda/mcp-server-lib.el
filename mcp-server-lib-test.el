@@ -133,6 +133,53 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
+(defmacro mcp-server-lib-test--with-metrics-tracking
+    (metrics-specs &rest body)
+  "Execute BODY and verify metrics changed as expected.
+METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists."
+  (declare (indent 1) (debug t))
+  (let ((before-bindings '())
+        (after-checks '()))
+    ;; Build bindings and checks for each metric
+    (dolist (spec metrics-specs)
+      (let* ((key (car spec))
+             (expected-calls (cadr spec))
+             (expected-errors (caddr spec))
+             (metrics-var (gensym "metrics"))
+             (calls-var (gensym "calls"))
+             (errors-var (gensym "errors")))
+        ;; Add before bindings
+        (push `(,metrics-var (mcp-server-lib-metrics-get ,key)) before-bindings)
+        (push `(,calls-var (mcp-server-lib-metrics-calls ,metrics-var)) before-bindings)
+        (push `(,errors-var (mcp-server-lib-metrics-errors ,metrics-var)) before-bindings)
+        ;; Add after checks
+        (push `(let ((metrics-after (mcp-server-lib-metrics-get ,key)))
+                 (should (= (+ ,calls-var ,expected-calls)
+                            (mcp-server-lib-metrics-calls metrics-after)))
+                 (should (= (+ ,errors-var ,expected-errors)
+                            (mcp-server-lib-metrics-errors metrics-after))))
+              after-checks)))
+    `(let* ,(nreverse before-bindings)
+       ,@body
+       ,@(nreverse after-checks))))
+
+(defmacro mcp-server-lib-test--verify-req-success (method &rest body)
+  "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
+Captures metrics before BODY execution and asserts after that:
+- calls increased by 1
+- errors stayed the same
+
+Note: This macro assumes the MCP server is already running.  If server
+start/stop is required, use `mcp-server-lib-test--with-request' instead.
+
+IMPORTANT: Any request-issuing test MUST use this macro or
+`mcp-server-lib-test--with-request' to ensure proper metric tracking and
+verification."
+  (declare (indent defun) (debug t))
+  `(mcp-server-lib-test--with-metrics-tracking
+       ((,method 1 0))
+     ,@body))
+
 (defun mcp-server-lib-test--get-success-result (method request)
   "Process REQUEST and return the result from a successful response.
 METHOD is the JSON-RPC method name for metrics verification.
@@ -389,53 +436,6 @@ Optional ARGS is the association list of arguments to pass to the tool."
    (mcp-server-lib-create-tools-call-request tool-id 999)
    -32600
    (format "Tool not found: %s" tool-id)))
-
-(defmacro mcp-server-lib-test--with-metrics-tracking
-    (metrics-specs &rest body)
-  "Execute BODY and verify metrics changed as expected.
-METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists."
-  (declare (indent 1) (debug t))
-  (let ((before-bindings '())
-        (after-checks '()))
-    ;; Build bindings and checks for each metric
-    (dolist (spec metrics-specs)
-      (let* ((key (car spec))
-             (expected-calls (cadr spec))
-             (expected-errors (caddr spec))
-             (metrics-var (gensym "metrics"))
-             (calls-var (gensym "calls"))
-             (errors-var (gensym "errors")))
-        ;; Add before bindings
-        (push `(,metrics-var (mcp-server-lib-metrics-get ,key)) before-bindings)
-        (push `(,calls-var (mcp-server-lib-metrics-calls ,metrics-var)) before-bindings)
-        (push `(,errors-var (mcp-server-lib-metrics-errors ,metrics-var)) before-bindings)
-        ;; Add after checks
-        (push `(let ((metrics-after (mcp-server-lib-metrics-get ,key)))
-                 (should (= (+ ,calls-var ,expected-calls)
-                            (mcp-server-lib-metrics-calls metrics-after)))
-                 (should (= (+ ,errors-var ,expected-errors)
-                            (mcp-server-lib-metrics-errors metrics-after))))
-              after-checks)))
-    `(let* ,(nreverse before-bindings)
-       ,@body
-       ,@(nreverse after-checks))))
-
-(defmacro mcp-server-lib-test--verify-req-success (method &rest body)
-  "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
-Captures metrics before BODY execution and asserts after that:
-- calls increased by 1
-- errors stayed the same
-
-Note: This macro assumes the MCP server is already running.  If server
-start/stop is required, use `mcp-server-lib-test--with-request' instead.
-
-IMPORTANT: Any request-issuing test MUST use this macro or
-`mcp-server-lib-test--with-request' to ensure proper metric tracking and
-verification."
-  (declare (indent defun) (debug t))
-  `(mcp-server-lib-test--with-metrics-tracking
-       ((,method 1 0))
-     ,@body))
 
 (defmacro mcp-server-lib-test--with-error-tracking
     (tool-id &rest body)
