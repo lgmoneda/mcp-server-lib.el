@@ -184,7 +184,7 @@ verification."
   "Process REQUEST and return the result from a successful response.
 METHOD is the JSON-RPC method name for metrics verification.
 This function expects the request to succeed and will fail the test if an
-error is present in the response. It verifies that the response contains no
+error is present in the response.  It verifies that the response contains no
 error and that the method metrics show success before returning the result."
   (let (result)
     (mcp-server-lib-test--verify-req-success
@@ -386,8 +386,6 @@ Arguments:
               `(mcp-server-lib-test--register-resource ,uri ,handler ,@props
                  ,server-and-body))))
     server-and-body))
-
-
 
 (defun mcp-server-lib-test--check-jsonrpc-error
     (request expected-code expected-message)
