@@ -652,14 +652,11 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . "2024-11-05")
                  ("capabilities" . ,(make-hash-table)))))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request))
            (protocol-version (alist-get 'protocolVersion result)))
       ;; Server should respond with its supported version, not client's
-      (should (string= "2025-03-26" protocol-version))
-      ;; Response should not have an error
-      (should-not (alist-get 'error resp-obj)))))
+      (should (string= "2025-03-26" protocol-version)))))
 
 (ert-deftest mcp-server-lib-test-initialize-missing-protocol-version
     ()
@@ -671,11 +668,9 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize") ("id" . 17)
                ("params" .
                 (("capabilities" . ,(make-hash-table)))))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj)))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request)))
       ;; Server should still respond successfully with its version
-      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -691,11 +686,9 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . 123) ; Number instead of string
                  ("capabilities" . ,(make-hash-table)))))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj)))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request)))
       ;; Server should still respond successfully with its version
-      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -709,11 +702,9 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize")
                ("id" . 19)
                ("params" . "malformed"))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj)))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request)))
       ;; Server should still respond successfully
-      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -725,11 +716,9 @@ When both are registered, capabilities should include both fields."
              `(("jsonrpc" . "2.0")
                ("method" . "initialize")
                ("id" . 20))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj)))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request)))
       ;; Server should still respond successfully
-      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -743,11 +732,9 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . :json-null)
                  ("capabilities" . ,(make-hash-table)))))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj)))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request)))
       ;; Server should still respond successfully with its version
-      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -761,11 +748,9 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . "")
                  ("capabilities" . ,(make-hash-table)))))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj)))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request)))
       ;; Server should still respond successfully with its version
-      (should-not (alist-get 'error resp-obj))
       (should
        (string= "2025-03-26" (alist-get 'protocolVersion result))))))
 
@@ -782,11 +767,9 @@ When both are registered, capabilities should include both fields."
                   (("roots" . ,(make-hash-table))
                    ("sampling" . ,(make-hash-table))
                    ("experimental" . ,(make-hash-table)))))))))
-           (resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed init-request))
-           (result (alist-get 'result resp-obj)))
+           (result (mcp-server-lib-test--get-request-result
+                    "initialize" init-request)))
       ;; Server should respond successfully, ignoring client capabilities
-      (should-not (alist-get 'error resp-obj))
       (should (string= "2025-03-26" (alist-get 'protocolVersion result)))
       ;; Server capabilities should not be affected by client capabilities
       (let ((capabilities (alist-get 'capabilities result)))
