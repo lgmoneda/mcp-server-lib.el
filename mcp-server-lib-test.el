@@ -475,12 +475,11 @@ then verifies that both calls and errors increased by 1 at both levels."
     (should (arrayp result))
     result))
 
-(defun mcp-server-lib-test--read-resource (uri &optional id)
-  "Send a resources/read request for URI and return the parsed response.
-Optional ID defaults to 1 if not provided."
+(defun mcp-server-lib-test--read-resource (uri)
+  "Send a resources/read request for URI and return the parsed response."
   (let ((request (json-encode
                   `((jsonrpc . "2.0")
-                    (id . ,(or id 1))
+                    (id . 777)
                     (method . "resources/read")
                     (params . ((uri . ,uri)))))))
     (mcp-server-lib-process-jsonrpc-parsed request)))
