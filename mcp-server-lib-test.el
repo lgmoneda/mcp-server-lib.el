@@ -1648,11 +1648,15 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--return-string
      :name "Test Resource"
      ;; Verify it's still listed only once
-     (mcp-server-lib-test--check-resource-count 1))
+     (mcp-server-lib-test--check-single-resource
+      '((uri . "test://resource1")
+        (name . "Test Resource"))))
     
     ;; After inner macro completes, it unregisters once (ref count goes from 2 to 1)
     ;; Resource should still exist because outer registration is still active
-    (mcp-server-lib-test--check-resource-count 1))
+    (mcp-server-lib-test--check-single-resource
+     '((uri . "test://resource1")
+       (name . "Test Resource"))))
    
    ;; After outer macro completes, it unregisters again (ref count = 0)
    ;; Resource should no longer be listed
