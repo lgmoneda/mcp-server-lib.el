@@ -502,27 +502,21 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
       (dolist (field expected-fields)
         (should (equal (alist-get (car field) resource) (cdr field)))))))
 
-(defun mcp-server-lib-test--check-resource-read-response (uri expected-fields)
-  "Read resource at URI and verify response to contain expected fields.
-EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
-  (let ((response (mcp-server-lib-test--read-resource uri)))
-    (should-not (alist-get 'error response))
-    (let* ((result (alist-get 'result response))
-           (contents (alist-get 'contents result)))
-      (should (arrayp contents))
-      (should (= 1 (length contents)))
-      (let ((content (aref contents 0)))
-        (dolist (field expected-fields)
-          (should (equal (alist-get (car field) content) (cdr field))))))))
 
 (defun mcp-server-lib-test--verify-resource-read (uri expected-fields)
   "Verify that reading resource at URI succeeds with EXPECTED-FIELDS.
-This is a convenience wrapper that combines verify-req-success
-with check-resource-read-response for the common pattern."
+EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
   (mcp-server-lib-test--verify-req-success
    "resources/read"
-   (mcp-server-lib-test--check-resource-read-response
-    uri expected-fields)))
+   (let ((response (mcp-server-lib-test--read-resource uri)))
+     (should-not (alist-get 'error response))
+     (let* ((result (alist-get 'result response))
+            (contents (alist-get 'contents result)))
+       (should (arrayp contents))
+       (should (= 1 (length contents)))
+       (let ((content (aref contents 0)))
+         (dolist (field expected-fields)
+           (should (equal (alist-get (car field) content) (cdr field)))))))))
 
 (defun mcp-server-lib-test--read-resource-error (uri expected-code &rest expected-message-substrings)
   "Read resource at URI expecting an error with EXPECTED-CODE and message substrings.
@@ -1614,7 +1608,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     '((uri . "test://minimal")
       (name . "Minimal Resource")))
    ;; Verify resource can be read without mime-type
-   (mcp-server-lib-test--check-resource-read-response
+   (mcp-server-lib-test--verify-resource-read
     "test://minimal"
     '((uri . "test://minimal")
       (text . "test result")))))
