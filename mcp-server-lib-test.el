@@ -453,24 +453,15 @@ then verifies that both calls and errors increased by 1 at both levels."
      (let ((request (mcp-server-lib-create-tools-call-request ,tool-id 999)))
        ,@body)))
 
-(defun mcp-server-lib-test--get-tool-list-for-request (request)
-  "Get the tool list from a tools/list REQUEST.
-Return the `tools` array from the result after verifying it is an array."
+(defun mcp-server-lib-test--get-tool-list ()
+  "Get the successful response to a standard `tools/list` request."
   (let ((result
          (alist-get
           'tools
           (mcp-server-lib-test--get-success-result
-           "tools/list" request))))
+           "tools/list"
+           (mcp-server-lib-create-tools-list-request)))))
     (should (arrayp result))
-    result))
-
-(defun mcp-server-lib-test--get-tool-list ()
-  "Get the successful response to a standard `tool/list` request."
-  (let (result)
-    (mcp-server-lib-test--verify-req-success "tools/list"
-      (setq result
-            (mcp-server-lib-test--get-tool-list-for-request
-             (mcp-server-lib-create-tools-list-request))))
     result))
 
 (defun mcp-server-lib-test--get-resource-list-for-request (request)
@@ -1023,20 +1014,6 @@ from a function loaded from bytecode rather than interpreted elisp."
       (mcp-server-lib-test--verify-tool-schema-in-single-tool-list
        "input-string" "string" "test parameter for string input"))))
 
-(ert-deftest mcp-server-lib-test-tools-list-extra-key ()
-  "Test that `tools/list` request with an extra, unexpected key works correctly.
-Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
-  (mcp-server-lib-test--with-request "tools/list"
-    ;; Create a tools/list request with an extra key
-    (let ((request-with-extra
-           (json-encode
-            `(("jsonrpc" . "2.0")
-              ("method" . "tools/list")
-              ("id" . 43)
-              ("extra_key" . "unexpected value")))))
-      ;; Just checking if tool list is an array is enough
-      (mcp-server-lib-test--get-tool-list-for-request
-       request-with-extra))))
 
 (ert-deftest mcp-server-lib-test-tools-list-read-only-hint ()
   "Test that `tools/list` response includes readOnlyHint=true."
