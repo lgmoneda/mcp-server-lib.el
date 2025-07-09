@@ -243,10 +243,12 @@ the server in the middle of a test."
          (mcp-server-lib-start)
          (mcp-server-lib-test--assert-initialize-result
           (mcp-server-lib-test--get-initialize-result) ,tools ,resources)
-         (mcp-server-lib-process-jsonrpc
-          (json-encode
-           '(("jsonrpc" . "2.0")
-             ("method" . "notifications/initialized"))))
+         ;; Send initialized notification - should return nil
+         (should-not
+          (mcp-server-lib-process-jsonrpc
+           (json-encode
+            '(("jsonrpc" . "2.0")
+              ("method" . "notifications/initialized")))))
          ,@body)
      (mcp-server-lib-stop)))
 
@@ -635,18 +637,6 @@ When both are registered, capabilities should include both fields."
     :name "Test Resource"
     (mcp-server-lib-test--with-server :tools t :resources t))))
 
-(ert-deftest mcp-server-lib-test-notifications-initialized ()
-  "Test the MCP `notifications/initialized` request handling."
-  (mcp-server-lib-test--with-request "notifications/initialized"
-    (let* ((notifications-initialized
-            (json-encode
-             `(("jsonrpc" . "2.0")
-               ("method" . "notifications/initialized"))))
-           (response
-            (mcp-server-lib-process-jsonrpc
-             notifications-initialized)))
-      ;; Notifications are one-way, should return nil
-      (should-not response))))
 
 (ert-deftest mcp-server-lib-test-initialize-old-protocol-version ()
   "Test server responds with its version for older client version."
