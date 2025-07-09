@@ -484,10 +484,10 @@ then verifies that both calls and errors increased by 1 at both levels."
                     (params . ((uri . ,uri)))))))
     (mcp-server-lib-process-jsonrpc-parsed request)))
 
-(defun mcp-server-lib-test--check-resource-count (expected-count)
-  "Check the resource list to contain EXPECTED-COUNT resources."
+(defun mcp-server-lib-test--check-no-resources ()
+  "Check that the resource list is empty."
   (let ((resources (mcp-server-lib-test--get-resource-list)))
-    (should (= expected-count (length resources)))))
+    (should (= 0 (length resources)))))
 
 (defun mcp-server-lib-test--check-single-resource (expected-fields)
   "Check the resource list to contain exactly one resource with EXPECTED-FIELDS.
@@ -1565,7 +1565,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest test-mcp-server-lib-resources-list-empty ()
   "Test resources/list with no registered resources."
   (mcp-server-lib-test--with-server :tools nil :resources nil
-    (mcp-server-lib-test--check-resource-count 0)))
+    (mcp-server-lib-test--check-no-resources)))
 
 (ert-deftest test-mcp-server-lib-register-resource ()
   "Test registering a direct resource."
@@ -1660,7 +1660,7 @@ from a function loaded from bytecode rather than interpreted elisp."
    
    ;; After outer macro completes, it unregisters again (ref count = 0)
    ;; Resource should no longer be listed
-   (mcp-server-lib-test--check-resource-count 0)))
+   (mcp-server-lib-test--check-no-resources)))
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-name ()
   "Test that resource registration with missing :name produces an error."
