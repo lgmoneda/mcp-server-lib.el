@@ -174,3 +174,7 @@ For implementation details and roadmap, refer to the `TODO.org` file which conta
 ## Coding Principles
 
 - Prefer named functions to lambdas
+
+## Symbol Definition Guidelines
+
+- Define symbols in the source file not below their first use
