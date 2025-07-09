@@ -309,11 +309,12 @@ Arguments:
                  ,server-and-body))))
     server-and-body))
 
-(defun mcp-server-lib-test--get-request-result (method request)
-  "Process REQUEST via `mcp-server-lib-process-jsonrpc' and return result.
+(defun mcp-server-lib-test--get-success-result (method request)
+  "Process REQUEST and return the result from a successful response.
 METHOD is the JSON-RPC method name for metrics verification.
-Verifies that the response contains no error and the method metrics show
-success."
+This function expects the request to succeed and will fail the test if an
+error is present in the response. It verifies that the response contains no
+error and that the method metrics show success before returning the result."
   (let (result)
     (mcp-server-lib-test--verify-req-success
      method
@@ -325,7 +326,7 @@ success."
 
 (defun mcp-server-lib-test--get-initialize-result ()
   "Send an MCP `initialize` request and return its result."
-  (mcp-server-lib-test--get-request-result
+  (mcp-server-lib-test--get-success-result
    "initialize"
    (json-encode
     `(("jsonrpc" . "2.0")
@@ -366,7 +367,7 @@ Optional ARGS is the association list of arguments to pass to the tool."
          (tool-errors-before
           (mcp-server-lib-metrics-errors tool-metrics))
          (result
-          (mcp-server-lib-test--get-request-result
+          (mcp-server-lib-test--get-success-result
            "tools/call"
            (mcp-server-lib-create-tools-call-request
             tool-id id args))))
@@ -451,7 +452,7 @@ Return the `tools` array from the result after verifying it is an array."
   (let ((result
          (alist-get
           'tools
-          (mcp-server-lib-test--get-request-result
+          (mcp-server-lib-test--get-success-result
            "tools/list" request))))
     (should (arrayp result))
     result))
@@ -471,7 +472,7 @@ Return the `resources` array from the result after verifying it is an array."
   (let ((result
          (alist-get
           'resources
-          (mcp-server-lib-test--get-request-result
+          (mcp-server-lib-test--get-success-result
            "resources/list" request))))
     (should (arrayp result))
     result))
@@ -652,7 +653,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . "2024-11-05")
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request))
            (protocol-version (alist-get 'protocolVersion result)))
       ;; Server should respond with its supported version, not client's
@@ -668,7 +669,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize") ("id" . 17)
                ("params" .
                 (("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should still respond successfully with its version
       (should
@@ -686,7 +687,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . 123) ; Number instead of string
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should still respond successfully with its version
       (should
@@ -702,7 +703,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize")
                ("id" . 19)
                ("params" . "malformed"))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should still respond successfully
       (should
@@ -716,7 +717,7 @@ When both are registered, capabilities should include both fields."
              `(("jsonrpc" . "2.0")
                ("method" . "initialize")
                ("id" . 20))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should still respond successfully
       (should
@@ -732,7 +733,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . :json-null)
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should still respond successfully with its version
       (should
@@ -748,7 +749,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . "")
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should still respond successfully with its version
       (should
@@ -767,7 +768,7 @@ When both are registered, capabilities should include both fields."
                   (("roots" . ,(make-hash-table))
                    ("sampling" . ,(make-hash-table))
                    ("experimental" . ,(make-hash-table)))))))))
-           (result (mcp-server-lib-test--get-request-result
+           (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should respond successfully, ignoring client capabilities
       (should (string= "2025-03-26" (alist-get 'protocolVersion result)))
