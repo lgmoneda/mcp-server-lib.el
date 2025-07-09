@@ -206,6 +206,28 @@ error and that the method metrics show success before returning the result."
        (("protocolVersion" . "2025-03-26")
         ("capabilities" . ,(make-hash-table))))))))
 
+(defun mcp-server-lib-test--assert-initialize-result (init-result tools resources)
+  "Assert the structure of an initialize result.
+INIT-RESULT is the result from an initialize request.
+TOOLS is a boolean indicating if tools capability is expected.
+RESOURCES is a boolean indicating if resources capability is expected."
+  (let ((protocol-version (alist-get 'protocolVersion init-result))
+        (capabilities (alist-get 'capabilities init-result))
+        (server-info (alist-get 'serverInfo init-result)))
+    (should (string= "2025-03-26" protocol-version))
+    (should (string= mcp-server-lib--name (alist-get 'name server-info)))
+    ;; Verify capabilities match expectations
+    (when tools
+      (should (assoc 'tools capabilities))
+      ;; Empty objects {} in JSON are parsed as nil in Elisp
+      (should-not (alist-get 'tools capabilities)))
+    (when resources
+      (should (assoc 'resources capabilities))
+      (should-not (alist-get 'resources capabilities)))
+    ;; Verify exact count
+    (should (= (+ (if tools 1 0) (if resources 1 0))
+               (length capabilities)))))
+
 (cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources
                                                      &allow-other-keys)
   "Run BODY with MCP server active and initialized.
@@ -219,27 +241,8 @@ the server in the middle of a test."
   `(unwind-protect
        (progn
          (mcp-server-lib-start)
-         (let* ((init-result (mcp-server-lib-test--get-initialize-result))
-                (protocol-version (alist-get 'protocolVersion init-result))
-                (capabilities (alist-get 'capabilities init-result))
-                (server-info (alist-get 'serverInfo init-result)))
-           ;; Verify protocol version
-           (should (stringp protocol-version))
-           (should (string= "2025-03-26" protocol-version))
-           ;; Verify server info
-           (should (string= mcp-server-lib--name (alist-get 'name server-info)))
-           ;; Verify capabilities match expectations
-           ,@(when tools
-               `((should (assoc 'tools capabilities))
-                 ;; Empty objects {} in JSON are parsed as nil in Elisp
-                 (should-not (alist-get 'tools capabilities))))
-           ,@(when resources
-               `((should (assoc 'resources capabilities))
-                 ;; Empty objects {} in JSON are parsed as nil in Elisp
-                 (should-not (alist-get 'resources capabilities))))
-           ;; Verify exact count
-           (should (= (+ (if ,tools 1 0) (if ,resources 1 0))
-                      (length capabilities))))
+         (mcp-server-lib-test--assert-initialize-result
+          (mcp-server-lib-test--get-initialize-result) ,tools ,resources)
          (mcp-server-lib-process-jsonrpc
           (json-encode
            '(("jsonrpc" . "2.0")
@@ -656,10 +659,8 @@ When both are registered, capabilities should include both fields."
                 (("protocolVersion" . "2024-11-05")
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-test--get-success-result
-                    "initialize" init-request))
-           (protocol-version (alist-get 'protocolVersion result)))
-      ;; Server should respond with its supported version, not client's
-      (should (string= "2025-03-26" protocol-version)))))
+                    "initialize" init-request)))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-missing-protocol-version
     ()
@@ -673,9 +674,7 @@ When both are registered, capabilities should include both fields."
                 (("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
-      ;; Server should still respond successfully with its version
-      (should
-       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 (ert-deftest
     mcp-server-lib-test-initialize-non-string-protocol-version
@@ -691,9 +690,7 @@ When both are registered, capabilities should include both fields."
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
-      ;; Server should still respond successfully with its version
-      (should
-       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-malformed-params ()
   "Test initialize request with completely malformed params."
@@ -707,9 +704,7 @@ When both are registered, capabilities should include both fields."
                ("params" . "malformed"))))
            (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
-      ;; Server should still respond successfully
-      (should
-       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-missing-params ()
   "Test initialize request without params field."
@@ -721,9 +716,7 @@ When both are registered, capabilities should include both fields."
                ("id" . 20))))
            (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
-      ;; Server should still respond successfully
-      (should
-       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-null-protocol-version ()
   "Test initialize request with null protocolVersion."
@@ -737,9 +730,7 @@ When both are registered, capabilities should include both fields."
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
-      ;; Server should still respond successfully with its version
-      (should
-       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-empty-protocol-version ()
   "Test initialize request with empty string protocolVersion."
@@ -753,9 +744,7 @@ When both are registered, capabilities should include both fields."
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
-      ;; Server should still respond successfully with its version
-      (should
-       (string= "2025-03-26" (alist-get 'protocolVersion result))))))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-with-valid-client-capabilities ()
   "Test initialize request with valid client capabilities (roots, sampling, experimental)."
@@ -773,11 +762,7 @@ When both are registered, capabilities should include both fields."
            (result (mcp-server-lib-test--get-success-result
                     "initialize" init-request)))
       ;; Server should respond successfully, ignoring client capabilities
-      (should (string= "2025-03-26" (alist-get 'protocolVersion result)))
-      ;; Server capabilities should not be affected by client capabilities
-      (let ((capabilities (alist-get 'capabilities result)))
-        ;; Since no tools/resources registered in this test, capabilities should be empty
-        (should (= 0 (length capabilities)))))))
+      (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
 ;;; `mcp-server-lib-register-tool' tests
 
