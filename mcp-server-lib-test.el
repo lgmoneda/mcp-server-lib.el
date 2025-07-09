@@ -133,6 +133,21 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
+(defun mcp-server-lib-test--get-success-result (method request)
+  "Process REQUEST and return the result from a successful response.
+METHOD is the JSON-RPC method name for metrics verification.
+This function expects the request to succeed and will fail the test if an
+error is present in the response. It verifies that the response contains no
+error and that the method metrics show success before returning the result."
+  (let (result)
+    (mcp-server-lib-test--verify-req-success
+     method
+     (let ((resp-obj
+            (mcp-server-lib-process-jsonrpc-parsed request)))
+       (should-not (alist-get 'error resp-obj))
+       (setq result (alist-get 'result resp-obj))))
+    result))
+
 (defun mcp-server-lib-test--get-initialize-result ()
   "Send an MCP `initialize` request and return its result."
   (mcp-server-lib-test--get-success-result
@@ -320,20 +335,6 @@ Arguments:
                  ,server-and-body))))
     server-and-body))
 
-(defun mcp-server-lib-test--get-success-result (method request)
-  "Process REQUEST and return the result from a successful response.
-METHOD is the JSON-RPC method name for metrics verification.
-This function expects the request to succeed and will fail the test if an
-error is present in the response. It verifies that the response contains no
-error and that the method metrics show success before returning the result."
-  (let (result)
-    (mcp-server-lib-test--verify-req-success
-     method
-     (let ((resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed request)))
-       (should-not (alist-get 'error resp-obj))
-       (setq result (alist-get 'result resp-obj))))
-    result))
 
 
 (defun mcp-server-lib-test--check-jsonrpc-error
