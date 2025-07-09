@@ -443,13 +443,15 @@ Optional ARGS is the association list of arguments to pass to the tool."
 (defmacro mcp-server-lib-test--check-tool-call-error
     (tool-id &rest body)
   "Execute BODY and verify both call and error counts increased for TOOL-ID.
+Creates a tools/call request and binds it to `request' for use in BODY.
 Captures method and tool metrics before execution, executes BODY,
 then verifies that both calls and errors increased by 1 at both levels."
   (declare (indent 1) (debug t))
   `(mcp-server-lib-test--with-metrics-tracking
        (("tools/call" 1 1)
         ((format "tools/call:%s" ,tool-id) 1 1))
-     ,@body))
+     (let ((request (mcp-server-lib-create-tools-call-request ,tool-id 999)))
+       ,@body)))
 
 (defun mcp-server-lib-test--get-tool-list-for-request (request)
   "Get the tool list from a tools/list REQUEST.
@@ -1150,10 +1152,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :description "A tool that always fails"))
     (mcp-server-lib-test--check-tool-call-error "failing-tool"
       ;; Call tool directly without verify-req-success wrapper
-      (let* ((request
-              (mcp-server-lib-create-tools-call-request
-               "failing-tool" 11))
-             (resp-obj
+      (let* ((resp-obj
               (mcp-server-lib-process-jsonrpc-parsed request)))
         ;; Check no JSON-RPC error
         (should-not (alist-get 'error resp-obj))
@@ -1170,8 +1169,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :description "A tool that throws a generic error"))
     (mcp-server-lib-test--check-tool-call-error "generic-error-tool"
       (mcp-server-lib-test--check-jsonrpc-error
-       (mcp-server-lib-create-tools-call-request
-        "generic-error-tool" 12)
+       request
        -32603 "Internal error executing tool"))))
 
 (ert-deftest mcp-server-lib-test-tools-call-no-args ()
@@ -1243,8 +1241,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       (mcp-server-lib-test--check-tool-call-error "undefined-handler-tool"
         ;; Try to call the tool - should return an error
         (mcp-server-lib-test--check-jsonrpc-error
-         (mcp-server-lib-create-tools-call-request
-          "undefined-handler-tool" 16)
+         request
          -32603 "Internal error executing tool")))))
 
 
