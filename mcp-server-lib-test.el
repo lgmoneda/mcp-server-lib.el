@@ -464,24 +464,15 @@ then verifies that both calls and errors increased by 1 at both levels."
     (should (arrayp result))
     result))
 
-(defun mcp-server-lib-test--get-resource-list-for-request (request)
-  "Get the resource list from a resources/list REQUEST.
-Return the `resources` array from the result after verifying it is an array."
+(defun mcp-server-lib-test--get-resource-list ()
+  "Get the successful response to a standard `resources/list` request."
   (let ((result
          (alist-get
           'resources
           (mcp-server-lib-test--get-success-result
-           "resources/list" request))))
+           "resources/list"
+           (mcp-server-lib-create-resources-list-request)))))
     (should (arrayp result))
-    result))
-
-(defun mcp-server-lib-test--get-resource-list ()
-  "Get the successful response to a standard `resources/list` request."
-  (let (result)
-    (mcp-server-lib-test--verify-req-success "resources/list"
-      (setq result
-            (mcp-server-lib-test--get-resource-list-for-request
-             (mcp-server-lib-create-resources-list-request))))
     result))
 
 (defun mcp-server-lib-test--read-resource (uri &optional id)
