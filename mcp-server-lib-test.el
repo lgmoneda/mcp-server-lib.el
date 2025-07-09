@@ -133,6 +133,17 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
+(defun mcp-server-lib-test--get-initialize-result ()
+  "Send an MCP `initialize` request and return its result."
+  (mcp-server-lib-test--get-success-result
+   "initialize"
+   (json-encode
+    `(("jsonrpc" . "2.0")
+      ("method" . "initialize") ("id" . 15)
+      ("params" .
+       (("protocolVersion" . "2025-03-26")
+        ("capabilities" . ,(make-hash-table))))))))
+
 (cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources
                                                      &allow-other-keys)
   "Run BODY with MCP server active and initialized.
@@ -324,16 +335,6 @@ error and that the method metrics show success before returning the result."
        (setq result (alist-get 'result resp-obj))))
     result))
 
-(defun mcp-server-lib-test--get-initialize-result ()
-  "Send an MCP `initialize` request and return its result."
-  (mcp-server-lib-test--get-success-result
-   "initialize"
-   (json-encode
-    `(("jsonrpc" . "2.0")
-      ("method" . "initialize") ("id" . 15)
-      ("params" .
-       (("protocolVersion" . "2025-03-26")
-        ("capabilities" . ,(make-hash-table))))))))
 
 (defun mcp-server-lib-test--check-jsonrpc-error
     (request expected-code expected-message)
