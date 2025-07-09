@@ -44,6 +44,9 @@
 (defconst mcp-server-lib-test--unregister-tool-id "test-unregister"
   "Tool ID used for testing tool unregistration.")
 
+(defconst mcp-server-lib-test--resource-read-request-id 777
+  "Request ID used for resource read operations in tests.")
+
 ;;; Generic test handlers
 
 (defun mcp-server-lib-test--return-string ()
@@ -479,7 +482,7 @@ then verifies that both calls and errors increased by 1 at both levels."
   "Send a resources/read request for URI and return the parsed response."
   (let ((request (json-encode
                   `((jsonrpc . "2.0")
-                    (id . 777)
+                    (id . ,mcp-server-lib-test--resource-read-request-id)
                     (method . "resources/read")
                     (params . ((uri . ,uri)))))))
     (mcp-server-lib-process-jsonrpc-parsed request)))
@@ -520,6 +523,24 @@ with check-resource-read-response for the common pattern."
    "resources/read"
    (mcp-server-lib-test--check-resource-read-response
     uri expected-fields)))
+
+(defun mcp-server-lib-test--read-resource-error (uri expected-code &rest expected-message-substrings)
+  "Read resource at URI expecting an error with EXPECTED-CODE and message substrings.
+EXPECTED-MESSAGE-SUBSTRINGS are exact strings that should all appear in the error message.
+Also verifies the response structure including jsonrpc version and id."
+  (let ((response (mcp-server-lib-test--read-resource uri)))
+    ;; Check top-level response structure
+    (should (equal "2.0" (alist-get 'jsonrpc response)))
+    (should (equal mcp-server-lib-test--resource-read-request-id (alist-get 'id response)))
+    (should (alist-get 'error response))
+    (should-not (alist-get 'result response))
+    ;; Check error object
+    (let ((error-obj (alist-get 'error response)))
+      (should (equal expected-code (alist-get 'code error-obj)))
+      (let ((message (alist-get 'message error-obj)))
+        (dolist (substring expected-message-substrings)
+          (should (string-search substring message))))
+      error-obj)))
 
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
   "Verify a `tools/list` response against EXPECTED-TOOLS.
