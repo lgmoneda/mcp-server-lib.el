@@ -442,7 +442,7 @@ Optional ARGS is the association list of arguments to pass to the tool."
    -32600
    (format "Tool not found: %s" tool-id)))
 
-(defmacro mcp-server-lib-test--with-error-tracking
+(defmacro mcp-server-lib-test--check-tool-call-error
     (tool-id &rest body)
   "Execute BODY and verify both call and error counts increased for TOOL-ID.
 Captures method and tool metrics before execution, executes BODY,
@@ -1150,7 +1150,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       ((#'mcp-server-lib-test--tool-handler-mcp-server-lib-tool-throw
         :id "failing-tool"
         :description "A tool that always fails"))
-    (mcp-server-lib-test--with-error-tracking "failing-tool"
+    (mcp-server-lib-test--check-tool-call-error "failing-tool"
       ;; Call tool directly without verify-req-success wrapper
       (let* ((request
               (mcp-server-lib-create-tools-call-request
@@ -1170,7 +1170,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
       ((#'mcp-server-lib-test--generic-error-handler
         :id "generic-error-tool"
         :description "A tool that throws a generic error"))
-    (mcp-server-lib-test--with-error-tracking "generic-error-tool"
+    (mcp-server-lib-test--check-tool-call-error "generic-error-tool"
       (mcp-server-lib-test--check-jsonrpc-error
        (mcp-server-lib-create-tools-call-request
         "generic-error-tool" 12)
@@ -1242,7 +1242,7 @@ Per JSON-RPC 2.0 spec, servers should ignore extra/unknown members."
         :id "undefined-handler-tool"
         :description "A tool whose handler will be undefined"))
     (mcp-server-lib-test--with-undefined-function 'mcp-server-lib-test--handler-to-be-undefined
-      (mcp-server-lib-test--with-error-tracking "undefined-handler-tool"
+      (mcp-server-lib-test--check-tool-call-error "undefined-handler-tool"
         ;; Try to call the tool - should return an error
         (mcp-server-lib-test--check-jsonrpc-error
          (mcp-server-lib-create-tools-call-request
