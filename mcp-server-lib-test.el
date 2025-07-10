@@ -600,9 +600,9 @@ PARAM-DESCRIPTION as the expected description of the parameter."
 (defun mcp-server-lib-test--check-mcp-server-lib-content-format
     (result expected-text)
   "Check that RESULT follows the MCP content format with EXPECTED-TEXT."
-  (let ((response `((result . ,result))))
-    (let ((text (mcp-server-lib-ert-check-text-response response)))
-      (should (string= expected-text text)))))
+  (let* ((response `((result . ,result)))
+         (text (mcp-server-lib-ert-check-text-response response)))
+    (should (string= expected-text text))))
 
 ;;; Initialization and server capabilities tests
 
@@ -1126,15 +1126,11 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "failing-tool"
         :description "A tool that always fails"))
     (mcp-server-lib-test--check-tool-call-error "failing-tool"
-      ;; Call tool directly without verify-req-success wrapper
       (let* ((resp-obj
-              (mcp-server-lib-process-jsonrpc-parsed request)))
-        ;; Check no JSON-RPC error
-        (should-not (alist-get 'error resp-obj))
-        ;; Check error response using helper
-        (let ((text
-               (mcp-server-lib-ert-check-text-response resp-obj t)))
-          (should (string= "This tool intentionally fails" text)))))))
+              (mcp-server-lib-process-jsonrpc-parsed request))
+             (text
+              (mcp-server-lib-ert-check-text-response resp-obj t)))
+        (should (string= "This tool intentionally fails" text))))))
 
 (ert-deftest mcp-server-lib-test-tools-call-generic-error ()
   "Test that generic errors use standard JSON-RPC error format."
@@ -1199,12 +1195,12 @@ from a function loaded from bytecode rather than interpreted elisp."
       ((#'mcp-server-lib-test--return-nil
         :id "nil-returning-tool"
         :description "A tool that returns nil"))
-    (let ((result
-           (mcp-server-lib-test--call-tool "nil-returning-tool" 14)))
-      (let ((response `((result . ,result))))
-        (let ((text
-               (mcp-server-lib-ert-check-text-response response)))
-          (should (string= "" text)))))))
+    (let* ((result
+            (mcp-server-lib-test--call-tool "nil-returning-tool" 14))
+           (response `((result . ,result)))
+           (text
+            (mcp-server-lib-ert-check-text-response response)))
+      (should (string= "" text)))))
 
 (ert-deftest mcp-server-lib-test-tools-call-handler-undefined ()
   "Test calling a tool whose handler function no longer exists."

@@ -36,6 +36,8 @@
 If EXPECTED-ERROR is non-nil, expects isError to be true.
 Returns the text content string on success.
 Signals test failure if response structure is invalid."
+  ;; Ensure no JSON-RPC error - we're checking successful responses
+  (should-not (alist-get 'error response))
   (let ((result (alist-get 'result response)))
     (should result)
     (should (alist-get 'content result))
