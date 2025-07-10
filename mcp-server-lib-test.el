@@ -139,10 +139,12 @@ The original function definition is saved and restored after BODY executes."
 (defmacro mcp-server-lib-test--with-metrics-tracking
     (metrics-specs &rest body)
   "Execute BODY and verify metrics changed as expected.
-METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists."
+METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists.
+Returns the result of the last form in BODY."
   (declare (indent 1) (debug t))
   (let ((before-bindings '())
-        (after-checks '()))
+        (after-checks '())
+        (result-var (gensym "result")))
     ;; Build bindings and checks for each metric
     (dolist (spec metrics-specs)
       (let* ((key (car spec))
@@ -162,9 +164,10 @@ METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists."
                  (should (= (+ ,errors-var ,expected-errors)
                             (mcp-server-lib-metrics-errors metrics-after))))
               after-checks)))
-    `(let* ,(nreverse before-bindings)
-       ,@body
-       ,@(nreverse after-checks))))
+    `(let* (,@(nreverse before-bindings)
+            (,result-var (progn ,@body)))
+       ,@(nreverse after-checks)
+       ,result-var)))
 
 (defmacro mcp-server-lib-test--verify-req-success (method &rest body)
   "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
@@ -189,14 +192,12 @@ METHOD is the JSON-RPC method name for metrics verification.
 This function expects the request to succeed and will fail the test if an
 error is present in the response.  It verifies that the response contains no
 error and that the method metrics show success before returning the result."
-  (let (result)
-    (mcp-server-lib-test--verify-req-success
-     method
-     (let ((resp-obj
-            (mcp-server-lib-process-jsonrpc-parsed request)))
-       (should-not (alist-get 'error resp-obj))
-       (setq result (alist-get 'result resp-obj))))
-    result))
+  (mcp-server-lib-test--verify-req-success
+   method
+   (let ((resp-obj
+          (mcp-server-lib-process-jsonrpc-parsed request)))
+     (should-not (alist-get 'error resp-obj))
+     (alist-get 'result resp-obj))))
 
 (defun mcp-server-lib-test--get-initialize-result ()
   "Send an MCP `initialize` request and return its result."
