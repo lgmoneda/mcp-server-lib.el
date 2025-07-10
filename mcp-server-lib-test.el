@@ -529,8 +529,7 @@ EXPECTED-MESSAGE should be the exact error message string."
     ;; Check error object
     (let ((error-obj (alist-get 'error response)))
       (should (equal expected-code (alist-get 'code error-obj)))
-      (should (equal expected-message (alist-get 'message error-obj)))
-      error-obj)))
+      (should (equal expected-message (alist-get 'message error-obj))))))
 
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
   "Verify a `tools/list` response against EXPECTED-TOOLS.
