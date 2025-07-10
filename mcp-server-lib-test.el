@@ -517,9 +517,8 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
          (dolist (field expected-fields)
            (should (equal (alist-get (car field) content) (cdr field)))))))))
 
-(defun mcp-server-lib-test--read-resource-error (uri expected-code &rest
-  expected-message-substrings)
-  "Read resource at URI expecting an EXPECTED-CODE with EXPECTED-MESSAGE-SUBSTRINGS."
+(defun mcp-server-lib-test--read-resource-error (uri expected-code expected-message)
+  "Read resource at URI expecting an EXPECTED-CODE with EXPECTED-MESSAGE."
   (let ((response (mcp-server-lib-test--read-resource uri)))
     ;; Check top-level response structure
     (should (equal "2.0" (alist-get 'jsonrpc response)))
@@ -529,9 +528,7 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
     ;; Check error object
     (let ((error-obj (alist-get 'error response)))
       (should (equal expected-code (alist-get 'code error-obj)))
-      (let ((message (alist-get 'message error-obj)))
-        (dolist (substring expected-message-substrings)
-          (should (string-search substring message))))
+      (should (string-search expected-message (alist-get 'message error-obj)))
       error-obj)))
 
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
