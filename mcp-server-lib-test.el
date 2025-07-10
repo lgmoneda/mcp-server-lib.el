@@ -395,13 +395,13 @@ Arguments:
   "Test that JSON-RPC REQUEST is rejected with expected error.
 REQUEST is a string containing the JSON-RPC request.
 EXPECTED-CODE is the expected error code.
-EXPECTED-MESSAGE is a regex pattern to match against the error message."
+EXPECTED-MESSAGE is the exact error message string to match."
   (let* ((resp-obj (mcp-server-lib-process-jsonrpc-parsed request))
          (err-obj (alist-get 'error resp-obj))
          (err-code (alist-get 'code err-obj))
          (err-msg (alist-get 'message err-obj)))
     (should (= err-code expected-code))
-    (should (string-match expected-message err-msg))))
+    (should (equal expected-message err-msg))))
 
 (defun mcp-server-lib-test--check-invalid-jsonrpc-version (version)
   "Test that JSON-RPC request with VERSION is rejected properly."
@@ -1147,7 +1147,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     (mcp-server-lib-test--check-tool-call-error "generic-error-tool"
       (mcp-server-lib-test--check-jsonrpc-error
        request
-       -32603 "Internal error executing tool"))))
+       -32603 "Internal error executing tool: Generic error occurred"))))
 
 (ert-deftest mcp-server-lib-test-tools-call-no-args ()
   "Test the `tools/call` request with a tool that takes no arguments."
@@ -1219,7 +1219,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         ;; Try to call the tool - should return an error
         (mcp-server-lib-test--check-jsonrpc-error
          request
-         -32603 "Internal error executing tool")))))
+         -32603 "Internal error executing tool: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined")))))
 
 
 ;;; `mcp-server-lib-process-jsonrpc' tests
@@ -1228,7 +1228,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   "Test that invalid JSON input returns a parse error."
   (mcp-server-lib-test--with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
-     "This is not valid JSON" -32700 "Parse error")))
+     "This is not valid JSON" -32700 "Parse error: JSON readtable error: 84")))
 
 (ert-deftest mcp-server-lib-test-method-not-found ()
   "Test that unknown methods return method-not-found error."
