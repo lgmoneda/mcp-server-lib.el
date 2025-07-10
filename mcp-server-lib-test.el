@@ -512,15 +512,35 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
 EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
   (mcp-server-lib-test--verify-req-success
    "resources/read"
-   (let ((response (mcp-server-lib-test--read-resource uri)))
-     (should-not (alist-get 'error response))
+   (let* ((response (mcp-server-lib-test--read-resource uri))
+          (response-keys (mapcar #'car response)))
+     ;; Check response has exactly the expected fields
+     (should (= 3 (length response-keys)))
+     (should (member 'jsonrpc response-keys))
+     (should (member 'id response-keys))
+     (should (member 'result response-keys))
+     ;; Check response field values
+     (should (string= "2.0" (alist-get 'jsonrpc response)))
+     (should (equal mcp-server-lib-test--resource-read-request-id
+                    (alist-get 'id response)))
+     ;; Check result structure
      (let* ((result (alist-get 'result response))
-            (contents (alist-get 'contents result)))
-       (should (arrayp contents))
-       (should (= 1 (length contents)))
-       (let ((content (aref contents 0)))
-         (dolist (field expected-fields)
-           (should (equal (alist-get (car field) content) (cdr field)))))))))
+            (result-keys (mapcar #'car result)))
+       (should (= 1 (length result-keys)))
+       (should (member 'contents result-keys))
+       ;; Check contents array
+       (let ((contents (alist-get 'contents result)))
+         (should (arrayp contents))
+         (should (= 1 (length contents)))
+         ;; Check content item structure
+         (let* ((content (aref contents 0))
+                (content-keys (mapcar #'car content)))
+           ;; Verify exact field count
+           (should (= (length expected-fields) (length content-keys)))
+           ;; Verify each expected field exists and has correct value
+           (dolist (field expected-fields)
+             (should (member (car field) content-keys))
+             (should (equal (alist-get (car field) content) (cdr field))))))))))
 
 (defun mcp-server-lib-test--read-resource-error (uri expected-code expected-message)
   "Read resource at URI expecting an EXPECTED-CODE with EXPECTED-MESSAGE.
