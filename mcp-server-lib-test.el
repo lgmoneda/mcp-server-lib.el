@@ -507,6 +507,10 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
       (dolist (field expected-fields)
         (should (equal (alist-get (car field) resource) (cdr field)))))))
 
+(defun mcp-server-lib-test--find-resource-by-uri (uri resources)
+  "Find a resource in RESOURCES array by its URI field."
+  (seq-find (lambda (r) (equal (alist-get 'uri r) uri)) resources))
+
 (defun mcp-server-lib-test--verify-resource-read (uri expected-fields)
   "Verify that reading resource at URI succeeds with EXPECTED-FIELDS.
 EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
@@ -1737,8 +1741,8 @@ from a function loaded from bytecode rather than interpreted elisp."
     (let ((resources (mcp-server-lib-test--get-resource-list)))
       (should (= 2 (length resources)))
       ;; Check each resource
-      (let ((resource1 (seq-find (lambda (r) (equal (alist-get 'uri r) "test://resource1")) resources))
-            (resource2 (seq-find (lambda (r) (equal (alist-get 'uri r) "test://resource2")) resources)))
+      (let ((resource1 (mcp-server-lib-test--find-resource-by-uri "test://resource1" resources))
+            (resource2 (mcp-server-lib-test--find-resource-by-uri "test://resource2" resources)))
         ;; Verify first resource
         (should resource1)
         (should (equal (alist-get 'name resource1) "First Resource"))
