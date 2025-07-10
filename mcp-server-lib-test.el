@@ -502,7 +502,6 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
       (dolist (field expected-fields)
         (should (equal (alist-get (car field) resource) (cdr field)))))))
 
-
 (defun mcp-server-lib-test--verify-resource-read (uri expected-fields)
   "Verify that reading resource at URI succeeds with EXPECTED-FIELDS.
 EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
@@ -518,10 +517,9 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
          (dolist (field expected-fields)
            (should (equal (alist-get (car field) content) (cdr field)))))))))
 
-(defun mcp-server-lib-test--read-resource-error (uri expected-code &rest expected-message-substrings)
-  "Read resource at URI expecting an error with EXPECTED-CODE and message substrings.
-EXPECTED-MESSAGE-SUBSTRINGS are exact strings that should all appear in the error message.
-Also verifies the response structure including jsonrpc version and id."
+(defun mcp-server-lib-test--read-resource-error (uri expected-code &rest
+  expected-message-substrings)
+  "Read resource at URI expecting an EXPECTED-CODE with EXPECTED-MESSAGE-SUBSTRINGS."
   (let ((response (mcp-server-lib-test--read-resource uri)))
     ;; Check top-level response structure
     (should (equal "2.0" (alist-get 'jsonrpc response)))
