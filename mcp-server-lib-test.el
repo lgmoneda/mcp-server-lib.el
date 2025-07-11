@@ -1775,13 +1775,10 @@ from a function loaded from bytecode rather than interpreted elisp."
      (mcp-server-lib-test--with-metrics-tracking
       (("resources/read" 1 1))
       ;; Try to read the resource - should return an error
-      (let ((response (mcp-server-lib-test--read-resource "test://undefined-handler")))
-        (should (alist-get 'error response))
-        (let ((error-obj (alist-get 'error response)))
-          (should (equal (alist-get 'code error-obj)
-                         mcp-server-lib--error-internal))
-          (should (string-match "Error reading resource test://undefined-handler"
-                                (alist-get 'message error-obj)))))))))
+      (mcp-server-lib-test--read-resource-error
+       "test://undefined-handler"
+       mcp-server-lib--error-internal
+       "Error reading resource test://undefined-handler: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined")))))
 
 (provide 'mcp-server-lib-test)
 
