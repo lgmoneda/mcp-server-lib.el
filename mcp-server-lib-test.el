@@ -1656,13 +1656,10 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest test-mcp-server-lib-resources-read-not-found ()
   "Test reading a non-existent resource returns error."
   (mcp-server-lib-test--with-server :tools nil :resources nil
-   (let ((response (mcp-server-lib-test--read-resource "test://nonexistent")))
-     (should (alist-get 'error response))
-     (let ((error-obj (alist-get 'error response)))
-       (should (equal (alist-get 'code error-obj)
-                      mcp-server-lib--error-invalid-params))
-       (should (string-match "Resource not found: test://nonexistent"
-                             (alist-get 'message error-obj)))))))
+   (mcp-server-lib-test--read-resource-error
+    "test://nonexistent"
+    mcp-server-lib--error-invalid-params
+    "Resource not found: test://nonexistent")))
 
 (ert-deftest test-mcp-server-lib-register-resource-duplicate ()
   "Test registering the same resource twice increments ref count."
