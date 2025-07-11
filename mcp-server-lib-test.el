@@ -1759,16 +1759,11 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Error Resource"))
    (mcp-server-lib-test--with-metrics-tracking
     (("resources/read" 1 1))
-    ;; Try to read the resource
-    (let ((response (mcp-server-lib-test--read-resource "test://error-resource")))
-      (should (alist-get 'error response))
-      (let ((error-obj (alist-get 'error response)))
-        (should (equal (alist-get 'code error-obj)
-                       mcp-server-lib--error-internal))
-        (should (string-match "Error reading resource test://error-resource"
-                              (alist-get 'message error-obj)))
-        (should (string-match "Generic error occurred"
-                              (alist-get 'message error-obj))))))))
+    ;; Try to read the resource - should return an error
+    (mcp-server-lib-test--read-resource-error
+     "test://error-resource"
+     mcp-server-lib--error-internal
+     "Error reading resource test://error-resource: Generic error occurred"))))
 
 (ert-deftest mcp-server-lib-test-resources-read-handler-undefined ()
   "Test reading a resource whose handler function no longer exists."
