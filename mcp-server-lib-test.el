@@ -1681,30 +1681,31 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-register-resource-duplicate ()
   "Test registering the same resource twice increments ref count."
-  (mcp-server-lib-test--with-server
-   :tools nil :resources nil
+  (mcp-server-lib-test--with-resources
+   (("test://resource1"
+     #'mcp-server-lib-test--return-string
+     :name "Test Resource"))
+   ;; The macro automatically verifies the resource is in the list
+   ;; Now register the same resource again to test ref counting
    (mcp-server-lib-test--register-resource
     "test://resource1"
     #'mcp-server-lib-test--return-string
     :name "Test Resource"
-    (mcp-server-lib-test--register-resource
-     "test://resource1"
-     #'mcp-server-lib-test--return-string
-     :name "Test Resource"
-     ;; Verify it's still listed only once
-     (mcp-server-lib-test--check-single-resource
-      '((uri . "test://resource1")
-        (name . "Test Resource"))))
-    
-    ;; After inner macro completes, it unregisters once (ref count goes from 2 to 1)
-    ;; Resource should still exist because outer registration is still active
+    ;; Verify it's still listed only once
     (mcp-server-lib-test--check-single-resource
      '((uri . "test://resource1")
        (name . "Test Resource"))))
    
-   ;; After outer macro completes, it unregisters again (ref count = 0)
-   ;; Resource should no longer be listed
-   (mcp-server-lib-test--check-no-resources)))
+   ;; After inner macro completes, it unregisters once (ref count goes from 2 to 1)
+   ;; Resource should still exist because outer registration is still active
+   (mcp-server-lib-test--check-single-resource
+    '((uri . "test://resource1")
+      (name . "Test Resource"))))
+  
+  ;; After outer macro completes, it unregisters again (ref count = 0)
+  ;; Resource should no longer be listed
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--check-no-resources)))
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-name ()
   "Test that resource registration with missing :name produces an error."
