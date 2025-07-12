@@ -367,6 +367,9 @@ Arguments:
   "Run BODY with MCP server active and RESOURCES registered.
 All resources are automatically unregistered after BODY execution.
 
+After registering all resources, automatically verifies that the resource list
+contains exactly the registered resources with their expected properties.
+
 IMPORTANT: Tests should use this macro instead of calling
 `mcp-server-lib-register-resource' directly, except when testing registration
 failures or error conditions.
@@ -376,20 +379,44 @@ Arguments:
              `mcp-server-lib-register-resource': (URI HANDLER &rest PROPERTIES)
   BODY       Forms to execute with server running and resources registered"
   (declare (indent 1) (debug t))
-  ;; Build nested mcp-server-lib-test--register-resource calls
-  ;; wrapping server start and body execution
-  (let ((server-and-body
-         `(mcp-server-lib-test--with-server :tools nil :resources t
-            ,@body)))
-    ;; Process resources in reverse order to build proper nesting
-    (dolist (resource-spec (reverse resources))
-      (let* ((uri (car resource-spec))
-             (handler (cadr resource-spec))
-             (props (cddr resource-spec)))
-        (setq server-and-body
-              `(mcp-server-lib-test--register-resource ,uri ,handler ,@props
-                 ,server-and-body))))
-    server-and-body))
+  ;; Build the verification code
+  (let ((verification-code
+         `(let ((resource-list (mcp-server-lib-test--get-resource-list)))
+            ;; Check we have the expected number of resources
+            (should (= ,(length resources) (length resource-list)))
+            ;; Verify each registered resource appears in the list
+            ,@(mapcar
+               (lambda (resource-spec)
+                 (let* ((uri (car resource-spec))
+                        (props (cddr resource-spec))
+                        (name (plist-get props :name))
+                        (description (plist-get props :description))
+                        (mime-type (plist-get props :mime-type)))
+                   `(let ((resource (mcp-server-lib-test--find-resource-by-uri ,uri resource-list)))
+                      (should resource)
+                      (should (equal (alist-get 'uri resource) ,uri))
+                      (should (equal (alist-get 'name resource) ,name))
+                      ,@(when description
+                          `((should (equal (alist-get 'description resource) ,description))))
+                      ,@(when mime-type
+                          `((should (equal (alist-get 'mimeType resource) ,mime-type)))))))
+               resources))))
+    ;; Build nested mcp-server-lib-test--register-resource calls
+    ;; wrapping server start, verification, and body execution
+    (let ((server-and-body
+           `(mcp-server-lib-test--with-server :tools nil :resources t
+              ;; Add verification after all resources are registered
+              ,verification-code
+              ,@body)))
+      ;; Process resources in reverse order to build proper nesting
+      (dolist (resource-spec (reverse resources))
+        (let* ((uri (car resource-spec))
+               (handler (cadr resource-spec))
+               (props (cddr resource-spec)))
+          (setq server-and-body
+                `(mcp-server-lib-test--register-resource ,uri ,handler ,@props
+                   ,server-and-body))))
+      server-and-body)))
 
 (defun mcp-server-lib-test--check-error-object (response expected-code expected-message)
   "Check that RESPONSE has error with EXPECTED-CODE and EXPECTED-MESSAGE."
@@ -1604,12 +1631,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         :name "Test Resource"
         :description "A test resource"
         :mime-type "text/plain"))
-    ;; Verify it was registered by checking resources/list
-    (mcp-server-lib-test--check-single-resource
-     '((uri . "test://resource1")
-       (name . "Test Resource")
-       (description . "A test resource")
-       (mimeType . "text/plain")))))
+    ))
 
 (ert-deftest test-mcp-server-lib-register-resource-minimal ()
   "Test registering a resource with only required fields."
@@ -1617,10 +1639,6 @@ from a function loaded from bytecode rather than interpreted elisp."
    (("test://minimal"
      #'mcp-server-lib-test--return-string
      :name "Minimal Resource"))
-   ;; Verify it was registered correctly
-   (mcp-server-lib-test--check-single-resource
-    '((uri . "test://minimal")
-      (name . "Minimal Resource")))
    ;; Verify resource can be read without mime-type
    (mcp-server-lib-test--verify-resource-read
     "test://minimal"
