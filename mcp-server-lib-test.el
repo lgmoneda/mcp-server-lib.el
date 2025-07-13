@@ -590,6 +590,17 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
              (should (member (car field) content-keys))
              (should (equal (alist-get (car field) content) (cdr field))))))))))
 
+(defmacro mcp-server-lib-test--check-resource-read-error
+    (uri expected-code expected-message)
+  "Read resource at URI and verify error response with metrics tracking.
+Verifies that resources/read is called once with one error, and checks
+that the error response has EXPECTED-CODE and EXPECTED-MESSAGE."
+  (declare (indent 0) (debug t))
+  `(mcp-server-lib-test--with-metrics-tracking
+       (("resources/read" 1 1))
+     (mcp-server-lib-test--read-resource-error
+      ,uri ,expected-code ,expected-message)))
+
 (defun mcp-server-lib-test--read-resource-error (uri expected-code expected-message)
   "Read resource at URI expecting an EXPECTED-CODE with EXPECTED-MESSAGE.
 EXPECTED-MESSAGE should be the exact error message string."
@@ -1793,13 +1804,10 @@ from a function loaded from bytecode rather than interpreted elisp."
    (("test://error-resource"
      #'mcp-server-lib-test--generic-error-handler
      :name "Error Resource"))
-   (mcp-server-lib-test--with-metrics-tracking
-    (("resources/read" 1 1))
-    ;; Try to read the resource - should return an error
-    (mcp-server-lib-test--read-resource-error
+   (mcp-server-lib-test--check-resource-read-error
      "test://error-resource"
      mcp-server-lib-test--error-internal
-     "Error reading resource test://error-resource: Generic error occurred"))))
+     "Error reading resource test://error-resource: Generic error occurred")))
 
 (ert-deftest mcp-server-lib-test-resources-read-handler-undefined ()
   "Test reading a resource whose handler function no longer exists."
