@@ -378,6 +378,10 @@ Arguments:
            ,@body)
        (mcp-server-lib-unregister-resource ,uri))))
 
+(defun mcp-server-lib-test--find-resource-by-uri (uri resources)
+  "Find a resource in RESOURCES array by its URI field."
+  (seq-find (lambda (r) (equal (alist-get 'uri r) uri)) resources))
+
 (defmacro mcp-server-lib-test--with-resources (resources &rest body)
   "Run BODY with MCP server active and RESOURCES registered.
 All resources are automatically unregistered after BODY execution.
@@ -548,10 +552,6 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
       (should (= (length expected-fields) (length resource)))
       (dolist (field expected-fields)
         (should (equal (alist-get (car field) resource) (cdr field)))))))
-
-(defun mcp-server-lib-test--find-resource-by-uri (uri resources)
-  "Find a resource in RESOURCES array by its URI field."
-  (seq-find (lambda (r) (equal (alist-get 'uri r) uri)) resources))
 
 (defun mcp-server-lib-test--verify-resource-read (uri expected-fields)
   "Verify that reading resource at URI succeeds with EXPECTED-FIELDS.
