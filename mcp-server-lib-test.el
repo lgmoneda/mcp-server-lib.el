@@ -67,8 +67,7 @@
 ;;; Generic test handlers
 
 (defun mcp-server-lib-test--return-string ()
-  "Generic handler to return a test string.
-Can be used for both tool and resource testing."
+  "Generic handler to return a test string."
   "test result")
 
 (defun mcp-server-lib-test--generic-error-handler ()
@@ -81,8 +80,7 @@ Used for testing behavior when handlers no longer exist."
   "Handler was defined when called")
 
 (defun mcp-server-lib-test--return-nil ()
-  "Generic handler to return nil.
-Can be used for both tool and resource testing."
+  "Generic handler to return nil."
   nil)
 
 ;;; Test tool handlers
