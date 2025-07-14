@@ -382,6 +382,26 @@ Arguments:
   "Find a resource in RESOURCES array by its URI field."
   (seq-find (lambda (r) (equal (alist-get 'uri r) uri)) resources))
 
+(defun mcp-server-lib-test--build-resource-verification (resource-spec)
+  "Build verification code for a single RESOURCE-SPEC.
+RESOURCE-SPEC is a list of (URI HANDLER &rest PROPERTIES).
+Returns a form that verifies the resource appears in resource-list with
+expected properties."
+  (let* ((uri (car resource-spec))
+         (props (cddr resource-spec))
+         (name (plist-get props :name))
+         (description (plist-get props :description))
+         (mime-type (plist-get props :mime-type)))
+    `(let ((resource (mcp-server-lib-test--find-resource-by-uri ,uri
+                                                                resource-list)))
+       (should resource)
+       (should (equal (alist-get 'uri resource) ,uri))
+       (should (equal (alist-get 'name resource) ,name))
+       ,@(when description
+           `((should (equal (alist-get 'description resource) ,description))))
+       ,@(when mime-type
+           `((should (equal (alist-get 'mimeType resource) ,mime-type)))))))
+
 (defmacro mcp-server-lib-test--with-resources (resources &rest body)
   "Run BODY with MCP server active and RESOURCES registered.
 All resources are automatically unregistered after BODY execution.
@@ -404,22 +424,8 @@ Arguments:
             ;; Check we have the expected number of resources
             (should (= ,(length resources) (length resource-list)))
             ;; Verify each registered resource appears in the list
-            ,@(mapcar
-               (lambda (resource-spec)
-                 (let* ((uri (car resource-spec))
-                        (props (cddr resource-spec))
-                        (name (plist-get props :name))
-                        (description (plist-get props :description))
-                        (mime-type (plist-get props :mime-type)))
-                   `(let ((resource (mcp-server-lib-test--find-resource-by-uri ,uri resource-list)))
-                      (should resource)
-                      (should (equal (alist-get 'uri resource) ,uri))
-                      (should (equal (alist-get 'name resource) ,name))
-                      ,@(when description
-                          `((should (equal (alist-get 'description resource) ,description))))
-                      ,@(when mime-type
-                          `((should (equal (alist-get 'mimeType resource) ,mime-type)))))))
-               resources))))
+            ,@(mapcar #'mcp-server-lib-test--build-resource-verification
+                      resources))))
     ;; Build nested mcp-server-lib-test--register-resource calls
     ;; wrapping server start, verification, and body execution
     (let ((server-and-body
