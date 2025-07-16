@@ -135,7 +135,23 @@ MCP Parameters:"
 (declare-function mcp-server-lib-test-bytecode-handler--handler
                   "mcp-server-lib-bytecode-handler-test")
 
-;;; Test resource handlers
+;;; Test resource template handlers
+
+(defun mcp-server-lib-test--template-handler-error (_params)
+  "Template handler to ignore PARAMS and throw an error."
+  (error "Generic error occurred"))
+
+(defun mcp-server-lib-test--resource-template-handler-dump-params (params)
+  "Generic template handler that dumps the PARAMS alist."
+  (format "params: %S" params))
+
+(defun mcp-server-lib-test--resource-template-handler-dump-params-2 (params)
+  "Alternative template handler that dumps PARAMS."
+  (format "Handler-2: params: %S" params))
+
+(defun mcp-server-lib-test--resource-template-handler-nil (params)
+  "Test template handler to ignore PARAMS and return nil."
+  nil)
 
 ;;; Test helpers
 
@@ -382,6 +398,13 @@ Arguments:
   "Find a resource in RESOURCES array by its URI field."
   (seq-find (lambda (r) (equal (alist-get 'uri r) uri)) resources))
 
+(defun mcp-server-lib-test--find-resource-by-uri-template (uri-template
+  resources)
+  "Find a resource in RESOURCES array with URI-TEMPLATE field.
+The URI-TEMPLATE is searched as uriTemplate in JSON."
+  (seq-find (lambda (r) (equal (alist-get 'uriTemplate r) uri-template))
+  resources))
+
 (defun mcp-server-lib-test--build-resource-verification (resource-spec)
   "Build verification code for a single RESOURCE-SPEC.
 RESOURCE-SPEC is a list of (URI HANDLER &rest PROPERTIES).
@@ -391,11 +414,16 @@ expected properties."
          (props (cddr resource-spec))
          (name (plist-get props :name))
          (description (plist-get props :description))
-         (mime-type (plist-get props :mime-type)))
-    `(let ((resource (mcp-server-lib-test--find-resource-by-uri ,uri
-                                                                resource-list)))
+         (mime-type (plist-get props :mime-type))
+         (is-template (string-match-p "{" uri)))
+    `(let ((resource ,(if is-template
+                          `(mcp-server-lib-test--find-resource-by-uri-template
+                            ,uri resource-list)
+                        `(mcp-server-lib-test--find-resource-by-uri
+                          ,uri resource-list))))
        (should resource)
-       (should (equal (alist-get 'uri resource) ,uri))
+       (should (equal (alist-get ',(if is-template 'uriTemplate 'uri) resource)
+                      ,uri))
        (should (equal (alist-get 'name resource) ,name))
        ,@(when description
            `((should (equal (alist-get 'description resource) ,description))))
@@ -604,6 +632,20 @@ that the error response has EXPECTED-CODE and EXPECTED-MESSAGE."
        (("resources/read" 1 1))
      (mcp-server-lib-test--read-resource-error
       ,uri ,expected-code ,expected-message)))
+
+(defun mcp-server-lib-test--check-resource-read-request-error (params expected-code expected-message)
+  "Test that a resources/read request with PARAMS returns expected error.
+PARAMS is the params value to send in the JSON-RPC request.
+EXPECTED-CODE is the expected error code.
+EXPECTED-MESSAGE is the expected error message."
+  (mcp-server-lib-test--check-jsonrpc-error
+   (json-encode
+    `((jsonrpc . "2.0")
+      (id . 1)
+      (method . "resources/read")
+      (params . ,params)))
+   expected-code
+   expected-message))
 
 (defun mcp-server-lib-test--read-resource-error (uri expected-code expected-message)
   "Read resource at URI expecting an EXPECTED-CODE with EXPECTED-MESSAGE.
@@ -1827,6 +1869,551 @@ from a function loaded from bytecode rather than interpreted elisp."
        "test://undefined-handler"
        mcp-server-lib-test--error-internal
        "Error reading resource test://undefined-handler: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined")))))
+
+;;; Resource Template Invalid Syntax Tests
+
+(defun mcp-server-lib-test--assert-invalid-template-registration (uri)
+  "Assert that registering a resource template with URI fails."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+   (should-error
+    (mcp-server-lib-register-resource
+     uri
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Test Template"))))
+
+(defun mcp-server-lib-test--assert-invalid-handler-registration (handler
+                                                                 handler-desc)
+  "Check that registering a resource with invalid HANDLER & HANDLER-DESC fails."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (should-error
+     (mcp-server-lib-register-resource
+      "test://resource"
+      handler
+      :name (format "Resource with %s" handler-desc))
+     :type 'error)))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-unclosed ()
+  "Test resource template with unclosed variable syntax error."
+  (mcp-server-lib-test--assert-invalid-template-registration "org://{filename"))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-unmatched-close ()
+  "Test resource template with unmatched closing brace syntax error."
+  (mcp-server-lib-test--assert-invalid-template-registration "org://filename}"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-empty ()
+  "Test resource template with empty variable name syntax error."
+  (mcp-server-lib-test--assert-invalid-template-registration "org://{}"))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-numeric-variable ()
+  "Test resource template with numeric variable name is rejected."
+  (mcp-server-lib-test--assert-invalid-template-registration
+    "org://{123}/content"))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-special-chars-variable
+    ()
+  "Test resource template with special characters in variable name is rejected."
+  (mcp-server-lib-test--assert-invalid-template-registration
+    "org://{var-name}/content"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-scheme-only ()
+  "Test resource template with only scheme and no path."
+  (mcp-server-lib-test--assert-invalid-template-registration "org://"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-no-scheme ()
+  "Test resource template without a scheme."
+  (mcp-server-lib-test--assert-invalid-template-registration "{foo}"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-single-colon ()
+  "Test resource template with single colon instead of ://."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo:bar"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-single-slash ()
+  "Test resource template with :/ instead of ://."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo:/bar"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-no-colon ()
+  "Test resource template with path but no scheme separator."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo/bar"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-extra-colon ()
+  "Test resource template with extra colon before ://."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo:://bar"))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-no-scheme-prefix ()
+  "Test resource template starting with ://."
+  (mcp-server-lib-test--assert-invalid-template-registration "://bar"))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-double-slash-only ()
+  "Test resource template with // but no scheme."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo//bar"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-trailing-colon
+    ()
+  "Test resource template with trailing colon only."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo:"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-colon-slash ()
+  "Test resource template with :/ at end."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo:/"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-leading-colon
+    ()
+  "Test resource template starting with colon."
+  (mcp-server-lib-test--assert-invalid-template-registration ":foo//bar"))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-space-in-scheme ()
+  "Test resource template with space in scheme."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo bar://baz"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-numeric-scheme
+    ()
+  "Test resource template with numeric scheme."
+  (mcp-server-lib-test--assert-invalid-template-registration "123://bar"))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-underscore-in-scheme ()
+  "Test resource template with underscore in scheme."
+  (mcp-server-lib-test--assert-invalid-template-registration "foo_bar://baz"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-hyphen-first ()
+  "Test resource template with hyphen as first character in scheme."
+  (mcp-server-lib-test--assert-invalid-template-registration "-foo://bar"))
+
+(ert-deftest test-mcp-server-lib-resource-template-invalid-syntax-empty-string ()
+  "Test resource template with empty string."
+  (mcp-server-lib-test--assert-invalid-template-registration ""))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-invalid-syntax-whitespace-only ()
+  "Test resource template with whitespace only."
+  (mcp-server-lib-test--assert-invalid-template-registration "   "))
+
+(ert-deftest test-mcp-server-lib-register-resource-nil-handler ()
+  "Test resource registration with nil handler fails."
+  (mcp-server-lib-test--assert-invalid-handler-registration nil "nil handler"))
+
+(ert-deftest test-mcp-server-lib-register-resource-string-handler ()
+  "Test resource registration with string handler fails."
+  (mcp-server-lib-test--assert-invalid-handler-registration
+   "not a function" "string handler"))
+
+(ert-deftest test-mcp-server-lib-register-resource-number-handler ()
+  "Test resource registration with number handler fails."
+  (mcp-server-lib-test--assert-invalid-handler-registration 42 "number handler"))
+
+(ert-deftest test-mcp-server-lib-resource-template-simple-variable ()
+  "Test resource template with simple variable."
+  (mcp-server-lib-test--with-resources
+   (("org://{filename}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org file content"
+     :mime-type "text/plain"))
+   ;; Test successful match
+   (mcp-server-lib-test--verify-resource-read
+    "org://projects.org"
+    '((uri . "org://projects.org")
+      (mimeType . "text/plain")
+      (text . "params: ((\"filename\" . \"projects.org\"))")))
+   ;; Test non-matching prefix
+   (mcp-server-lib-test--read-resource-error
+    "file://projects.org"
+    mcp-server-lib-test--error-invalid-params
+    "Resource not found: file://projects.org")))
+
+(ert-deftest test-mcp-server-lib-resource-template-reserved-expansion ()
+  "Test resource template with reserved expansion."
+  (mcp-server-lib-test--with-resources
+   (("org://{+path}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org path"
+     :description "Access org files by path with slashes"))
+   ;; Test with slashes in variable
+   (mcp-server-lib-test--verify-resource-read
+    "org://folder/subfolder/file.org"
+    '((uri . "org://folder/subfolder/file.org")
+      (text . "params: ((\"path\" . \"folder/subfolder/file.org\"))")))))
+
+(ert-deftest test-mcp-server-lib-resource-template-multiple-variables ()
+  "Test resource template with multiple variables."
+  (mcp-server-lib-test--with-resources
+   (("org://{filename}/headline/{+path}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org headline"
+     :mime-type "text/plain"))
+   (mcp-server-lib-test--verify-resource-read
+    "org://todo.org/headline/Tasks/Urgent"
+    '((uri . "org://todo.org/headline/Tasks/Urgent")
+      (mimeType . "text/plain")
+      (text .
+            "params: ((\"filename\" . \"todo.org\") (\"path\" . \"Tasks/Urgent\"))")))))
+
+(ert-deftest test-mcp-server-lib-register-resource-missing-name ()
+  "Test error when registering template without name."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (should-error
+     (mcp-server-lib-register-resource
+      "test://{id}"
+      #'mcp-server-lib-test--resource-template-handler-dump-params)
+     :type 'error)))
+
+(ert-deftest test-mcp-server-lib-resources-read-direct-precedence ()
+  "Test that direct resources take precedence over resource templates."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Register template first
+    (mcp-server-lib-test--register-resource
+     "test://{id}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Template Resource"
+     ;; Register direct resource with URI that would match template
+     (mcp-server-lib-test--register-resource
+      "test://exact"
+      #'mcp-server-lib-test--return-string
+      :name "Direct Resource"
+      ;; Should get direct resource content
+      (mcp-server-lib-test--verify-resource-read
+       "test://exact"
+       '((uri . "test://exact")
+         (text . "test result")))))))
+
+(ert-deftest test-mcp-server-lib-resources-read-multiple-template-schemes ()
+  "Test that resource templates with different schemes route correctly."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--register-resource
+     "org://{filename}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org Files"
+     (mcp-server-lib-test--register-resource
+      "doc://{docname}"
+      #'mcp-server-lib-test--resource-template-handler-dump-params-2
+      :name "Doc Files"
+      (mcp-server-lib-test--verify-resource-read
+       "org://projects.org"
+       '((uri . "org://projects.org")
+         (text . "params: ((\"filename\" . \"projects.org\"))")))
+      (mcp-server-lib-test--verify-resource-read
+       "doc://manual.pdf"
+       '((uri . "doc://manual.pdf")
+         (text . "Handler-2: params: ((\"docname\" . \"manual.pdf\"))"))))))
+
+(ert-deftest test-mcp-server-lib-resources-read-no-template-match ()
+  "Test error when no resource template matches the URI."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--register-resource
+     "test://{id}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Test Template"
+     ;; Try to read with non-matching URI
+     (mcp-server-lib-test--read-resource-error
+      "other://123"
+      mcp-server-lib-test--error-invalid-params
+      "Resource not found: other://123"))))
+
+(ert-deftest test-mcp-server-lib-resource-template-empty-parameter-value ()
+  "Test resource template matching with empty parameter value."
+  (mcp-server-lib-test--with-resources
+   (("org://{filename}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org file template"))
+   ;; Test URI with empty filename parameter
+   (mcp-server-lib-test--verify-resource-read
+    "org://"
+    '((uri . "org://")
+      (text . "params: ((\"filename\" . \"\"))"))))))
+
+(ert-deftest test-mcp-server-lib-unregister-resource-multiple ()
+  "Test unregistering one resource when multiple are registered."
+  (mcp-server-lib-test--with-resources
+   (("org://{filename}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org Files")
+    ("doc://{docname}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params-2
+     :name "Doc Files")
+    ("test://{id}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Test Files"))
+   ;; Verify all three are listed
+   (let ((resources (mcp-server-lib-test--get-resource-list)))
+     (should (= 3 (length resources))))
+   ;; Unregister the middle one
+   (mcp-server-lib-unregister-resource "doc://{docname}")
+   ;; Verify only two remain
+   (let ((resources (mcp-server-lib-test--get-resource-list)))
+     (should (= 2 (length resources)))
+     ;; Check the remaining ones
+     (should (mcp-server-lib-test--find-resource-by-uri-template
+              "org://{filename}" resources))
+     (should (mcp-server-lib-test--find-resource-by-uri-template
+              "test://{id}" resources))
+     ;; Verify the unregistered one is gone
+     (should-not (mcp-server-lib-test--find-resource-by-uri-template
+                  "doc://{docname}" resources)))
+   ;; Verify the remaining templates still work
+   (mcp-server-lib-test--verify-resource-read
+    "org://test.org"
+    '((uri . "org://test.org")
+      (text . "params: ((\"filename\" . \"test.org\"))")))
+   (mcp-server-lib-test--verify-resource-read
+    "test://123"
+    '((uri . "test://123")
+      (text . "params: ((\"id\" . \"123\"))")))
+   ;; Verify the unregistered template no longer matches
+   (mcp-server-lib-test--read-resource-error
+    "doc://manual.pdf"
+    mcp-server-lib-test--error-invalid-params
+    "Resource not found: doc://manual.pdf")))
+
+(ert-deftest test-mcp-server-lib-resources-read-template-handler-error ()
+  "Test template handler errors bumping metrics and returning JSON-RPC errors."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--register-resource
+     "error://{id}"
+     #'mcp-server-lib-test--template-handler-error
+     :name "Error Template"
+     (mcp-server-lib-test--check-resource-read-error
+       "error://test"
+       mcp-server-lib-test--error-internal
+       "Error reading resource error://test: Generic error occurred"))))
+
+(ert-deftest test-mcp-server-lib-resources-read-template-handler-nil ()
+  "Test nil-returning template handler produces valid response with empty text."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--register-resource
+     "nil://{id}"
+     #'mcp-server-lib-test--resource-template-handler-nil
+     :name "Nil Template"
+     ;; Read the resource
+     (mcp-server-lib-test--verify-resource-read
+      "nil://test"
+      '((uri . "nil://test")
+        (text . nil))))))
+
+(ert-deftest test-mcp-server-lib-resources-read-template-handler-undefined ()
+  "Test reading a resource template whose handler function no longer exists."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--register-resource
+     "undefined://{id}"
+     #'mcp-server-lib-test--handler-to-be-undefined
+     :name "Undefined Handler Template"
+     (mcp-server-lib-test--with-undefined-function
+      'mcp-server-lib-test--handler-to-be-undefined
+       (mcp-server-lib-test--with-metrics-tracking
+        (("resources/read" 1 1))
+        ;; Try to read the resource - should return an error
+        (mcp-server-lib-test--read-resource-error
+         "undefined://test-123"
+         mcp-server-lib-test--error-internal
+         "Error reading resource undefined://test-123: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined"))))))
+
+(ert-deftest test-mcp-server-lib-resource-template-scheme-case-insensitive ()
+  "Test that URI schemes should be case-insensitive per RFC 3986."
+  (mcp-server-lib-test--with-resources
+   (("test://{id}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Test Template"))
+   ;; Test uppercase scheme should match
+   (mcp-server-lib-test--verify-resource-read
+    "TEST://123"
+    '((uri . "TEST://123")
+      (text . "params: ((\"id\" . \"123\"))")))
+   ;; Test mixed case scheme should match
+   (mcp-server-lib-test--verify-resource-read
+    "Test://456"
+    '((uri . "Test://456")
+      (text . "params: ((\"id\" . \"456\"))")))))
+
+(ert-deftest test-mcp-server-lib-resource-template-variable-names-case-sensitive
+    ()
+  "Test that variable names in templates are case-sensitive per RFC 6570."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Register template with lowercase variable
+    (mcp-server-lib-test--register-resource
+     "test://{username}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Lowercase Template"
+     ;; Register template with uppercase variable (different template)
+     (mcp-server-lib-test--register-resource
+      "test://{USERNAME}"
+      #'mcp-server-lib-test--resource-template-handler-dump-params-2
+      :name "Uppercase Template"
+      ;; Both templates should be registered
+      (let ((resources (mcp-server-lib-test--get-resource-list)))
+        (should (= 2 (length resources))))
+      ;; Test that they extract different variables
+      (mcp-server-lib-test--verify-resource-read
+       "test://john"
+       '((uri . "test://john")
+         (text . "params: ((\"username\" . \"john\"))")))))))
+
+(ert-deftest test-mcp-server-lib-resource-template-path-literals-case-sensitive
+    ()
+  "Test that literal path segments are case-sensitive."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Register template with lowercase path
+    (mcp-server-lib-test--register-resource
+     "test://path/{id}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Lowercase Path Template"
+     ;; Register template with uppercase path
+     (mcp-server-lib-test--register-resource
+      "test://PATH/{id}"
+      (lambda (params)
+        (format "UPPERCASE PATH: %s" (alist-get "id" params nil nil #'string=)))
+      :name "Uppercase Path Template"
+      ;; Both templates should be registered
+      (let ((resources (mcp-server-lib-test--get-resource-list)))
+        (should (= 2 (length resources))))
+      ;; Test lowercase path matches only lowercase template
+      (mcp-server-lib-test--verify-resource-read
+       "test://path/123"
+       '((uri . "test://path/123")
+         (text . "params: ((\"id\" . \"123\"))")))
+      ;; Test uppercase path matches only uppercase template
+      (mcp-server-lib-test--verify-resource-read
+       "test://PATH/456"
+       '((uri . "test://PATH/456")
+         (text . "UPPERCASE PATH: 456")))
+      ;; Test mixed case path doesn't match either
+      (mcp-server-lib-test--read-resource-error
+       "test://Path/789"
+       mcp-server-lib-test--error-invalid-params
+       "Resource not found: test://Path/789")))))
+
+(ert-deftest test-mcp-server-lib-resource-template-unicode-in-variables ()
+  "Test Unicode characters in variable values with proper percent-encoding."
+  (mcp-server-lib-test--with-resources
+   (("org://{filename}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org file template"))
+   ;; Test with direct Unicode character in URI
+   (mcp-server-lib-test--verify-resource-read
+    "org://café.org"
+    '((uri . "org://café.org")
+      (text . "params: ((\"filename\" . \"café.org\"))")))
+   ;; Test with percent-encoded Unicode in URI
+   (mcp-server-lib-test--verify-resource-read
+    "org://caf%C3%A9.org"
+    '((uri . "org://caf%C3%A9.org")
+      (text . "params: ((\"filename\" . \"caf%C3%A9.org\"))")))
+   ;; Test with multiple Unicode characters
+   (mcp-server-lib-test--verify-resource-read
+    "org://文档.org"
+    '((uri . "org://文档.org")
+      (text . "params: ((\"filename\" . \"文档.org\"))")))))
+
+(ert-deftest test-mcp-server-lib-resource-template-percent-encoded-extraction ()
+  "Test that extracted parameters remain percent-encoded."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--register-resource
+     "file://{path}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "File template"
+     ;; Test spaces remain encoded
+     (mcp-server-lib-test--verify-resource-read
+      "file://my%20document.txt"
+      '((uri . "file://my%20document.txt")
+        (text . "params: ((\"path\" . \"my%20document.txt\"))")))
+     ;; Test Unicode remains encoded
+     (mcp-server-lib-test--verify-resource-read
+      "file://caf%C3%A9.txt"
+      '((uri . "file://caf%C3%A9.txt")
+        (text . "params: ((\"path\" . \"caf%C3%A9.txt\"))")))
+     ;; Test special characters remain encoded
+     (mcp-server-lib-test--verify-resource-read
+      "file://file%2Bwith%2Bplus.txt"
+      '((uri . "file://file%2Bwith%2Bplus.txt")
+        (text . "params: ((\"path\" . \"file%2Bwith%2Bplus.txt\"))"))))))
+
+(ert-deftest
+    test-mcp-server-lib-resource-template-reserved-expansion-passthrough ()
+  "Test that {+var} allows reserved chars without encoding."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    (mcp-server-lib-test--register-resource
+     "file:///{+path}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "File path template"
+     ;; Test mixed reserved characters
+     (mcp-server-lib-test--verify-resource-read
+      "file:///path/with?query=value#section"
+      '((uri . "file:///path/with?query=value#section")
+        (text . "params: ((\"path\" . \"path/with?query=value#section\"))"))))))
+
+(ert-deftest test-mcp-server-lib-resource-template-first-match-precedence ()
+  "Test which template wins when multiple could match."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Register general template first
+    (mcp-server-lib-test--register-resource
+     "test://{id}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "General template"
+     ;; Register more specific template second
+     (mcp-server-lib-test--register-resource
+      "test://item/{id}"
+      #'mcp-server-lib-test--resource-template-handler-dump-params-2
+      :name "Specific template"
+      ;; First registered template should win
+      (mcp-server-lib-test--verify-resource-read
+       "test://item/123"
+       '((uri . "test://item/123")
+         (text . "params: ((\"id\" . \"item/123\"))")))
+      ;; Verify both templates are registered
+      (let ((resources (mcp-server-lib-test--get-resource-list)))
+        (should (= 2 (length resources))))))))
+
+(ert-deftest test-mcp-server-lib-resources-read-malformed-params ()
+  "Test resources/read with invalid params structure (string instead of object)."
+  (mcp-server-lib-test--with-resources
+   (("test://resource" #'mcp-server-lib-test--return-string
+     :name "Test Resource"))
+   ;; Test with string params instead of object
+   (mcp-server-lib-test--check-resource-read-request-error
+    "invalid string params"
+    mcp-server-lib-test--error-internal
+    "Internal error: Wrong type argument: listp, \"invalid string params\"")))
+
+(ert-deftest test-mcp-server-lib-resources-read-missing-uri ()
+  "Test resources/read without uri parameter."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Test missing uri parameter
+    (mcp-server-lib-test--check-resource-read-request-error
+     nil ; No uri
+     mcp-server-lib-test--error-invalid-params
+     "Resource not found: nil")))
+
+(ert-deftest test-mcp-server-lib-resources-read-numeric-uri ()
+  "Test resources/read with numeric uri."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Test with number uri
+    (mcp-server-lib-test--check-resource-read-request-error
+     '((uri . 123))
+     mcp-server-lib-test--error-invalid-params
+     "Resource not found: 123")))
+
+(ert-deftest test-mcp-server-lib-resources-read-array-uri ()
+  "Test resources/read with array uri."
+  (mcp-server-lib-test--with-server :tools nil :resources nil
+    ;; Test with array uri
+    (mcp-server-lib-test--check-resource-read-request-error
+     '((uri . ["test" "array"]))
+     mcp-server-lib-test--error-invalid-params
+     "Resource not found: [test array]")))
+
+(ert-deftest test-mcp-server-lib-resource-template-handler-wrong-signature ()
+  "Test template handler that doesn't accept params argument."
+  (mcp-server-lib-test--with-resources
+   (("test://{id}"
+     #'mcp-server-lib-test--return-string
+     :name "Wrong Signature Handler"))
+   (mcp-server-lib-test--read-resource-error
+    "test://123"
+    mcp-server-lib-test--error-internal
+    "Error reading resource test://123: Wrong number of arguments: ((t) nil \"Generic handler to return a test string.\" \"test result\"), 1")))
 
 (provide 'mcp-server-lib-test)
 

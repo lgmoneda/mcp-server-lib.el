@@ -10,6 +10,7 @@
 * Features
 
 - Simple API for registering tools (Elisp functions) and resources
+- Resource templates with URI pattern matching (RFC 6570 subset)
 - Handles MCP protocol communication and JSON-RPC messages
 - Stdio transport via emacsclient wrapper script
 - Built-in usage metrics and debugging support
@@ -89,7 +90,10 @@ Optional properties:
 
 *** Registering Resources
 
+The library uses a unified API for both static and templated resources. The presence of ={variable}= syntax automatically determines whether a resource is static or templated:
+
 #+begin_src elisp
+;; Static resource (no variables)
 (mcp-server-lib-register-resource "resource://uri"
   (lambda () "resource content")
   :name "Resource Name"
@@ -100,9 +104,70 @@ Optional properties:
 (mcp-server-lib-register-resource "buffer://current"
   (lambda () (buffer-string))
   :name "Current Buffer")
+
+;; Template resource with simple variable
+(mcp-server-lib-register-resource "org://{filename}"
+  (lambda (params)
+    (with-temp-buffer
+      (insert-file-contents (alist-get "filename" params nil nil #'string=))
+      (buffer-string)))
+  :name "Org file content"
+  :description "Read any org file by name")
+
+;; Template with multiple variables
+(mcp-server-lib-register-resource "org://{filename}/headline/{+path}"
+  (lambda (params)
+    (let ((file (alist-get "filename" params nil nil #'string=))
+          (path (alist-get "path" params nil nil #'string=)))
+      ;; path can contain slashes with {+path}
+      (org-get-headline-content file path)))
+  :name "Org headline"
+  :description "Get specific headline from org file")
 #+end_src
 
-Resource handlers take no arguments and return strings. Use regular =error= for failures.
+Static resource handlers take no arguments and return strings. Template resource handlers receive an alist of parameters extracted from the URI. Use regular =error= for failures.
+
+Supported template syntax (RFC 6570 subset):
+- ={variable}= - Simple variable expansion
+- ={+variable}= - Reserved expansion (allows slashes)
+
+Direct resources take precedence over templates when both match a URI.
+
+*** Working with Resource Templates
+
+Resource template handlers receive extracted parameters as an alist. These parameters are matched from the URI but not automatically decoded - if you're working with file paths that might contain special characters, you'll want to decode them:
+
+#+begin_src elisp
+(mcp-server-lib-register-resource "file://{path}"
+  (lambda (params)
+    (let ((path (alist-get "path" params nil nil #'string=)))
+      ;; Decode if needed for filesystem access
+      (with-temp-buffer
+        (insert-file-contents (url-unhex-string path))
+        (buffer-string))))
+  :name "File reader")
+#+end_src
+
+Variable names in templates follow simple rules - stick to letters, numbers, and underscores. The URI scheme (like =file://= or =org://=) needs to be a valid URI scheme starting with a letter. URI schemes are case-insensitive per RFC 3986, so =HTTP://example.com= will match a template registered as =http://{domain}=.
+
+When multiple templates could match the same URI, which template is selected is undefined and depends on implementation details. Avoid registering overlapping templates.
+
+Templates can match empty values too - =org://= will match =org://{filename}= with an empty filename.
+
+Literal segments in templates must match exactly - =test://items/{id}= will match =test://items/123= but not =test://item/123=.
+
+The implementation uses non-greedy (first-match) behavior when matching variables. For example, =test://{name}.txt= matching =test://file.config.txt= extracts =name="file.config"=, not =name="file.config.txt"=.
+
+To unregister any resource (static or templated):
+
+#+begin_src elisp
+(mcp-server-lib-unregister-resource "org://{filename}")
+(mcp-server-lib-unregister-resource "resource://uri")
+#+end_src
+
+*** Resource Lists
+
+When clients request the resource list, direct resources appear with a =uri= field while templates show up with a =uriTemplate= field. This helps clients distinguish between static resources and dynamic patterns they can use.
 
 *** Utility Functions
 

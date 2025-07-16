@@ -42,7 +42,7 @@
 - [X] Resource implementation and data serialization
 - [X] Resource metadata handling
 - [ ] Resource streaming capabilities
-- [ ] Resource templates (URI patterns)
+- [X] Resource templates (URI patterns)
 
 ** Prompt Registration
 - [ ] Prompt template definition API

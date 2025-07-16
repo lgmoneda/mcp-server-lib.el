@@ -8,6 +8,8 @@
                                                  (mcp-server-lib-test--register-tool . 1)
                                                  (mcp-server-lib-test--with-resources . 1)
                                                  (mcp-server-lib-test--register-resource . 2)
+                                                 (mcp-server-lib-test--register-resource-template . 2)
+                                                 (mcp-server-lib-test--with-resource-templates . 1)
                                                  (mcp-server-lib-test--with-undefined-function . 1)
                                                  (mcp-server-lib-test--with-request . defun)
                                                  (mcp-server-lib-test--verify-req-success . defun)
