@@ -8,3 +8,4 @@
 dist/
 
 # Planning documents
+jsonrpc-error-counter.patch
