@@ -2415,7 +2415,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     mcp-server-lib-test--error-internal
     (if (version< emacs-version "30.1")
         "Error reading resource test://123: Wrong number of arguments: ((t) nil \"Generic handler to return a test string.\" \"test result\"), 1"
-      "Error reading resource test://123: Wrong number of arguments"))))
+      "Error reading resource test://123: Wrong number of arguments: #[nil (\"test result\") (t) nil \"Generic handler to return a test string.\"], 1"))))
 
 (provide 'mcp-server-lib-test)
 
