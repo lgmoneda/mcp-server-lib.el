@@ -1,0 +1,212 @@
+# JSON-RPC Error Counter Implementation
+#
+# This patch implements error tracking at the JSON-RPC protocol level,
+# capturing parse errors, invalid requests, and other protocol-level
+# issues that occur before method dispatch.
+#
+# The implementation adds:
+# - mcp-server-lib-metrics--track-jsonrpc-error function for tracking errors
+# - Integration points in mcp-server-lib.el to track various error types
+# - Comprehensive tests for error counter functionality
+# - Updates TODO.org to mark the task as complete
+#
+# This feature allows monitoring of transport-level issues and protocol
+# compliance problems, providing visibility into errors that would otherwise
+# be hard to track systematically.
+#
+# Author: Assistant (proactively implemented from TODO.org)
+# Date: 2025-07-12
+
+diff --git a/TODO.org b/TODO.org
+index 1f3bddb..89bd379 100644
+--- a/TODO.org
++++ b/TODO.org
+@@ -129,7 +129,7 @@
+ ** Testing
+ - [X] Unit tests for basic server lifecycle
+ - [X] Unit tests for core protocol methods
+-- [ ] Add an error counter for JSON-RPC level errors
++- [X] Add an error counter for JSON-RPC level errors
+   - Track parse errors, invalid JSON-RPC format, etc.
+   - These errors occur before method dispatch
+   - Would allow monitoring transport-level issues
+diff --git a/mcp-server-lib-metrics.el b/mcp-server-lib-metrics.el
+index 5e2b83e..9e6d86b 100644
+--- a/mcp-server-lib-metrics.el
++++ b/mcp-server-lib-metrics.el
+@@ -24,7 +24,9 @@
+ 
+ ;; This file provides metrics collection functionality for the MCP server.
+ ;; It tracks usage statistics for all MCP operations including tools,
+-;; resources, and prompts.
++;; resources, and prompts.  Additionally, it tracks JSON-RPC level errors
++;; such as parse errors and invalid request formats that occur before
++;; method dispatch.
+ 
+ ;;; Code:
+ 
+@@ -83,6 +85,32 @@
+     (when is-error
+       (cl-incf (mcp-server-lib-metrics-errors metrics)))))
+ 
++(defun mcp-server-lib-metrics--track-jsonrpc-error (error-type)
++  "Track a JSON-RPC level error of ERROR-TYPE.
++ERROR-TYPE should be a string describing the error type, such as
++\"parse-error\" or \"invalid-request\".
++
++This function tracks errors that occur at the JSON-RPC protocol level,
++before method dispatch.  It maintains both an aggregate counter for all
++JSON-RPC errors (\"jsonrpc-errors\") and specific counters for each
++error type (\"jsonrpc-errors:ERROR-TYPE\").
++
++Common error types:
++  - \"parse-error\": JSON parsing failed
++  - \"invalid-version\": JSON-RPC version is not \"2.0\"
++  - \"missing-id\": Request lacks required \\='id\\=' field
++  - \"missing-method\": Request lacks required \\='method\\=' field
++  - \"notification-with-id\": Notification contains forbidden \\='id\\=' field"
++  (let ((metrics (mcp-server-lib-metrics--get "jsonrpc-errors")))
++    (cl-incf (mcp-server-lib-metrics-calls metrics))
++    (cl-incf (mcp-server-lib-metrics-errors metrics)))
++  ;; Also track specific error type
++  (let ((metrics
++         (mcp-server-lib-metrics--get
++          (format "jsonrpc-errors:%s" error-type))))
++    (cl-incf (mcp-server-lib-metrics-calls metrics))
++    (cl-incf (mcp-server-lib-metrics-errors metrics))))
++
+ ;;; Public functions
+ 
+ (defun mcp-server-lib-metrics-get (operation)
+diff --git a/mcp-server-lib-test.el b/mcp-server-lib-test.el
+index 3947d90..d896c34 100644
+--- a/mcp-server-lib-test.el
++++ b/mcp-server-lib-test.el
+@@ -1428,6 +1428,92 @@ Use this macro when you need to test with specific template patterns."
+           ;; New resource should be registered
+           (should (mcp-server-lib--find-resource "/project/doc.txt")))))))
+ 
++(ert-deftest mcp-server-lib-test-jsonrpc-error-counter-parse-error ()
++  "Test that JSON-RPC parse errors are tracked in metrics."
++  (mcp-server-lib-test--with-server :tools nil :resources nil
++    ;; Get initial metrics
++    (let* ((initial-metrics (mcp-server-lib-metrics-get "jsonrpc-errors"))
++           (initial-calls (mcp-server-lib-metrics-calls initial-metrics))
++           (initial-errors (mcp-server-lib-metrics-errors initial-metrics)))
++      ;; Send invalid JSON (returns error response, doesn't throw)
++      (let ((response (mcp-server-lib-process-jsonrpc "not valid json")))
++        ;; Should return a parse error response
++        (should (string-match-p "\"error\"" response))
++        (should (string-match-p "-32700" response)))
++      ;; Check that error counter was incremented
++      (let* ((updated-metrics (mcp-server-lib-metrics-get "jsonrpc-errors"))
++             (updated-calls (mcp-server-lib-metrics-calls updated-metrics))
++             (updated-errors (mcp-server-lib-metrics-errors updated-metrics)))
++        (should (= (1+ initial-calls) updated-calls))
++        (should (= (1+ initial-errors) updated-errors)))
++      ;; Also check specific parse-error counter
++      (let* ((parse-metrics (mcp-server-lib-metrics-get "jsonrpc-errors:parse-error"))
++             (parse-calls (mcp-server-lib-metrics-calls parse-metrics))
++             (parse-errors (mcp-server-lib-metrics-errors parse-metrics)))
++        (should (>= parse-calls 1))
++        (should (>= parse-errors 1))))))
++
++(ert-deftest mcp-server-lib-test-jsonrpc-error-counter-invalid-version ()
++  "Test that invalid JSON-RPC version errors are tracked."
++  (mcp-server-lib-test--with-server :tools nil :resources nil
++    ;; Get initial metrics
++    (let* ((initial-metrics (mcp-server-lib-metrics-get "jsonrpc-errors:invalid-version"))
++           (initial-calls (mcp-server-lib-metrics-calls initial-metrics))
++           (initial-errors (mcp-server-lib-metrics-errors initial-metrics)))
++      ;; Send request with wrong version
++      (mcp-server-lib-process-jsonrpc
++       (json-encode '(("jsonrpc" . "1.0") ("method" . "test") ("id" . 1))))
++      ;; Check that error counter was incremented
++      (let* ((updated-metrics (mcp-server-lib-metrics-get "jsonrpc-errors:invalid-version"))
++             (updated-calls (mcp-server-lib-metrics-calls updated-metrics))
++             (updated-errors (mcp-server-lib-metrics-errors updated-metrics)))
++        (should (= (1+ initial-calls) updated-calls))
++        (should (= (1+ initial-errors) updated-errors))))))
++
++(ert-deftest mcp-server-lib-test-jsonrpc-error-counter-missing-id ()
++  "Test that missing ID errors are tracked in metrics."
++  (mcp-server-lib-test--with-server :tools nil :resources nil
++    ;; Get initial metrics
++    (let* ((initial-metrics (mcp-server-lib-metrics-get "jsonrpc-errors:missing-id"))
++           (initial-calls (mcp-server-lib-metrics-calls initial-metrics))
++           (initial-errors (mcp-server-lib-metrics-errors initial-metrics)))
++      ;; Send request without ID (but not a notification)
++      (mcp-server-lib-process-jsonrpc
++       (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/call"))))
++      ;; Check that error counter was incremented
++      (let* ((updated-metrics (mcp-server-lib-metrics-get "jsonrpc-errors:missing-id"))
++             (updated-calls (mcp-server-lib-metrics-calls updated-metrics))
++             (updated-errors (mcp-server-lib-metrics-errors updated-metrics)))
++        (should (= (1+ initial-calls) updated-calls))
++        (should (= (1+ initial-errors) updated-errors))))))
++
++(ert-deftest mcp-server-lib-test-jsonrpc-error-counter-missing-method ()
++  "Test that missing method errors are tracked in metrics."
++  (mcp-server-lib-test--with-server :tools nil :resources nil
++    ;; Get initial metrics for missing-method errors
++    (let* ((initial-metrics (mcp-server-lib-metrics-get "jsonrpc-errors:missing-method"))
++           (initial-calls (mcp-server-lib-metrics-calls initial-metrics))
++           (initial-errors (mcp-server-lib-metrics-errors initial-metrics)))
++      ;; Send request without method
++      (mcp-server-lib-process-jsonrpc
++       (json-encode '(("jsonrpc" . "2.0") ("id" . 1))))
++      ;; Check that error counter was incremented
++      (let* ((updated-metrics (mcp-server-lib-metrics-get "jsonrpc-errors:missing-method"))
++             (updated-calls (mcp-server-lib-metrics-calls updated-metrics))
++             (updated-errors (mcp-server-lib-metrics-errors updated-metrics)))
++        (should (= (1+ initial-calls) updated-calls))
++        (should (= (1+ initial-errors) updated-errors))))))
++
+ ;;; `mcp-server-lib-process-jsonrpc-parsed' tests
+ 
+ (ert-deftest mcp-server-lib-test-process-jsonrpc-parsed ()
+diff --git a/mcp-server-lib.el b/mcp-server-lib.el
+index 3e2aab8..0fac62f 100644
+--- a/mcp-server-lib.el
++++ b/mcp-server-lib.el
+@@ -248,6 +248,7 @@ ID is the request ID (nil for notifications)."
+      
+      ;; Return error for non-2.0 requests
+      ((not (equal jsonrpc "2.0"))
++      (mcp-server-lib-metrics--track-jsonrpc-error "invalid-version")
+       (mcp-server-lib--jsonrpc-error
+        id
+        mcp-server-lib--error-invalid-request
+@@ -256,6 +257,8 @@ ID is the request ID (nil for notifications)."
+      
+      ;; Check if id is present for notifications/* methods
+      ((and id is-notification)
++      (mcp-server-lib-metrics--track-jsonrpc-error
++       "notification-with-id")
+       (mcp-server-lib--jsonrpc-error
+        id
+        mcp-server-lib--error-invalid-request
+@@ -264,6 +267,7 @@ ID is the request ID (nil for notifications)."
+      
+      ;; Check if id is missing
+      ((and (not id) (not is-notification))
++      (mcp-server-lib-metrics--track-jsonrpc-error "missing-id")
+       (mcp-server-lib--jsonrpc-error
+        nil
+        mcp-server-lib--error-invalid-request
+@@ -271,6 +275,7 @@ ID is the request ID (nil for notifications)."
+      
+      ;; Check if method is missing
+      ((not method)
++      (mcp-server-lib-metrics--track-jsonrpc-error "missing-method")
+       (mcp-server-lib--jsonrpc-error
+        id
+        mcp-server-lib--error-invalid-request
+@@ -691,6 +696,7 @@ Returns the JSON-RPC response string."
+          (setq response (mcp-server-lib--validate-and-dispatch-request request)))
+       (json-error
+        ;; If JSON parsing fails, create a parse error response
++       (mcp-server-lib-metrics--track-jsonrpc-error "parse-error")
+        (setq response
+              (mcp-server-lib--jsonrpc-error
+               nil mcp-server-lib--error-parse
