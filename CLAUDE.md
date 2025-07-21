@@ -174,6 +174,8 @@ For implementation details and roadmap, refer to the `TODO.org` file which conta
 ## Coding Principles
 
 - Prefer named functions to lambdas
+- Follow YAGNI (You Aren't Gonna Need It) - don't add functionality until it's actually needed
+- Follow DRY (Don't Repeat Yourself) - extract common code into reusable functions
 
 ## Symbol Definition Guidelines
 
