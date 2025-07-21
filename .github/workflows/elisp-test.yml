@@ -30,6 +30,9 @@ jobs:
       packages: read
       # To report GitHub Actions status checks
       statuses: write
+      # To create test report checks
+      checks: write
+      pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
@@ -45,6 +48,8 @@ jobs:
           version: "snapshot"
 
       - name: Run tests
+        env:
+          EMACS_TEST_JUNIT_REPORT: mcp-server-lib-test.xml
         run: |
           eask clean all
           eask package
@@ -54,3 +59,19 @@ jobs:
           eask lint keywords
           eask lint regexps
           eask run script test
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}-emacs-${{ matrix.emacs_version }}
+          path: mcp-server-lib-test.xml
+          retention-days: 7
+
+      - name: Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results - ${{ matrix.os }} - Emacs ${{ matrix.emacs_version }}
+          path: mcp-server-lib-test.xml
+          reporter: java-junit
