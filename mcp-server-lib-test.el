@@ -565,11 +565,8 @@ then verifies that both calls and errors increased by 1 at both levels."
 
 (defun mcp-server-lib-test--read-resource (uri)
   "Send a resources/read request for URI and return the parsed response."
-  (let ((request (json-encode
-                  `((jsonrpc . "2.0")
-                    (id . ,mcp-server-lib-test--resource-read-request-id)
-                    (method . "resources/read")
-                    (params . ((uri . ,uri)))))))
+  (let ((request (mcp-server-lib-create-resources-read-request
+                  uri mcp-server-lib-test--resource-read-request-id)))
     (mcp-server-lib-process-jsonrpc-parsed request)))
 
 (defun mcp-server-lib-test--check-no-resources ()
@@ -1078,6 +1075,34 @@ from a function loaded from bytecode rather than interpreted elisp."
     (should (equal "2.0" (alist-get 'jsonrpc parsed)))
     (should (equal "resources/list" (alist-get 'method parsed)))
     (should (equal 1 (alist-get 'id parsed)))))
+
+;;; `mcp-server-lib-create-resources-read-request' tests
+
+(ert-deftest mcp-server-lib-test-create-resources-read-request-with-id ()
+  "Test `mcp-server-lib-create-resources-read-request' with a specified ID."
+  (let* ((id 42)
+         (uri "test://resource")
+         (request (mcp-server-lib-create-resources-read-request uri id))
+         (parsed (json-read-from-string request)))
+    ;; Verify basic JSON-RPC structure
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "resources/read" (alist-get 'method parsed)))
+    (should (equal id (alist-get 'id parsed)))
+    ;; Verify params
+    (let ((params (alist-get 'params parsed)))
+      (should (equal uri (alist-get 'uri params))))))
+
+(ert-deftest mcp-server-lib-test-create-resources-read-request-default-id ()
+  "Test `mcp-server-lib-create-resources-read-request' with default ID."
+  (let* ((uri "test://resource")
+         (request (mcp-server-lib-create-resources-read-request uri))
+         (parsed (json-read-from-string request)))
+    (should (equal "2.0" (alist-get 'jsonrpc parsed)))
+    (should (equal "resources/read" (alist-get 'method parsed)))
+    (should (equal 1 (alist-get 'id parsed)))
+    ;; Verify params
+    (let ((params (alist-get 'params parsed)))
+      (should (equal uri (alist-get 'uri params))))))
 
 ;;; tools/list tests
 
