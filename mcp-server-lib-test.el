@@ -387,7 +387,7 @@ Arguments:
   (declare (indent 1) (debug t))
   ;; Build the verification code
   (let ((verification-code
-         `(let ((resource-list (mcp-server-lib-test--get-resource-list)))
+         `(let ((resource-list (mcp-server-lib-ert-get-resource-list)))
             ;; Check we have the expected number of resources
             (should (= ,(length resources) (length resource-list)))
             ;; Verify each registered resource appears in the list
@@ -491,16 +491,6 @@ then verifies that both calls and errors increased by 1 at both levels."
     (should (arrayp result))
     result))
 
-(defun mcp-server-lib-test--get-resource-list ()
-  "Get the successful response to a standard `resources/list` request."
-  (let ((result
-         (alist-get
-          'resources
-          (mcp-server-lib-ert-get-success-result
-           "resources/list"
-           (mcp-server-lib-create-resources-list-request)))))
-    (should (arrayp result))
-    result))
 
 (defun mcp-server-lib-test--read-resource (uri)
   "Send a resources/read request for URI and return the parsed response."
@@ -510,13 +500,13 @@ then verifies that both calls and errors increased by 1 at both levels."
 
 (defun mcp-server-lib-test--check-no-resources ()
   "Check that the resource list is empty."
-  (let ((resources (mcp-server-lib-test--get-resource-list)))
+  (let ((resources (mcp-server-lib-ert-get-resource-list)))
     (should (= 0 (length resources)))))
 
 (defun mcp-server-lib-test--check-single-resource (expected-fields)
   "Check the resource list to contain exactly one resource with EXPECTED-FIELDS.
 EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
-  (let ((resources (mcp-server-lib-test--get-resource-list)))
+  (let ((resources (mcp-server-lib-ert-get-resource-list)))
     (should (= 1 (length resources)))
     (let ((resource (aref resources 0)))
       (should (= (length expected-fields) (length resource)))
@@ -1792,7 +1782,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         :name "Second Resource"
         :mime-type "text/markdown"))
     ;; Verify both resources are listed
-    (let ((resources (mcp-server-lib-test--get-resource-list)))
+    (let ((resources (mcp-server-lib-ert-get-resource-list)))
       (should (= 2 (length resources)))
       ;; Check each resource
       (let ((resource1 (mcp-server-lib-test--find-resource-by-uri "test://resource1" resources))
@@ -2103,12 +2093,12 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "Test Files"))
    ;; Verify all three are listed
-   (let ((resources (mcp-server-lib-test--get-resource-list)))
+   (let ((resources (mcp-server-lib-ert-get-resource-list)))
      (should (= 3 (length resources))))
    ;; Unregister the middle one
    (mcp-server-lib-unregister-resource "doc://{docname}")
    ;; Verify only two remain
-   (let ((resources (mcp-server-lib-test--get-resource-list)))
+   (let ((resources (mcp-server-lib-ert-get-resource-list)))
      (should (= 2 (length resources)))
      ;; Check the remaining ones
      (should (mcp-server-lib-test--find-resource-by-uri-template
@@ -2207,7 +2197,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       #'mcp-server-lib-test--resource-template-handler-dump-params-2
       :name "Uppercase Template"
       ;; Both templates should be registered
-      (let ((resources (mcp-server-lib-test--get-resource-list)))
+      (let ((resources (mcp-server-lib-ert-get-resource-list)))
         (should (= 2 (length resources))))
       ;; Test that they extract different variables
       (mcp-server-lib-test--verify-resource-read
@@ -2231,7 +2221,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         (format "UPPERCASE PATH: %s" (alist-get "id" params nil nil #'string=)))
       :name "Uppercase Path Template"
       ;; Both templates should be registered
-      (let ((resources (mcp-server-lib-test--get-resource-list)))
+      (let ((resources (mcp-server-lib-ert-get-resource-list)))
         (should (= 2 (length resources))))
       ;; Test lowercase path matches only lowercase template
       (mcp-server-lib-test--verify-resource-read
@@ -2327,7 +2317,7 @@ from a function loaded from bytecode rather than interpreted elisp."
        '((uri . "test://item/123")
          (text . "params: ((\"id\" . \"item/123\"))")))
       ;; Verify both templates are registered
-      (let ((resources (mcp-server-lib-test--get-resource-list)))
+      (let ((resources (mcp-server-lib-ert-get-resource-list)))
         (should (= 2 (length resources))))))))
 
 (ert-deftest test-mcp-server-lib-resources-read-malformed-params ()

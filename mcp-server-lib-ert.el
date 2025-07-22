@@ -171,6 +171,28 @@ Example:
       (should-not (alist-get 'error resp-obj))
       (alist-get 'result resp-obj))))
 
+(defun mcp-server-lib-ert-get-resource-list ()
+  "Get the successful response to a standard \\='resources/list request.
+This is a convenience function for tests that need to verify resource lists.
+It sends a resources/list request, verifies success, and returns the
+resources array.
+
+Returns an array of resource objects.
+
+Example:
+  (let ((resources (mcp-server-lib-ert-get-resource-list)))
+    (should (= 2 (length resources)))
+    (should (string= \"test://resource1\"
+                     (alist-get \\='uri (aref resources 0)))))"
+  (let ((result
+         (alist-get
+          'resources
+          (mcp-server-lib-ert-get-success-result
+           "resources/list"
+           (mcp-server-lib-create-resources-list-request)))))
+    (should (arrayp result))
+    result))
+
 (provide 'mcp-server-lib-ert)
 
 ;; Local Variables:

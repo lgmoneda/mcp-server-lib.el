@@ -216,6 +216,12 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
        (tools (mcp-server-lib-ert-get-success-result "tools/list" request)))
   ;; tools contains the result field from the response
   (should (arrayp tools)))
+
+;; Get resource list (convenience function)
+(let ((resources (mcp-server-lib-ert-get-resource-list)))
+  (should (= 2 (length resources)))
+  (should (string= "test://resource1"
+                   (alist-get 'uri (aref resources 0)))))
 #+end_src
 
 *** Debugging
