@@ -17,4 +17,5 @@
                                                  (mcp-server-lib-test--verify-req-success . defun)
                                                  (mcp-server-lib-test--with-error-tracking . 1)
                                                  (mcp-server-lib-test--check-resource-read-error . 0)
+                                                 (mcp-server-lib-ert-with-metrics-tracking . 1)
                                                  (cl-defstruct . nil)))))))

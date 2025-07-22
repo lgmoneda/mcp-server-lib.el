@@ -167,39 +167,6 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
-(defmacro mcp-server-lib-test--with-metrics-tracking
-    (metrics-specs &rest body)
-  "Execute BODY and verify metrics changed as expected.
-METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists.
-Returns the result of the last form in BODY."
-  (declare (indent 1) (debug t))
-  (let ((before-bindings '())
-        (after-checks '())
-        (result-var (gensym "result")))
-    ;; Build bindings and checks for each metric
-    (dolist (spec metrics-specs)
-      (let* ((key (car spec))
-             (expected-calls (cadr spec))
-             (expected-errors (caddr spec))
-             (metrics-var (gensym "metrics"))
-             (calls-var (gensym "calls"))
-             (errors-var (gensym "errors")))
-        ;; Add before bindings
-        (push `(,metrics-var (mcp-server-lib-metrics-get ,key)) before-bindings)
-        (push `(,calls-var (mcp-server-lib-metrics-calls ,metrics-var)) before-bindings)
-        (push `(,errors-var (mcp-server-lib-metrics-errors ,metrics-var)) before-bindings)
-        ;; Add after checks
-        (push `(let ((metrics-after (mcp-server-lib-metrics-get ,key)))
-                 (should (= (+ ,calls-var ,expected-calls)
-                            (mcp-server-lib-metrics-calls metrics-after)))
-                 (should (= (+ ,errors-var ,expected-errors)
-                            (mcp-server-lib-metrics-errors metrics-after))))
-              after-checks)))
-    `(let* (,@(nreverse before-bindings)
-            (,result-var (progn ,@body)))
-       ,@(nreverse after-checks)
-       ,result-var)))
-
 (defmacro mcp-server-lib-test--verify-req-success (method &rest body)
   "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
 Captures metrics before BODY execution and asserts after that:
@@ -213,7 +180,7 @@ IMPORTANT: Any request-issuing test MUST use this macro or
 `mcp-server-lib-test--with-request' to ensure proper metric tracking and
 verification."
   (declare (indent defun) (debug t))
-  `(mcp-server-lib-test--with-metrics-tracking
+  `(mcp-server-lib-ert-with-metrics-tracking
        ((,method 1 0))
      ,@body))
 
@@ -535,7 +502,7 @@ Creates a tools/call request and binds it to `request' for use in BODY.
 Captures method and tool metrics before execution, executes BODY,
 then verifies that both calls and errors increased by 1 at both levels."
   (declare (indent 1) (debug t))
-  `(mcp-server-lib-test--with-metrics-tracking
+  `(mcp-server-lib-ert-with-metrics-tracking
        (("tools/call" 1 1)
         ((format "tools/call:%s" ,tool-id) 1 1))
      (let ((request (mcp-server-lib-create-tools-call-request ,tool-id 999)))
@@ -625,7 +592,7 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
 Verifies that resources/read is called once with one error, and checks
 that the error response has EXPECTED-CODE and EXPECTED-MESSAGE."
   (declare (indent 0) (debug t))
-  `(mcp-server-lib-test--with-metrics-tracking
+  `(mcp-server-lib-ert-with-metrics-tracking
        (("resources/read" 1 1))
      (mcp-server-lib-test--read-resource-error
       ,uri ,expected-code ,expected-message)))
@@ -1887,7 +1854,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--handler-to-be-undefined
      :name "Undefined Handler Resource"))
    (mcp-server-lib-test--with-undefined-function 'mcp-server-lib-test--handler-to-be-undefined
-     (mcp-server-lib-test--with-metrics-tracking
+     (mcp-server-lib-ert-with-metrics-tracking
       (("resources/read" 1 1))
       ;; Try to read the resource - should return an error
       (mcp-server-lib-test--read-resource-error
@@ -2228,7 +2195,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Undefined Handler Template"
      (mcp-server-lib-test--with-undefined-function
       'mcp-server-lib-test--handler-to-be-undefined
-       (mcp-server-lib-test--with-metrics-tracking
+       (mcp-server-lib-ert-with-metrics-tracking
         (("resources/read" 1 1))
         ;; Try to read the resource - should return an error
         (mcp-server-lib-test--read-resource-error

@@ -29,6 +29,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'mcp-server-lib-metrics)
 
 (defun mcp-server-lib-ert-check-text-response
     (response &optional expected-error)
@@ -67,6 +68,66 @@ Signals test failure if response structure is invalid."
               :json-false)))
           ;; Return the text content
           text)))))
+
+(defmacro mcp-server-lib-ert-with-metrics-tracking
+    (metrics-specs &rest body)
+  "Execute BODY and verify metrics changed as expected.
+METRICS-SPECS is a list of (METRICS-KEY EXPECTED-CALLS EXPECTED-ERRORS) lists.
+Returns the result of the last form in BODY.
+
+Arguments:
+  METRICS-SPECS - List of metric specifications, each containing:
+    - METRICS-KEY: String key for the metric to track
+    - EXPECTED-CALLS: Number of expected call increments
+    - EXPECTED-ERRORS: Number of expected error increments
+  BODY - Forms to execute while tracking metrics
+
+Example:
+  (mcp-server-lib-ert-with-metrics-tracking
+      ((\"initialize\" 1 0)
+       (\"tools/list\" 2 0))
+    ;; Code that should increment initialize calls by 1
+    ;; and tools/list calls by 2 with no errors
+    ...)"
+  (declare (indent 1) (debug t))
+  (let ((before-bindings '())
+        (after-checks '())
+        (result-var (gensym "result")))
+    ;; Build bindings and checks for each metric
+    (dolist (spec metrics-specs)
+      (let* ((key (car spec))
+             (expected-calls (cadr spec))
+             (expected-errors (caddr spec))
+             (metrics-var (gensym "metrics"))
+             (calls-var (gensym "calls"))
+             (errors-var (gensym "errors")))
+        ;; Add before bindings
+        (push `(,metrics-var (mcp-server-lib-metrics-get ,key))
+              before-bindings)
+        (push `(,calls-var
+                (mcp-server-lib-metrics-calls ,metrics-var))
+              before-bindings)
+        (push `(,errors-var
+                (mcp-server-lib-metrics-errors ,metrics-var))
+              before-bindings)
+        ;; Add after checks
+        (push `(let ((metrics-after
+                      (mcp-server-lib-metrics-get ,key)))
+                 (should
+                  (= (+ ,calls-var ,expected-calls)
+                     (mcp-server-lib-metrics-calls metrics-after)))
+                 (should
+                  (= (+ ,errors-var ,expected-errors)
+                     (mcp-server-lib-metrics-errors metrics-after))))
+              after-checks)))
+    `(let* (,@
+            (nreverse before-bindings)
+            (,result-var
+             (progn
+               ,@body)))
+       ,@
+       (nreverse after-checks)
+       ,result-var)))
 
 (provide 'mcp-server-lib-ert)
 

@@ -188,6 +188,25 @@ For testing and debugging:
 (mcp-server-lib-stop)
 #+end_src
 
+*** Test Utilities
+
+The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP servers:
+
+#+begin_src elisp
+;; Track metrics changes during test execution
+(mcp-server-lib-ert-with-metrics-tracking
+    ((method expected-calls expected-errors) ...)
+  ;; Test code here
+  )
+
+;; Example: Verify a method is called once with no errors
+(mcp-server-lib-ert-with-metrics-tracking
+    (("tools/list" 1 0))
+  ;; Code that should call tools/list once
+  (mcp-server-lib-process-jsonrpc-parsed
+   (mcp-server-lib-create-tools-list-request)))
+#+end_src
+
 *** Debugging
 
 Enable JSON-RPC message logging:
