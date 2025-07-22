@@ -148,6 +148,29 @@ Example:
   `(mcp-server-lib-ert-with-metrics-tracking ((,method 1 0))
      ,@body))
 
+(defun mcp-server-lib-ert-get-success-result (method request)
+  "Process REQUEST and return the result from a successful response.
+METHOD is the JSON-RPC method name for metrics verification.
+This function expects the request to succeed and will fail the test if an
+error is present in the response.  It verifies that the response contains no
+error and that the method metrics show success before returning the result.
+
+Arguments:
+  METHOD - The MCP method name for metrics tracking (e.g., \"initialize\")
+  REQUEST - The JSON-RPC request to process
+
+Returns the \\='result field from the response.
+
+Example:
+  (let* ((request (mcp-server-lib-create-tools-list-request))
+         (tools (mcp-server-lib-ert-get-success-result \"tools/list\" request)))
+    ;; tools now contains the tools array from the response
+    (should (arrayp tools)))"
+  (mcp-server-lib-ert-verify-req-success method
+    (let ((resp-obj (mcp-server-lib-process-jsonrpc-parsed request)))
+      (should-not (alist-get 'error resp-obj))
+      (alist-get 'result resp-obj))))
+
 (provide 'mcp-server-lib-ert)
 
 ;; Local Variables:

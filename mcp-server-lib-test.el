@@ -168,22 +168,10 @@ The original function definition is saved and restored after BODY executes."
        (fset ,function-symbol original-def))))
 
 
-(defun mcp-server-lib-test--get-success-result (method request)
-  "Process REQUEST and return the result from a successful response.
-METHOD is the JSON-RPC method name for metrics verification.
-This function expects the request to succeed and will fail the test if an
-error is present in the response.  It verifies that the response contains no
-error and that the method metrics show success before returning the result."
-  (mcp-server-lib-ert-verify-req-success
-   method
-   (let ((resp-obj
-          (mcp-server-lib-process-jsonrpc-parsed request)))
-     (should-not (alist-get 'error resp-obj))
-     (alist-get 'result resp-obj))))
 
 (defun mcp-server-lib-test--get-initialize-result ()
   "Send an MCP `initialize` request and return its result."
-  (mcp-server-lib-test--get-success-result
+  (mcp-server-lib-ert-get-success-result
    "initialize"
    (json-encode
     `(("jsonrpc" . "2.0")
@@ -458,7 +446,7 @@ Optional ARGS is the association list of arguments to pass to the tool."
          (tool-errors-before
           (mcp-server-lib-metrics-errors tool-metrics))
          (result
-          (mcp-server-lib-test--get-success-result
+          (mcp-server-lib-ert-get-success-result
            "tools/call"
            (mcp-server-lib-create-tools-call-request
             tool-id id args))))
@@ -497,7 +485,7 @@ then verifies that both calls and errors increased by 1 at both levels."
   (let ((result
          (alist-get
           'tools
-          (mcp-server-lib-test--get-success-result
+          (mcp-server-lib-ert-get-success-result
            "tools/list"
            (mcp-server-lib-create-tools-list-request)))))
     (should (arrayp result))
@@ -508,7 +496,7 @@ then verifies that both calls and errors increased by 1 at both levels."
   (let ((result
          (alist-get
           'resources
-          (mcp-server-lib-test--get-success-result
+          (mcp-server-lib-ert-get-success-result
            "resources/list"
            (mcp-server-lib-create-resources-list-request)))))
     (should (arrayp result))
@@ -711,7 +699,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . "2024-11-05")
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
@@ -725,7 +713,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize") ("id" . 17)
                ("params" .
                 (("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
@@ -741,7 +729,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . 123) ; Number instead of string
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
@@ -755,7 +743,7 @@ When both are registered, capabilities should include both fields."
                ("method" . "initialize")
                ("id" . 19)
                ("params" . "malformed"))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
@@ -767,7 +755,7 @@ When both are registered, capabilities should include both fields."
              `(("jsonrpc" . "2.0")
                ("method" . "initialize")
                ("id" . 20))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
@@ -781,7 +769,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . :json-null)
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
@@ -795,7 +783,7 @@ When both are registered, capabilities should include both fields."
                ("params" .
                 (("protocolVersion" . "")
                  ("capabilities" . ,(make-hash-table)))))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       (mcp-server-lib-test--assert-initialize-result result nil nil))))
 
@@ -812,7 +800,7 @@ When both are registered, capabilities should include both fields."
                   (("roots" . ,(make-hash-table))
                    ("sampling" . ,(make-hash-table))
                    ("experimental" . ,(make-hash-table)))))))))
-           (result (mcp-server-lib-test--get-success-result
+           (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       ;; Server should respond successfully, ignoring client capabilities
       (mcp-server-lib-test--assert-initialize-result result nil nil))))

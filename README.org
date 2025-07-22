@@ -210,6 +210,12 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
 (mcp-server-lib-ert-verify-req-success "tools/list"
   (mcp-server-lib-process-jsonrpc-parsed
    (mcp-server-lib-create-tools-list-request)))
+
+;; Process a request and get the successful result
+(let* ((request (mcp-server-lib-create-tools-list-request))
+       (tools (mcp-server-lib-ert-get-success-result "tools/list" request)))
+  ;; tools contains the result field from the response
+  (should (arrayp tools)))
 #+end_src
 
 *** Debugging
