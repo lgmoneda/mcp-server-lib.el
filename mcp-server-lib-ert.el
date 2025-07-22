@@ -129,6 +129,25 @@ Example:
        (nreverse after-checks)
        ,result-var)))
 
+(defmacro mcp-server-lib-ert-verify-req-success (method &rest body)
+  "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
+Captures metrics before BODY execution and asserts after that:
+- calls increased by 1
+- errors stayed the same
+
+Arguments:
+  METHOD - The MCP method name to track (e.g., \"tools/list\")
+  BODY - Forms to execute while tracking metrics
+
+Example:
+  (mcp-server-lib-ert-verify-req-success \"tools/list\"
+    (let ((response (mcp-server-lib-process-jsonrpc-parsed request)))
+      (should-not (alist-get \\='error response))
+      (alist-get \\='result response)))"
+  (declare (indent defun) (debug t))
+  `(mcp-server-lib-ert-with-metrics-tracking ((,method 1 0))
+     ,@body))
+
 (provide 'mcp-server-lib-ert)
 
 ;; Local Variables:

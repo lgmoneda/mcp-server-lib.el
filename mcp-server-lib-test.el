@@ -167,22 +167,6 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
-(defmacro mcp-server-lib-test--verify-req-success (method &rest body)
-  "Execute BODY and verify METHOD metrics show success (+1 call, +0 errors).
-Captures metrics before BODY execution and asserts after that:
-- calls increased by 1
-- errors stayed the same
-
-Note: This macro assumes the MCP server is already running.  If server
-start/stop is required, use `mcp-server-lib-test--with-request' instead.
-
-IMPORTANT: Any request-issuing test MUST use this macro or
-`mcp-server-lib-test--with-request' to ensure proper metric tracking and
-verification."
-  (declare (indent defun) (debug t))
-  `(mcp-server-lib-ert-with-metrics-tracking
-       ((,method 1 0))
-     ,@body))
 
 (defun mcp-server-lib-test--get-success-result (method request)
   "Process REQUEST and return the result from a successful response.
@@ -190,7 +174,7 @@ METHOD is the JSON-RPC method name for metrics verification.
 This function expects the request to succeed and will fail the test if an
 error is present in the response.  It verifies that the response contains no
 error and that the method metrics show success before returning the result."
-  (mcp-server-lib-test--verify-req-success
+  (mcp-server-lib-ert-verify-req-success
    method
    (let ((resp-obj
           (mcp-server-lib-process-jsonrpc-parsed request)))
@@ -263,11 +247,11 @@ This macro:
 4. Verifies the method was called exactly once with no errors
 5. Stops the server
 
-IMPORTANT: This macro or `mcp-server-lib-test--verify-req-success' MUST be used
+IMPORTANT: This macro or `mcp-server-lib-ert-verify-req-success' MUST be used
 for any successful request testing to ensure proper metric tracking."
   (declare (indent defun) (debug t))
   `(mcp-server-lib-test--with-server :tools nil :resources nil
-     (mcp-server-lib-test--verify-req-success ,method
+     (mcp-server-lib-ert-verify-req-success ,method
        ,@body)))
 
 (defmacro mcp-server-lib-test--register-tool (handler &rest props-and-body)
@@ -554,7 +538,7 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
 (defun mcp-server-lib-test--verify-resource-read (uri expected-fields)
   "Verify that reading resource at URI succeeds with EXPECTED-FIELDS.
 EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
-  (mcp-server-lib-test--verify-req-success
+  (mcp-server-lib-ert-verify-req-success
    "resources/read"
    (let* ((response (mcp-server-lib-test--read-resource uri))
           (response-keys (mapcar #'car response)))
@@ -1106,7 +1090,7 @@ from a function loaded from bytecode rather than interpreted elisp."
        (#'mcp-server-lib-test--return-string
         :id "test-tool-2"
         :description "Second tool for testing"))
-    (mcp-server-lib-test--verify-req-success "tools/list"
+    (mcp-server-lib-ert-verify-req-success "tools/list"
       (mcp-server-lib-test--verify-tool-list-request
        '(("test-tool-1" .
           ((description . "First tool for testing")
@@ -1126,7 +1110,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       ((#'mcp-server-lib-test--tool-handler-string-arg
         :id "requires-arg"
         :description "A tool that requires an argument"))
-    (mcp-server-lib-test--verify-req-success "tools/list"
+    (mcp-server-lib-ert-verify-req-success "tools/list"
       (mcp-server-lib-test--verify-tool-schema-in-single-tool-list
        "input-string" "string" "test parameter for string input"))))
 
@@ -1138,7 +1122,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "read-only-tool"
         :description "A tool that doesn't modify its environment"
         :read-only t))
-    (mcp-server-lib-test--verify-req-success "tools/list"
+    (mcp-server-lib-ert-verify-req-success "tools/list"
       (mcp-server-lib-test--verify-tool-list-request
        '(("read-only-tool" .
           ((description
@@ -1153,7 +1137,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         :id "non-read-only-tool"
         :description "Tool that modifies its environment"
         :read-only nil))
-    (mcp-server-lib-test--verify-req-success "tools/list"
+    (mcp-server-lib-ert-verify-req-success "tools/list"
       (mcp-server-lib-test--verify-tool-list-request
        '(("non-read-only-tool" .
           ((description . "Tool that modifies its environment")
@@ -1168,7 +1152,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         :description "A tool with multiple annotations"
         :title "Friendly Multi-Tool"
         :read-only t))
-    (mcp-server-lib-test--verify-req-success "tools/list"
+    (mcp-server-lib-ert-verify-req-success "tools/list"
       (mcp-server-lib-test--verify-tool-list-request
        '(("multi-annotated-tool" .
           ((description . "A tool with multiple annotations")

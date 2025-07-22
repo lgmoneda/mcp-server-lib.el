@@ -205,6 +205,11 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
   ;; Code that should call tools/list once
   (mcp-server-lib-process-jsonrpc-parsed
    (mcp-server-lib-create-tools-list-request)))
+
+;; Simplified syntax for verifying successful single method calls
+(mcp-server-lib-ert-verify-req-success "tools/list"
+  (mcp-server-lib-process-jsonrpc-parsed
+   (mcp-server-lib-create-tools-list-request)))
 #+end_src
 
 *** Debugging
