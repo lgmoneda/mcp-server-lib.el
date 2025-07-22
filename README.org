@@ -2,6 +2,7 @@
 
 [[https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/elisp-test.yml][https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/elisp-test.yml/badge.svg]]
 [[https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/linter.yml][https://github.com/laurynas-biveinis/mcp-server-lib.el/actions/workflows/linter.yml/badge.svg]]
+[[https://melpa.org/#/mcp-server-lib][https://melpa.org/packages/mcp-server-lib-badge.svg]]
 
 * Overview
 
