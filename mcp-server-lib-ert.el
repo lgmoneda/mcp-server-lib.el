@@ -171,6 +171,25 @@ Example:
       (should-not (alist-get 'error resp-obj))
       (alist-get 'result resp-obj))))
 
+(defun mcp-server-lib-ert-get-initialize-result ()
+  "Send an MCP \\='initialize request and return its result.
+This is a convenience function for tests that need to send the standard
+initialize request and get the result.
+
+Returns the result field from the initialize response.
+
+Example:
+  (let ((result (mcp-server-lib-ert-get-initialize-result)))
+    (should (string= \"2025-03-26\" (alist-get \\='protocolVersion result))))"
+  (mcp-server-lib-ert-get-success-result
+   "initialize"
+   (json-encode
+    `(("jsonrpc" . "2.0")
+      ("method" . "initialize") ("id" . 15)
+      ("params" .
+       (("protocolVersion" . "2025-03-26")
+        ("capabilities" . ,(make-hash-table))))))))
+
 (defun mcp-server-lib-ert-get-resource-list ()
   "Get the successful response to a standard \\='resources/list request.
 This is a convenience function for tests that need to verify resource lists.

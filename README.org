@@ -222,6 +222,11 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
   ;; tools contains the result field from the response
   (should (arrayp tools)))
 
+;; Send initialize request and get result
+(let ((result (mcp-server-lib-ert-get-initialize-result)))
+  (should (string= "2025-03-26" (alist-get 'protocolVersion result)))
+  (should (alist-get 'serverInfo result)))
+
 ;; Get resource list (convenience function)
 (let ((resources (mcp-server-lib-ert-get-resource-list)))
   (should (= 2 (length resources)))

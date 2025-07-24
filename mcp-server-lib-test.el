@@ -167,19 +167,6 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
-
-
-(defun mcp-server-lib-test--get-initialize-result ()
-  "Send an MCP `initialize` request and return its result."
-  (mcp-server-lib-ert-get-success-result
-   "initialize"
-   (json-encode
-    `(("jsonrpc" . "2.0")
-      ("method" . "initialize") ("id" . 15)
-      ("params" .
-       (("protocolVersion" . "2025-03-26")
-        ("capabilities" . ,(make-hash-table))))))))
-
 (defun mcp-server-lib-test--assert-initialize-result (init-result tools resources)
   "Assert the structure of an initialize result.
 INIT-RESULT is the result from an initialize request.
@@ -216,7 +203,7 @@ the server in the middle of a test."
        (progn
          (mcp-server-lib-start)
          (mcp-server-lib-test--assert-initialize-result
-          (mcp-server-lib-test--get-initialize-result) ,tools ,resources)
+          (mcp-server-lib-ert-get-initialize-result) ,tools ,resources)
          ;; Send initialized notification - should return nil
          (should-not
           (mcp-server-lib-process-jsonrpc
