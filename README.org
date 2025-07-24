@@ -174,6 +174,8 @@ When clients request the resource list, direct resources appear with a =uri= fie
 
 =mcp-server-lib-name= - The name of the MCP server ("emacs-mcp-server-lib")
 
+=mcp-server-lib-protocol-version= - The MCP protocol version supported by this server ("2025-03-26")
+
 *** Utility Functions
 
 For testing and debugging:
@@ -224,8 +226,12 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
 
 ;; Send initialize request and get result
 (let ((result (mcp-server-lib-ert-get-initialize-result)))
-  (should (string= "2025-03-26" (alist-get 'protocolVersion result)))
+  (should (string= mcp-server-lib-protocol-version (alist-get 'protocolVersion result)))
   (should (alist-get 'serverInfo result)))
+
+;; Assert initialize result structure
+(let ((result (mcp-server-lib-ert-get-initialize-result)))
+  (mcp-server-lib-ert-assert-initialize-result result nil nil))
 
 ;; Get resource list (convenience function)
 (let ((resources (mcp-server-lib-ert-get-resource-list)))

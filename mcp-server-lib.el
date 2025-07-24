@@ -72,6 +72,9 @@ Defaults to `user-emacs-directory' but can be customized."
 (defconst mcp-server-lib-name "emacs-mcp-server-lib"
   "Name of the MCP server.")
 
+(defconst mcp-server-lib-protocol-version "2025-03-26"
+  "Current MCP protocol version supported by this server.")
+
 ;;; Internal Constants
 
 (defconst mcp-server-lib--error-parse -32700
@@ -88,9 +91,6 @@ Defaults to `user-emacs-directory' but can be customized."
 
 (defconst mcp-server-lib--error-internal -32603
   "Error code for Internal Error.")
-
-(defconst mcp-server-lib--protocol-version "2025-03-26"
-  "Current MCP protocol version supported by this server.")
 
 (defconst mcp-server-lib--uri-scheme-regex
   "[a-zA-Z][a-zA-Z0-9+.-]*://"
@@ -600,11 +600,11 @@ version and capabilities between the client and server."
       (push `(resources . ,(make-hash-table)) capabilities))
     (mcp-server-lib--jsonrpc-response
      id
-     `((protocolVersion . ,mcp-server-lib--protocol-version)
+     `((protocolVersion . ,mcp-server-lib-protocol-version)
        (serverInfo
         .
         ((name . ,mcp-server-lib-name)
-         (version . ,mcp-server-lib--protocol-version)))
+         (version . ,mcp-server-lib-protocol-version)))
        (capabilities . ,capabilities)))))
 
 (defun mcp-server-lib--handle-initialized ()

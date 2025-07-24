@@ -187,8 +187,48 @@ Example:
     `(("jsonrpc" . "2.0")
       ("method" . "initialize") ("id" . 15)
       ("params" .
-       (("protocolVersion" . "2025-03-26")
+       (("protocolVersion" . ,mcp-server-lib-protocol-version)
         ("capabilities" . ,(make-hash-table))))))))
+
+(defun mcp-server-lib-ert-assert-initialize-result
+    (init-result tools resources)
+  "Assert the structure of an initialize result.
+INIT-RESULT is the result from an initialize request.
+TOOLS is a boolean indicating if tools capability is expected.
+RESOURCES is a boolean indicating if resources capability is expected.
+
+This function validates:
+- Protocol version matches the expected version
+- Server info contains the correct server name
+- Capabilities match the expected state for tools and resources
+
+Example:
+  (let ((result (mcp-server-lib-ert-get-initialize-result)))
+    (mcp-server-lib-ert-assert-initialize-result result nil nil))"
+  (let ((protocol-version (alist-get 'protocolVersion init-result))
+        (capabilities (alist-get 'capabilities init-result))
+        (server-info (alist-get 'serverInfo init-result)))
+    (should
+     (string= mcp-server-lib-protocol-version protocol-version))
+    (should
+     (string= mcp-server-lib-name (alist-get 'name server-info)))
+    ;; Verify capabilities match expectations
+    (when tools
+      (should (assoc 'tools capabilities))
+      ;; Empty objects {} in JSON are parsed as nil in Elisp
+      (should-not (alist-get 'tools capabilities)))
+    (when resources
+      (should (assoc 'resources capabilities))
+      (should-not (alist-get 'resources capabilities)))
+    ;; Verify exact count
+    (should
+     (= (+ (if tools
+               1
+             0)
+           (if resources
+               1
+             0))
+        (length capabilities)))))
 
 (defun mcp-server-lib-ert-get-resource-list ()
   "Get the successful response to a standard \\='resources/list request.

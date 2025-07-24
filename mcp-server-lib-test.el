@@ -167,27 +167,6 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
-(defun mcp-server-lib-test--assert-initialize-result (init-result tools resources)
-  "Assert the structure of an initialize result.
-INIT-RESULT is the result from an initialize request.
-TOOLS is a boolean indicating if tools capability is expected.
-RESOURCES is a boolean indicating if resources capability is expected."
-  (let ((protocol-version (alist-get 'protocolVersion init-result))
-        (capabilities (alist-get 'capabilities init-result))
-        (server-info (alist-get 'serverInfo init-result)))
-    (should (string= "2025-03-26" protocol-version))
-    (should (string= mcp-server-lib-name (alist-get 'name server-info)))
-    ;; Verify capabilities match expectations
-    (when tools
-      (should (assoc 'tools capabilities))
-      ;; Empty objects {} in JSON are parsed as nil in Elisp
-      (should-not (alist-get 'tools capabilities)))
-    (when resources
-      (should (assoc 'resources capabilities))
-      (should-not (alist-get 'resources capabilities)))
-    ;; Verify exact count
-    (should (= (+ (if tools 1 0) (if resources 1 0))
-               (length capabilities)))))
 
 (cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources
                                                      &allow-other-keys)
@@ -202,7 +181,7 @@ the server in the middle of a test."
   `(unwind-protect
        (progn
          (mcp-server-lib-start)
-         (mcp-server-lib-test--assert-initialize-result
+         (mcp-server-lib-ert-assert-initialize-result
           (mcp-server-lib-ert-get-initialize-result) ,tools ,resources)
          ;; Send initialized notification - should return nil
          (should-not
@@ -678,7 +657,7 @@ When both are registered, capabilities should include both fields."
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-missing-protocol-version
     ()
@@ -692,7 +671,7 @@ When both are registered, capabilities should include both fields."
                 (("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 (ert-deftest
     mcp-server-lib-test-initialize-non-string-protocol-version
@@ -708,7 +687,7 @@ When both are registered, capabilities should include both fields."
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-malformed-params ()
   "Test initialize request with completely malformed params."
@@ -722,7 +701,7 @@ When both are registered, capabilities should include both fields."
                ("params" . "malformed"))))
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-missing-params ()
   "Test initialize request without params field."
@@ -734,7 +713,7 @@ When both are registered, capabilities should include both fields."
                ("id" . 20))))
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-null-protocol-version ()
   "Test initialize request with null protocolVersion."
@@ -748,7 +727,7 @@ When both are registered, capabilities should include both fields."
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-empty-protocol-version ()
   "Test initialize request with empty string protocolVersion."
@@ -762,7 +741,7 @@ When both are registered, capabilities should include both fields."
                  ("capabilities" . ,(make-hash-table)))))))
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 (ert-deftest mcp-server-lib-test-initialize-with-valid-client-capabilities ()
   "Test initialize request with valid client capabilities (roots, sampling, experimental)."
@@ -772,7 +751,7 @@ When both are registered, capabilities should include both fields."
              `(("jsonrpc" . "2.0")
                ("method" . "initialize") ("id" . 23)
                ("params" .
-                (("protocolVersion" . "2025-03-26")
+                (("protocolVersion" . ,mcp-server-lib-protocol-version)
                  ("capabilities" .
                   (("roots" . ,(make-hash-table))
                    ("sampling" . ,(make-hash-table))
@@ -780,7 +759,7 @@ When both are registered, capabilities should include both fields."
            (result (mcp-server-lib-ert-get-success-result
                     "initialize" init-request)))
       ;; Server should respond successfully, ignoring client capabilities
-      (mcp-server-lib-test--assert-initialize-result result nil nil))))
+      (mcp-server-lib-ert-assert-initialize-result result nil nil))))
 
 ;;; `mcp-server-lib-register-tool' tests
 
