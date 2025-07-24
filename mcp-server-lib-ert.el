@@ -171,16 +171,12 @@ Example:
       (should-not (alist-get 'error resp-obj))
       (alist-get 'result resp-obj))))
 
-(defun mcp-server-lib-ert-get-initialize-result ()
+(defun mcp-server-lib-ert--get-initialize-result ()
   "Send an MCP \\='initialize request and return its result.
 This is a convenience function for tests that need to send the standard
 initialize request and get the result.
 
-Returns the result field from the initialize response.
-
-Example:
-  (let ((result (mcp-server-lib-ert-get-initialize-result)))
-    (should (string= \"2025-03-26\" (alist-get \\='protocolVersion result))))"
+Returns the result field from the initialize response."
   (mcp-server-lib-ert-get-success-result
    "initialize"
    (json-encode
@@ -200,11 +196,7 @@ RESOURCES is a boolean indicating if resources capability is expected.
 This function validates:
 - Protocol version matches the expected version
 - Server info contains the correct server name
-- Capabilities match the expected state for tools and resources
-
-Example:
-  (let ((result (mcp-server-lib-ert-get-initialize-result)))
-    (mcp-server-lib-ert-assert-initialize-result result nil nil))"
+- Capabilities match the expected state for tools and resources"
   (let ((protocol-version (alist-get 'protocolVersion init-result))
         (capabilities (alist-get 'capabilities init-result))
         (server-info (alist-get 'serverInfo init-result)))
@@ -286,7 +278,9 @@ Example:
       (progn
         (mcp-server-lib-start)
         (mcp-server-lib-ert-assert-initialize-result
-         (mcp-server-lib-ert-get-initialize-result) ,tools ,resources)
+         (mcp-server-lib-ert--get-initialize-result)
+         ,tools
+         ,resources)
         ;; Send initialized notification - should return nil
         (should-not
          (mcp-server-lib-process-jsonrpc
