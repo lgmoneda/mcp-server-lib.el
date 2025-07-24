@@ -252,6 +252,50 @@ Example:
     (should (arrayp result))
     result))
 
+(cl-defmacro
+ mcp-server-lib-ert-with-server
+ (&rest body &key tools resources &allow-other-keys)
+ "Run BODY with MCP server active and initialized.
+Starts the server, sends initialize request, then runs BODY.
+TOOLS and RESOURCES are booleans indicating expected capabilities.
+
+This macro:
+1. Starts the MCP server with `mcp-server-lib-start'
+2. Sends and validates the initialize request
+3. Sends the initialized notification
+4. Executes BODY
+5. Stops the server with `mcp-server-lib-stop'
+
+Arguments:
+  TOOLS - If non-nil, expects server to have tools capability
+  RESOURCES - If non-nil, expects server to have resources capability
+  BODY - Forms to execute with server running
+
+Example:
+  ;; Test with no capabilities expected
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
+    (let ((response (mcp-server-lib-process-jsonrpc-parsed request)))
+      (should (alist-get \\='result response))))
+
+  ;; Test with tools capability expected
+  (mcp-server-lib-ert-with-server :tools t :resources nil
+    (let ((tools (mcp-server-lib-ert-get-resource-list)))
+      (should (arrayp tools))))"
+ (declare (indent defun) (debug t))
+ `(unwind-protect
+      (progn
+        (mcp-server-lib-start)
+        (mcp-server-lib-ert-assert-initialize-result
+         (mcp-server-lib-ert-get-initialize-result) ,tools ,resources)
+        ;; Send initialized notification - should return nil
+        (should-not
+         (mcp-server-lib-process-jsonrpc
+          (json-encode
+           '(("jsonrpc" . "2.0")
+             ("method" . "notifications/initialized")))))
+        ,@body)
+    (mcp-server-lib-stop)))
+
 (provide 'mcp-server-lib-ert)
 
 ;; Local Variables:

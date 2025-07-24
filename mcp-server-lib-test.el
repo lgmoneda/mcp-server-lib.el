@@ -167,31 +167,6 @@ The original function definition is saved and restored after BODY executes."
            ,@body)
        (fset ,function-symbol original-def))))
 
-
-(cl-defmacro mcp-server-lib-test--with-server (&rest body &key tools resources
-                                                     &allow-other-keys)
-  "Run BODY with MCP server active and initialized.
-Starts the server, sends initialize request, then runs BODY.
-TOOLS and RESOURCES are booleans indicating expected capabilities.
-
-IMPORTANT: Any test wishing to call `mcp-server-lib-start' MUST use this
-macro instead, with very few exceptions - such as stopping and restarting
-the server in the middle of a test."
-  (declare (indent defun) (debug t))
-  `(unwind-protect
-       (progn
-         (mcp-server-lib-start)
-         (mcp-server-lib-ert-assert-initialize-result
-          (mcp-server-lib-ert-get-initialize-result) ,tools ,resources)
-         ;; Send initialized notification - should return nil
-         (should-not
-          (mcp-server-lib-process-jsonrpc
-           (json-encode
-            '(("jsonrpc" . "2.0")
-              ("method" . "notifications/initialized")))))
-         ,@body)
-     (mcp-server-lib-stop)))
-
 (defmacro mcp-server-lib-test--with-request (method &rest body)
   "Execute BODY with MCP server active and verify METHOD metrics.
 This macro:
@@ -204,7 +179,7 @@ This macro:
 IMPORTANT: This macro or `mcp-server-lib-ert-verify-req-success' MUST be used
 for any successful request testing to ensure proper metric tracking."
   (declare (indent defun) (debug t))
-  `(mcp-server-lib-test--with-server :tools nil :resources nil
+  `(mcp-server-lib-ert-with-server :tools nil :resources nil
      (mcp-server-lib-ert-verify-req-success ,method
        ,@body)))
 
@@ -256,7 +231,7 @@ Arguments:
   ;; Build nested mcp-server-lib-test--register-tool calls
   ;; wrapping server start and body execution
   (let ((server-and-body
-         `(mcp-server-lib-test--with-server :tools t :resources nil
+         `(mcp-server-lib-ert-with-server :tools t :resources nil
             ,@body)))
     ;; Process tools in reverse order to build proper nesting
     (dolist (tool-spec (reverse tools))
@@ -362,7 +337,7 @@ Arguments:
     ;; Build nested mcp-server-lib-test--register-resource calls
     ;; wrapping server start, verification, and body execution
     (let ((server-and-body
-           `(mcp-server-lib-test--with-server :tools nil :resources t
+           `(mcp-server-lib-ert-with-server :tools nil :resources t
               ;; Add verification after all resources are registered
               ,verification-code
               ,@body)))
@@ -395,7 +370,7 @@ Arguments:
 
 (defun mcp-server-lib-test--check-invalid-jsonrpc-version (version)
   "Test that JSON-RPC request with VERSION is rejected properly."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode
       `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
@@ -628,7 +603,7 @@ PARAM-DESCRIPTION as the expected description of the parameter."
   "Test initialize when no tools or resources are registered.
 When no tools or resources are registered, the capabilities object
 should not include tools or resources fields at all."
-  (mcp-server-lib-test--with-server :tools nil :resources nil))
+  (mcp-server-lib-ert-with-server :tools nil :resources nil))
 
 (ert-deftest mcp-server-lib-test-initialize-with-tools-and-resources ()
   "Test initialize when both tools and resources are registered.
@@ -642,7 +617,7 @@ When both are registered, capabilities should include both fields."
     "test://resource"
     #'mcp-server-lib-test--return-string
     :name "Test Resource"
-    (mcp-server-lib-test--with-server :tools t :resources t))))
+    (mcp-server-lib-ert-with-server :tools t :resources t))))
 
 
 (ert-deftest mcp-server-lib-test-initialize-old-protocol-version ()
@@ -825,7 +800,7 @@ When both are registered, capabilities should include both fields."
   "Test reference counting behavior when registering a tool with duplicate ID.
 With reference counting, duplicate registrations should succeed and increment
 the reference count, returning the original tool definition."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-ert-with-server
    :tools nil :resources nil
    (mcp-server-lib-test--register-tool
     #'mcp-server-lib-test--return-string
@@ -879,7 +854,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-unregister-tool ()
   "Test that `mcp-server-lib-unregister-tool' removes a tool correctly."
-  (mcp-server-lib-test--with-server
+  (mcp-server-lib-ert-with-server
    :tools nil :resources nil
    (mcp-server-lib-test--register-tool
     #'mcp-server-lib-test--return-string
@@ -1045,7 +1020,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-tools-list-zero ()
   "Test the `tools/list` method returning empty array with no tools."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--verify-tool-list-request '())))
 
 (ert-deftest mcp-server-lib-test-tools-list-schema-one-arg-handler ()
@@ -1231,7 +1206,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-tools-call-unregistered-tool ()
   "Test the `tools/call` request with a tool that was never registered."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--verify-tool-not-found
      mcp-server-lib-test--nonexistent-tool-id)))
 
@@ -1266,13 +1241,13 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-parse-error ()
   "Test that invalid JSON input returns a parse error."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      "This is not valid JSON" mcp-server-lib-test--error-parse "Parse error: JSON readtable error: 84")))
 
 (ert-deftest mcp-server-lib-test-method-not-found ()
   "Test that unknown methods return method-not-found error."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode
       '(("jsonrpc" . "2.0")
@@ -1282,7 +1257,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc ()
   "Test that valid JSON that is not JSON-RPC returns an invalid request error."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("name" . "Test Object") ("value" . 42)))
      mcp-server-lib-test--error-invalid-request
@@ -1299,7 +1274,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc-missing-id ()
   "Test that JSON-RPC request lacking the `id` key is rejected properly."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/list")))
      mcp-server-lib-test--error-invalid-request
@@ -1307,7 +1282,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc-missing-method ()
   "Test that JSON-RPC request lacking the `method` key is rejected properly."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
      mcp-server-lib-test--error-invalid-request
@@ -1317,7 +1292,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest mcp-server-lib-test-process-jsonrpc-parsed ()
   "Test that `mcp-server-lib-process-jsonrpc-parsed' returns parsed response."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (let* ((request (mcp-server-lib-create-tools-list-request))
            (response (mcp-server-lib-process-jsonrpc-parsed request)))
       ;; Response should be a parsed alist, not a string
@@ -1332,7 +1307,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   "Test that when `mcp-server-lib-log-io' is t, JSON-RPC messages are logged."
   (setq mcp-server-lib-log-io t)
 
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (let* ((request (mcp-server-lib-create-tools-list-request))
            (response (mcp-server-lib-process-jsonrpc request)))
 
@@ -1357,7 +1332,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   "Test that when `mcp-server-lib-log-io' is nil, messages are not logged."
   (setq mcp-server-lib-log-io nil)
 
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (let ((request (mcp-server-lib-create-tools-list-request)))
       (mcp-server-lib-process-jsonrpc request)
       (should-not (get-buffer "*mcp-server-lib-log*")))))
@@ -1573,7 +1548,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest mcp-server-lib-test-metrics-reset-on-start ()
   "Test that starting the server resets metrics."
   ;; First part: generate metrics and verify they exist
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
                                     (mcp-server-lib-process-jsonrpc
                                      (mcp-server-lib-create-tools-list-request 100))
                                     
@@ -1584,7 +1559,7 @@ from a function loaded from bytecode rather than interpreted elisp."
                                       (should (string-match "[2-9][0-9]* calls\\|[0-9][0-9]+ calls" summary))))
   
   ;; Second part: start server again and verify metrics were reset
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
                                     ;; After server restart, only the initialize call should be counted
                                     (let ((summary (mcp-server-lib-metrics-summary)))
                                       (should (string-match "^MCP metrics: [12] calls" summary)))))
@@ -1614,7 +1589,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-list-empty ()
   "Test resources/list with no registered resources."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-no-resources)))
 
 (ert-deftest test-mcp-server-lib-register-resource ()
@@ -1667,7 +1642,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-not-found ()
   "Test reading a non-existent resource returns error."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
    (mcp-server-lib-test--read-resource-error
     "test://nonexistent"
     mcp-server-lib-test--error-invalid-params
@@ -1698,12 +1673,12 @@ from a function loaded from bytecode rather than interpreted elisp."
   
   ;; After outer macro completes, it unregisters again (ref count = 0)
   ;; Resource should no longer be listed
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-no-resources)))
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-name ()
   "Test that resource registration with missing :name produces an error."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (should-error
      (mcp-server-lib-register-resource
       "test://resource"
@@ -1713,7 +1688,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-handler ()
   "Test that resource registration with non-function handler produces an error."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (should-error
      (mcp-server-lib-register-resource
       "test://resource"
@@ -1723,7 +1698,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-register-resource-error-missing-uri ()
   "Test that resource registration with nil URI produces an error."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (should-error
      (mcp-server-lib-register-resource
       nil
@@ -1733,7 +1708,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-unregister-resource-nonexistent ()
   "Test that `mcp-server-lib-unregister-resource` returns nil for missing resources."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (should-not (mcp-server-lib-unregister-resource "test://nonexistent"))))
 
 (ert-deftest test-mcp-server-lib-resources-list-multiple ()
@@ -1794,7 +1769,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (defun mcp-server-lib-test--assert-invalid-template-registration (uri)
   "Assert that registering a resource template with URI fails."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
    (should-error
     (mcp-server-lib-register-resource
      uri
@@ -1804,7 +1779,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (defun mcp-server-lib-test--assert-invalid-handler-registration (handler
                                                                  handler-desc)
   "Check that registering a resource with invalid HANDLER & HANDLER-DESC fails."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (should-error
      (mcp-server-lib-register-resource
       "test://resource"
@@ -1975,7 +1950,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-register-resource-missing-name ()
   "Test error when registering template without name."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (should-error
      (mcp-server-lib-register-resource
       "test://{id}"
@@ -1984,7 +1959,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-direct-precedence ()
   "Test that direct resources take precedence over resource templates."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     ;; Register template first
     (mcp-server-lib-test--register-resource
      "test://{id}"
@@ -2003,7 +1978,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-multiple-template-schemes ()
   "Test that resource templates with different schemes route correctly."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--register-resource
      "org://{filename}"
      #'mcp-server-lib-test--resource-template-handler-dump-params
@@ -2023,7 +1998,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-no-template-match ()
   "Test error when no resource template matches the URI."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--register-resource
      "test://{id}"
      #'mcp-server-lib-test--resource-template-handler-dump-params
@@ -2091,7 +2066,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-template-handler-error ()
   "Test template handler errors bumping metrics and returning JSON-RPC errors."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--register-resource
      "error://{id}"
      #'mcp-server-lib-test--template-handler-error
@@ -2103,7 +2078,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-template-handler-nil ()
   "Test nil-returning template handler produces valid response with empty text."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--register-resource
      "nil://{id}"
      #'mcp-server-lib-test--resource-template-handler-nil
@@ -2116,7 +2091,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-template-handler-undefined ()
   "Test reading a resource template whose handler function no longer exists."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--register-resource
      "undefined://{id}"
      #'mcp-server-lib-test--handler-to-be-undefined
@@ -2151,7 +2126,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest test-mcp-server-lib-resource-template-variable-names-case-sensitive
     ()
   "Test that variable names in templates are case-sensitive per RFC 6570."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     ;; Register template with lowercase variable
     (mcp-server-lib-test--register-resource
      "test://{username}"
@@ -2174,7 +2149,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest test-mcp-server-lib-resource-template-path-literals-case-sensitive
     ()
   "Test that literal path segments are case-sensitive."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     ;; Register template with lowercase path
     (mcp-server-lib-test--register-resource
      "test://path/{id}"
@@ -2229,7 +2204,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resource-template-percent-encoded-extraction ()
   "Test that extracted parameters remain percent-encoded."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--register-resource
      "file://{path}"
      #'mcp-server-lib-test--resource-template-handler-dump-params
@@ -2253,7 +2228,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 (ert-deftest
     test-mcp-server-lib-resource-template-reserved-expansion-passthrough ()
   "Test that {+var} allows reserved chars without encoding."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--register-resource
      "file:///{+path}"
      #'mcp-server-lib-test--resource-template-handler-dump-params
@@ -2266,7 +2241,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resource-template-first-match-precedence ()
   "Test which template wins when multiple could match."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     ;; Register general template first
     (mcp-server-lib-test--register-resource
      "test://{id}"
@@ -2299,7 +2274,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-missing-uri ()
   "Test resources/read without uri parameter."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     ;; Test missing uri parameter
     (mcp-server-lib-test--check-resource-read-request-error
      nil ; No uri
@@ -2308,7 +2283,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-numeric-uri ()
   "Test resources/read with numeric uri."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     ;; Test with number uri
     (mcp-server-lib-test--check-resource-read-request-error
      '((uri . 123))
@@ -2317,7 +2292,7 @@ from a function loaded from bytecode rather than interpreted elisp."
 
 (ert-deftest test-mcp-server-lib-resources-read-array-uri ()
   "Test resources/read with array uri."
-  (mcp-server-lib-test--with-server :tools nil :resources nil
+  (mcp-server-lib-ert-with-server :tools nil :resources nil
     ;; Test with array uri
     (mcp-server-lib-test--check-resource-read-request-error
      '((uri . ["test" "array"]))

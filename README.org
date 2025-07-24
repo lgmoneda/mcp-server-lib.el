@@ -238,6 +238,15 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
   (should (= 2 (length resources)))
   (should (string= "test://resource1"
                    (alist-get 'uri (aref resources 0)))))
+
+;; Run tests with MCP server
+(mcp-server-lib-ert-with-server :tools nil :resources nil
+  ;; Server is started, initialized, and will be stopped after body
+  (let ((response (mcp-server-lib-process-jsonrpc-parsed
+                   (json-encode '(("jsonrpc" . "2.0")
+                                  ("method" . "tools/list")
+                                  ("id" . 1))))))
+    (should-not (alist-get 'error response))))
 #+end_src
 
 *** Debugging
