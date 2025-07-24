@@ -67,7 +67,12 @@ Defaults to `user-emacs-directory' but can be customized."
   :type 'directory
   :group 'mcp-server-lib)
 
-;;; Constants
+;;; Public Constants
+
+(defconst mcp-server-lib-name "emacs-mcp-server-lib"
+  "Name of the MCP server.")
+
+;;; Internal Constants
 
 (defconst mcp-server-lib--error-parse -32700
   "Error code for Parse Error.")
@@ -83,9 +88,6 @@ Defaults to `user-emacs-directory' but can be customized."
 
 (defconst mcp-server-lib--error-internal -32603
   "Error code for Internal Error.")
-
-(defconst mcp-server-lib--name "emacs-mcp-server-lib"
-  "Name of the MCP server.")
 
 (defconst mcp-server-lib--protocol-version "2025-03-26"
   "Current MCP protocol version supported by this server.")
@@ -601,7 +603,7 @@ version and capabilities between the client and server."
      `((protocolVersion . ,mcp-server-lib--protocol-version)
        (serverInfo
         .
-        ((name . ,mcp-server-lib--name)
+        ((name . ,mcp-server-lib-name)
          (version . ,mcp-server-lib--protocol-version)))
        (capabilities . ,capabilities)))))
 

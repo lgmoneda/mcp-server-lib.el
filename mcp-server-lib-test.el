@@ -189,7 +189,7 @@ RESOURCES is a boolean indicating if resources capability is expected."
         (capabilities (alist-get 'capabilities init-result))
         (server-info (alist-get 'serverInfo init-result)))
     (should (string= "2025-03-26" protocol-version))
-    (should (string= mcp-server-lib--name (alist-get 'name server-info)))
+    (should (string= mcp-server-lib-name (alist-get 'name server-info)))
     ;; Verify capabilities match expectations
     (when tools
       (should (assoc 'tools capabilities))

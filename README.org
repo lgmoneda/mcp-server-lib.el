@@ -170,6 +170,10 @@ To unregister any resource (static or templated):
 
 When clients request the resource list, direct resources appear with a =uri= field while templates show up with a =uriTemplate= field. This helps clients distinguish between static resources and dynamic patterns they can use.
 
+*** Constants
+
+=mcp-server-lib-name= - The name of the MCP server ("emacs-mcp-server-lib")
+
 *** Utility Functions
 
 For testing and debugging:
