@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2025 Laurynas Biveinis
 
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Homepage: https://github.com/laurynas-biveinis/mcp.el
 
 ;; This file is part of mcp-server-lib.

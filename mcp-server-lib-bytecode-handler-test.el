@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2024 Laurynas Biveinis
 ;; Author: Laurynas Biveinis
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; URL: https://github.com/laurynas-biveinis/mcp-server-lib.el
 
 ;;; Commentary:

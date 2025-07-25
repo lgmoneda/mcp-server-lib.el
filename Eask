@@ -1,7 +1,7 @@
 ;; -*- mode: eask; lexical-binding: t -*-
 
 (package "mcp-server-lib"
-         "0.1.0"
+         "0.2.0"
          "Model Context Protocol server library")
 
 (author "Laurynas Biveinis" "laurynas.biveinis@gmail.com")
