@@ -234,6 +234,13 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
 ;; Check error response structure
 (mcp-server-lib-ert-check-error-object response -32601 "Method not found")
 
+;; Verify resource read succeeds with expected fields
+(mcp-server-lib-ert-verify-resource-read
+ "test://resource1"
+ '((uri . "test://resource1")
+   (mimeType . "text/plain")
+   (text . "test result")))
+
 ;; Run tests with MCP server
 (mcp-server-lib-ert-with-server :tools nil :resources nil
   ;; Server is started, initialized, and will be stopped after body

@@ -44,9 +44,6 @@
 (defconst mcp-server-lib-test--unregister-tool-id "test-unregister"
   "Tool ID used for testing tool unregistration.")
 
-(defconst mcp-server-lib-test--resource-read-request-id 777
-  "Request ID used for resource read operations in tests.")
-
 ;;; JSON-RPC Error Codes for Testing
 
 (defconst mcp-server-lib-test--error-parse -32700
@@ -421,13 +418,6 @@ then verifies that both calls and errors increased by 1 at both levels."
     (should (arrayp result))
     result))
 
-
-(defun mcp-server-lib-test--read-resource (uri)
-  "Send a resources/read request for URI and return the parsed response."
-  (let ((request (mcp-server-lib-create-resources-read-request
-                  uri mcp-server-lib-test--resource-read-request-id)))
-    (mcp-server-lib-process-jsonrpc-parsed request)))
-
 (defun mcp-server-lib-test--check-no-resources ()
   "Check that the resource list is empty."
   (let ((resources (mcp-server-lib-ert-get-resource-list)))
@@ -442,41 +432,6 @@ EXPECTED-FIELDS is an alist of (field . value) pairs to verify."
       (should (= (length expected-fields) (length resource)))
       (dolist (field expected-fields)
         (should (equal (alist-get (car field) resource) (cdr field)))))))
-
-(defun mcp-server-lib-test--verify-resource-read (uri expected-fields)
-  "Verify that reading resource at URI succeeds with EXPECTED-FIELDS.
-EXPECTED-FIELDS is an alist of (field . value) pairs to verify in the content."
-  (mcp-server-lib-ert-verify-req-success
-   "resources/read"
-   (let* ((response (mcp-server-lib-test--read-resource uri))
-          (response-keys (mapcar #'car response)))
-     ;; Check response has exactly the expected fields
-     (should (= 3 (length response-keys)))
-     (should (member 'jsonrpc response-keys))
-     (should (member 'id response-keys))
-     (should (member 'result response-keys))
-     ;; Check response field values
-     (should (string= "2.0" (alist-get 'jsonrpc response)))
-     (should (equal mcp-server-lib-test--resource-read-request-id
-                    (alist-get 'id response)))
-     ;; Check result structure
-     (let* ((result (alist-get 'result response))
-            (result-keys (mapcar #'car result)))
-       (should (= 1 (length result-keys)))
-       (should (member 'contents result-keys))
-       ;; Check contents array
-       (let ((contents (alist-get 'contents result)))
-         (should (arrayp contents))
-         (should (= 1 (length contents)))
-         ;; Check content item structure
-         (let* ((content (aref contents 0))
-                (content-keys (mapcar #'car content)))
-           ;; Verify exact field count
-           (should (= (length expected-fields) (length content-keys)))
-           ;; Verify each expected field exists and has correct value
-           (dolist (field expected-fields)
-             (should (member (car field) content-keys))
-             (should (equal (alist-get (car field) content) (cdr field))))))))))
 
 (defmacro mcp-server-lib-test--check-resource-read-error
     (uri expected-code expected-message)
@@ -506,9 +461,9 @@ EXPECTED-MESSAGE is the expected error message."
 (defun mcp-server-lib-test--read-resource-error (uri expected-code expected-message)
   "Read resource at URI expecting an EXPECTED-CODE with EXPECTED-MESSAGE.
 EXPECTED-MESSAGE should be the exact error message string."
-  (let ((response (mcp-server-lib-test--read-resource uri)))
+  (let ((response (mcp-server-lib-ert--read-resource uri)))
     ;; Check specific request ID for this resource read
-    (should (equal mcp-server-lib-test--resource-read-request-id (alist-get 'id response)))
+    (should (equal mcp-server-lib-ert--resource-read-request-id (alist-get 'id response)))
     (mcp-server-lib-ert-check-error-object response expected-code expected-message)))
 
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
@@ -1598,7 +1553,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--return-string
      :name "Minimal Resource"))
    ;; Verify resource can be read without mime-type
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "test://minimal"
     '((uri . "test://minimal")
       (text . "test result")))))
@@ -1611,7 +1566,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Test Resource"
      :mime-type "text/plain"))
    ;; Read the resource
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "test://resource1"
     '((uri . "test://resource1")
       (mimeType . "text/plain")
@@ -1624,7 +1579,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--return-nil
      :name "Nil Resource"))
    ;; Read the resource
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "test://nil-resource"
     '((uri . "test://nil-resource")
       (text . nil)))))
@@ -1899,7 +1854,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Org file content"
      :mime-type "text/plain"))
    ;; Test successful match
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://projects.org"
     '((uri . "org://projects.org")
       (mimeType . "text/plain")
@@ -1918,7 +1873,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Org path"
      :description "Access org files by path with slashes"))
    ;; Test with slashes in variable
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://folder/subfolder/file.org"
     '((uri . "org://folder/subfolder/file.org")
       (text . "params: ((\"path\" . \"folder/subfolder/file.org\"))")))))
@@ -1930,7 +1885,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "Org headline"
      :mime-type "text/plain"))
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://todo.org/headline/Tasks/Urgent"
     '((uri . "org://todo.org/headline/Tasks/Urgent")
       (mimeType . "text/plain")
@@ -1960,7 +1915,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       #'mcp-server-lib-test--return-string
       :name "Direct Resource"
       ;; Should get direct resource content
-      (mcp-server-lib-test--verify-resource-read
+      (mcp-server-lib-ert-verify-resource-read
        "test://exact"
        '((uri . "test://exact")
          (text . "test result")))))))
@@ -1976,11 +1931,11 @@ from a function loaded from bytecode rather than interpreted elisp."
       "doc://{docname}"
       #'mcp-server-lib-test--resource-template-handler-dump-params-2
       :name "Doc Files"
-      (mcp-server-lib-test--verify-resource-read
+      (mcp-server-lib-ert-verify-resource-read
        "org://projects.org"
        '((uri . "org://projects.org")
          (text . "params: ((\"filename\" . \"projects.org\"))")))
-      (mcp-server-lib-test--verify-resource-read
+      (mcp-server-lib-ert-verify-resource-read
        "doc://manual.pdf"
        '((uri . "doc://manual.pdf")
          (text . "Handler-2: params: ((\"docname\" . \"manual.pdf\"))"))))))
@@ -2005,7 +1960,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "Org file template"))
    ;; Test URI with empty filename parameter
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://"
     '((uri . "org://")
       (text . "params: ((\"filename\" . \"\"))"))))))
@@ -2039,11 +1994,11 @@ from a function loaded from bytecode rather than interpreted elisp."
      (should-not (mcp-server-lib-test--find-resource-by-uri-template
                   "doc://{docname}" resources)))
    ;; Verify the remaining templates still work
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://test.org"
     '((uri . "org://test.org")
       (text . "params: ((\"filename\" . \"test.org\"))")))
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "test://123"
     '((uri . "test://123")
       (text . "params: ((\"id\" . \"123\"))")))
@@ -2073,7 +2028,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-nil
      :name "Nil Template"
      ;; Read the resource
-     (mcp-server-lib-test--verify-resource-read
+     (mcp-server-lib-ert-verify-resource-read
       "nil://test"
       '((uri . "nil://test")
         (text . nil))))))
@@ -2102,12 +2057,12 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "Test Template"))
    ;; Test uppercase scheme should match
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "TEST://123"
     '((uri . "TEST://123")
       (text . "params: ((\"id\" . \"123\"))")))
    ;; Test mixed case scheme should match
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "Test://456"
     '((uri . "Test://456")
       (text . "params: ((\"id\" . \"456\"))")))))
@@ -2130,7 +2085,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       (let ((resources (mcp-server-lib-ert-get-resource-list)))
         (should (= 2 (length resources))))
       ;; Test that they extract different variables
-      (mcp-server-lib-test--verify-resource-read
+      (mcp-server-lib-ert-verify-resource-read
        "test://john"
        '((uri . "test://john")
          (text . "params: ((\"username\" . \"john\"))")))))))
@@ -2154,12 +2109,12 @@ from a function loaded from bytecode rather than interpreted elisp."
       (let ((resources (mcp-server-lib-ert-get-resource-list)))
         (should (= 2 (length resources))))
       ;; Test lowercase path matches only lowercase template
-      (mcp-server-lib-test--verify-resource-read
+      (mcp-server-lib-ert-verify-resource-read
        "test://path/123"
        '((uri . "test://path/123")
          (text . "params: ((\"id\" . \"123\"))")))
       ;; Test uppercase path matches only uppercase template
-      (mcp-server-lib-test--verify-resource-read
+      (mcp-server-lib-ert-verify-resource-read
        "test://PATH/456"
        '((uri . "test://PATH/456")
          (text . "UPPERCASE PATH: 456")))
@@ -2176,17 +2131,17 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "Org file template"))
    ;; Test with direct Unicode character in URI
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://café.org"
     '((uri . "org://café.org")
       (text . "params: ((\"filename\" . \"café.org\"))")))
    ;; Test with percent-encoded Unicode in URI
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://caf%C3%A9.org"
     '((uri . "org://caf%C3%A9.org")
       (text . "params: ((\"filename\" . \"caf%C3%A9.org\"))")))
    ;; Test with multiple Unicode characters
-   (mcp-server-lib-test--verify-resource-read
+   (mcp-server-lib-ert-verify-resource-read
     "org://文档.org"
     '((uri . "org://文档.org")
       (text . "params: ((\"filename\" . \"文档.org\"))")))))
@@ -2199,17 +2154,17 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "File template"
      ;; Test spaces remain encoded
-     (mcp-server-lib-test--verify-resource-read
+     (mcp-server-lib-ert-verify-resource-read
       "file://my%20document.txt"
       '((uri . "file://my%20document.txt")
         (text . "params: ((\"path\" . \"my%20document.txt\"))")))
      ;; Test Unicode remains encoded
-     (mcp-server-lib-test--verify-resource-read
+     (mcp-server-lib-ert-verify-resource-read
       "file://caf%C3%A9.txt"
       '((uri . "file://caf%C3%A9.txt")
         (text . "params: ((\"path\" . \"caf%C3%A9.txt\"))")))
      ;; Test special characters remain encoded
-     (mcp-server-lib-test--verify-resource-read
+     (mcp-server-lib-ert-verify-resource-read
       "file://file%2Bwith%2Bplus.txt"
       '((uri . "file://file%2Bwith%2Bplus.txt")
         (text . "params: ((\"path\" . \"file%2Bwith%2Bplus.txt\"))"))))))
@@ -2223,7 +2178,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "File path template"
      ;; Test mixed reserved characters
-     (mcp-server-lib-test--verify-resource-read
+     (mcp-server-lib-ert-verify-resource-read
       "file:///path/with?query=value#section"
       '((uri . "file:///path/with?query=value#section")
         (text . "params: ((\"path\" . \"path/with?query=value#section\"))"))))))
@@ -2242,7 +2197,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       #'mcp-server-lib-test--resource-template-handler-dump-params-2
       :name "Specific template"
       ;; First registered template should win
-      (mcp-server-lib-test--verify-resource-read
+      (mcp-server-lib-ert-verify-resource-read
        "test://item/123"
        '((uri . "test://item/123")
          (text . "params: ((\"id\" . \"item/123\"))")))
