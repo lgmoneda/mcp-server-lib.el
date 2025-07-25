@@ -231,6 +231,9 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
   (should (string= "test://resource1"
                    (alist-get 'uri (aref resources 0)))))
 
+;; Check error response structure
+(mcp-server-lib-ert-check-error-object response -32601 "Method not found")
+
 ;; Run tests with MCP server
 (mcp-server-lib-ert-with-server :tools nil :resources nil
   ;; Server is started, initialized, and will be stopped after body

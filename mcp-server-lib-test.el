@@ -351,22 +351,11 @@ Arguments:
                    ,server-and-body))))
       server-and-body)))
 
-(defun mcp-server-lib-test--check-error-object (response expected-code expected-message)
-  "Check that RESPONSE has error with EXPECTED-CODE and EXPECTED-MESSAGE."
-  ;; Check that response contains only standard JSON-RPC fields plus error
-  (should (equal 3 (length response))) ; jsonrpc, id, error
-  (should (equal "2.0" (alist-get 'jsonrpc response)))
-  (should (assq 'id response))
-  (let ((error-obj (alist-get 'error response)))
-    (should error-obj)
-    (should (equal expected-code (alist-get 'code error-obj)))
-    (should (equal expected-message (alist-get 'message error-obj)))))
-
 (defun mcp-server-lib-test--check-jsonrpc-error
     (request expected-code expected-message)
   "Test that JSON-RPC REQUEST is rejected with EXPECTED-CODE and EXPECTED-MESSAGE."
   (let ((resp-obj (mcp-server-lib-process-jsonrpc-parsed request)))
-    (mcp-server-lib-test--check-error-object resp-obj expected-code expected-message)))
+    (mcp-server-lib-ert-check-error-object resp-obj expected-code expected-message)))
 
 (defun mcp-server-lib-test--check-invalid-jsonrpc-version (version)
   "Test that JSON-RPC request with VERSION is rejected properly."
@@ -520,7 +509,7 @@ EXPECTED-MESSAGE should be the exact error message string."
   (let ((response (mcp-server-lib-test--read-resource uri)))
     ;; Check specific request ID for this resource read
     (should (equal mcp-server-lib-test--resource-read-request-id (alist-get 'id response)))
-    (mcp-server-lib-test--check-error-object response expected-code expected-message)))
+    (mcp-server-lib-ert-check-error-object response expected-code expected-message)))
 
 (defun mcp-server-lib-test--verify-tool-list-request (expected-tools)
   "Verify a `tools/list` response against EXPECTED-TOOLS.

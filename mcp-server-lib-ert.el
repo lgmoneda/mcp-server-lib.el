@@ -290,6 +290,18 @@ Example:
         ,@body)
     (mcp-server-lib-stop)))
 
+(defun mcp-server-lib-ert-check-error-object
+    (response expected-code expected-message)
+  "Check that RESPONSE has error with EXPECTED-CODE and EXPECTED-MESSAGE."
+  ;; Check that response contains only standard JSON-RPC fields plus error
+  (should (equal 3 (length response))) ; jsonrpc, id, error
+  (should (equal "2.0" (alist-get 'jsonrpc response)))
+  (should (assq 'id response))
+  (let ((error-obj (alist-get 'error response)))
+    (should error-obj)
+    (should (equal expected-code (alist-get 'code error-obj)))
+    (should (equal expected-message (alist-get 'message error-obj)))))
+
 (provide 'mcp-server-lib-ert)
 
 ;; Local Variables:
