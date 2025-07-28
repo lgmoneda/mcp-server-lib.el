@@ -251,6 +251,27 @@ The =mcp-server-lib-ert= module provides utilities for writing ERT tests for MCP
     (should-not (alist-get 'error response))))
 #+end_src
 
+*** JSON-RPC Error Constants
+
+The library provides public constants for standard JSON-RPC 2.0 error codes:
+
+#+begin_src elisp
+mcp-server-lib-jsonrpc-error-parse           ; -32700 Parse Error
+mcp-server-lib-jsonrpc-error-invalid-request ; -32600 Invalid Request
+mcp-server-lib-jsonrpc-error-method-not-found ; -32601 Method Not Found  
+mcp-server-lib-jsonrpc-error-invalid-params  ; -32602 Invalid Params
+mcp-server-lib-jsonrpc-error-internal        ; -32603 Internal Error
+#+end_src
+
+These constants can be used when checking error responses in tests:
+
+#+begin_src elisp
+(mcp-server-lib-ert-check-error-object 
+  response 
+  mcp-server-lib-jsonrpc-error-method-not-found
+  "Method not found")
+#+end_src
+
 *** Debugging
 
 Enable JSON-RPC message logging:

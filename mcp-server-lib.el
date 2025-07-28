@@ -75,22 +75,24 @@ Defaults to `user-emacs-directory' but can be customized."
 (defconst mcp-server-lib-protocol-version "2025-03-26"
   "Current MCP protocol version supported by this server.")
 
+;;; Public API - JSON-RPC 2.0 Error Codes
+
+(defconst mcp-server-lib-jsonrpc-error-parse -32700
+  "JSON-RPC 2.0 Parse Error code.")
+
+(defconst mcp-server-lib-jsonrpc-error-invalid-request -32600
+  "JSON-RPC 2.0 Invalid Request error code.")
+
+(defconst mcp-server-lib-jsonrpc-error-method-not-found -32601
+  "JSON-RPC 2.0 Method Not Found error code.")
+
+(defconst mcp-server-lib-jsonrpc-error-invalid-params -32602
+  "JSON-RPC 2.0 Invalid Params error code.")
+
+(defconst mcp-server-lib-jsonrpc-error-internal -32603
+  "JSON-RPC 2.0 Internal Error code.")
+
 ;;; Internal Constants
-
-(defconst mcp-server-lib--error-parse -32700
-  "Error code for Parse Error.")
-
-(defconst mcp-server-lib--error-invalid-request -32600
-  "Error code for Invalid Request.")
-
-(defconst mcp-server-lib--error-method-not-found -32601
-  "Error code for Method Not Found.")
-
-(defconst mcp-server-lib--error-invalid-params -32602
-  "Error code for Invalid Params.")
-
-(defconst mcp-server-lib--error-internal -32603
-  "Error code for Internal Error.")
 
 (defconst mcp-server-lib--uri-scheme-regex
   "[a-zA-Z][a-zA-Z0-9+.-]*://"
@@ -327,7 +329,7 @@ DIRECTION should be \"in\" for incoming, \"out\" for outgoing."
 Returns a JSON-RPC error response string for internal errors."
   (mcp-server-lib--jsonrpc-error
    nil
-   mcp-server-lib--error-internal
+   mcp-server-lib-jsonrpc-error-internal
    (format "Internal error: %s" (error-message-string err))))
 
 (defun mcp-server-lib--validate-and-dispatch-request (request)
@@ -354,26 +356,26 @@ Returns a JSON-RPC formatted response string, or nil for notifications."
      ((not (equal jsonrpc "2.0"))
       (mcp-server-lib--jsonrpc-error
        id
-       mcp-server-lib--error-invalid-request
+       mcp-server-lib-jsonrpc-error-invalid-request
        "Invalid Request: Not JSON-RPC 2.0"))
 
      ;; Check if id is present for notifications/* methods
      ((and id is-notification)
       (mcp-server-lib--jsonrpc-error
        nil
-       mcp-server-lib--error-invalid-request
+       mcp-server-lib-jsonrpc-error-invalid-request
        "Invalid Request: Notifications must not include 'id' field"))
      ;; Check if id is missing
      ((and (not id) (not is-notification))
       (mcp-server-lib--jsonrpc-error
        nil
-       mcp-server-lib--error-invalid-request
+       mcp-server-lib-jsonrpc-error-invalid-request
        "Invalid Request: Missing required 'id' field"))
      ;; Check if method is missing
      ((not method)
       (mcp-server-lib--jsonrpc-error
        id
-       mcp-server-lib--error-invalid-request
+       mcp-server-lib-jsonrpc-error-invalid-request
        "Invalid Request: Missing required 'method' field"))
 
      ;; Process valid request
@@ -513,7 +515,7 @@ METHOD-METRICS is used to track errors."
     (error
      (cl-incf (mcp-server-lib-metrics-errors method-metrics))
      (mcp-server-lib--jsonrpc-error
-      id mcp-server-lib--error-internal
+      id mcp-server-lib-jsonrpc-error-internal
       (format "Error reading resource %s: %s"
               uri (error-message-string err))))))
 
@@ -543,7 +545,7 @@ METHOD-METRICS is used to track errors for this method."
      (t
       (mcp-server-lib--jsonrpc-error
        id
-       mcp-server-lib--error-invalid-params
+       mcp-server-lib-jsonrpc-error-invalid-params
        (format "Resource not found: %s" uri))))))
 
 (defun mcp-server-lib--dispatch-jsonrpc-method (id method params)
@@ -575,7 +577,7 @@ Returns a JSON-RPC response string for the request."
      (t
       (mcp-server-lib--jsonrpc-error
        id
-       mcp-server-lib--error-method-not-found
+       mcp-server-lib-jsonrpc-error-method-not-found
        (format "Method not found: %s" method))))))
 
 ;;; Notification handlers
@@ -751,14 +753,14 @@ METHOD-METRICS is used to track errors for this method."
              (mcp-server-lib-metrics--track-tool-call tool-name t)
              (cl-incf (mcp-server-lib-metrics-errors method-metrics))
              (mcp-server-lib--jsonrpc-error
-              id mcp-server-lib--error-internal
+              id mcp-server-lib-jsonrpc-error-internal
               (format "Internal error executing tool: %s"
                       (error-message-string err))))))
       (mcp-server-lib-metrics--track-tool-call tool-name t)
       (cl-incf (mcp-server-lib-metrics-errors method-metrics))
       (mcp-server-lib--jsonrpc-error
        id
-       mcp-server-lib--error-invalid-request
+       mcp-server-lib-jsonrpc-error-invalid-request
        (format "Tool not found: %s" tool-name)))))
 
 ;;; Error handling helpers
@@ -830,7 +832,7 @@ See also: `mcp-server-lib-process-jsonrpc-parsed'"
        ;; If JSON parsing fails, create a parse error response
        (setq response
              (mcp-server-lib--jsonrpc-error
-              nil mcp-server-lib--error-parse
+              nil mcp-server-lib-jsonrpc-error-parse
               (format "Parse error: %s"
                       (error-message-string json-err))))))
     ;; Step 2: Process the request if JSON parsing succeeded

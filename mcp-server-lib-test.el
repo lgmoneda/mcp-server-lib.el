@@ -44,23 +44,6 @@
 (defconst mcp-server-lib-test--unregister-tool-id "test-unregister"
   "Tool ID used for testing tool unregistration.")
 
-;;; JSON-RPC Error Codes for Testing
-
-(defconst mcp-server-lib-test--error-parse -32700
-  "JSON-RPC 2.0 Parse Error code for test assertions.")
-
-(defconst mcp-server-lib-test--error-invalid-request -32600
-  "JSON-RPC 2.0 Invalid Request error code for test assertions.")
-
-(defconst mcp-server-lib-test--error-method-not-found -32601
-  "JSON-RPC 2.0 Method Not Found error code for test assertions.")
-
-(defconst mcp-server-lib-test--error-invalid-params -32602
-  "JSON-RPC 2.0 Invalid Params error code for test assertions.")
-
-(defconst mcp-server-lib-test--error-internal -32603
-  "JSON-RPC 2.0 Internal Error code for test assertions.")
-
 ;;; Generic test handlers
 
 (defun mcp-server-lib-test--return-string ()
@@ -360,7 +343,7 @@ Arguments:
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode
       `(("jsonrpc" . ,version) ("method" . "tools/list") ("id" . 42)))
-     mcp-server-lib-test--error-invalid-request "Invalid Request: Not JSON-RPC 2.0")))
+     mcp-server-lib-jsonrpc-error-invalid-request "Invalid Request: Not JSON-RPC 2.0")))
 
 (defun mcp-server-lib-test--call-tool (tool-id &optional id args)
   "Call a tool with TOOL-ID and return its successful result.
@@ -391,7 +374,7 @@ Optional ARGS is the association list of arguments to pass to the tool."
   "Verify a call to non-existent tool with TOOL-ID returning an error."
   (mcp-server-lib-test--check-jsonrpc-error
    (mcp-server-lib-create-tools-call-request tool-id 999)
-   mcp-server-lib-test--error-invalid-request
+   mcp-server-lib-jsonrpc-error-invalid-request
    (format "Tool not found: %s" tool-id)))
 
 (defmacro mcp-server-lib-test--check-tool-call-error
@@ -1106,7 +1089,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     (mcp-server-lib-test--check-tool-call-error "generic-error-tool"
       (mcp-server-lib-test--check-jsonrpc-error
        request
-       mcp-server-lib-test--error-internal "Internal error executing tool: Generic error occurred"))))
+       mcp-server-lib-jsonrpc-error-internal "Internal error executing tool: Generic error occurred"))))
 
 (ert-deftest mcp-server-lib-test-tools-call-no-args ()
   "Test the `tools/call` request with a tool that takes no arguments."
@@ -1178,7 +1161,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         ;; Try to call the tool - should return an error
         (mcp-server-lib-test--check-jsonrpc-error
          request
-         mcp-server-lib-test--error-internal "Internal error executing tool: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined")))))
+         mcp-server-lib-jsonrpc-error-internal "Internal error executing tool: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined")))))
 
 
 ;;; `mcp-server-lib-process-jsonrpc' tests
@@ -1187,7 +1170,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   "Test that invalid JSON input returns a parse error."
   (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
-     "This is not valid JSON" mcp-server-lib-test--error-parse "Parse error: JSON readtable error: 84")))
+     "This is not valid JSON" mcp-server-lib-jsonrpc-error-parse "Parse error: JSON readtable error: 84")))
 
 (ert-deftest mcp-server-lib-test-method-not-found ()
   "Test that unknown methods return method-not-found error."
@@ -1197,14 +1180,14 @@ from a function loaded from bytecode rather than interpreted elisp."
       '(("jsonrpc" . "2.0")
         ("method" . "unknown/method")
         ("id" . 99)))
-     mcp-server-lib-test--error-method-not-found "Method not found: unknown/method")))
+     mcp-server-lib-jsonrpc-error-method-not-found "Method not found: unknown/method")))
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc ()
   "Test that valid JSON that is not JSON-RPC returns an invalid request error."
   (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("name" . "Test Object") ("value" . 42)))
-     mcp-server-lib-test--error-invalid-request
+     mcp-server-lib-jsonrpc-error-invalid-request
      "Invalid Request: Not JSON-RPC 2.0")))
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc-older-version ()
@@ -1221,7 +1204,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("method" . "tools/list")))
-     mcp-server-lib-test--error-invalid-request
+     mcp-server-lib-jsonrpc-error-invalid-request
      "Invalid Request: Missing required 'id' field")))
 
 (ert-deftest mcp-server-lib-test-invalid-jsonrpc-missing-method ()
@@ -1229,7 +1212,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-server-lib-ert-with-server :tools nil :resources nil
     (mcp-server-lib-test--check-jsonrpc-error
      (json-encode '(("jsonrpc" . "2.0") ("id" . 42)))
-     mcp-server-lib-test--error-invalid-request
+     mcp-server-lib-jsonrpc-error-invalid-request
      "Invalid Request: Missing required 'method' field")))
 
 ;;; `mcp-server-lib-process-jsonrpc-parsed' tests
@@ -1589,7 +1572,7 @@ from a function loaded from bytecode rather than interpreted elisp."
   (mcp-server-lib-ert-with-server :tools nil :resources nil
    (mcp-server-lib-test--read-resource-error
     "test://nonexistent"
-    mcp-server-lib-test--error-invalid-params
+    mcp-server-lib-jsonrpc-error-invalid-params
     "Resource not found: test://nonexistent")))
 
 (ert-deftest test-mcp-server-lib-register-resource-duplicate ()
@@ -1691,7 +1674,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Error Resource"))
    (mcp-server-lib-test--check-resource-read-error
      "test://error-resource"
-     mcp-server-lib-test--error-internal
+     mcp-server-lib-jsonrpc-error-internal
      "Error reading resource test://error-resource: Generic error occurred")))
 
 (ert-deftest mcp-server-lib-test-resources-read-handler-undefined ()
@@ -1706,7 +1689,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       ;; Try to read the resource - should return an error
       (mcp-server-lib-test--read-resource-error
        "test://undefined-handler"
-       mcp-server-lib-test--error-internal
+       mcp-server-lib-jsonrpc-error-internal
        "Error reading resource test://undefined-handler: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined")))))
 
 ;;; Resource Template Invalid Syntax Tests
@@ -1862,7 +1845,7 @@ from a function loaded from bytecode rather than interpreted elisp."
    ;; Test non-matching prefix
    (mcp-server-lib-test--read-resource-error
     "file://projects.org"
-    mcp-server-lib-test--error-invalid-params
+    mcp-server-lib-jsonrpc-error-invalid-params
     "Resource not found: file://projects.org")))
 
 (ert-deftest test-mcp-server-lib-resource-template-reserved-expansion ()
@@ -1950,7 +1933,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      ;; Try to read with non-matching URI
      (mcp-server-lib-test--read-resource-error
       "other://123"
-      mcp-server-lib-test--error-invalid-params
+      mcp-server-lib-jsonrpc-error-invalid-params
       "Resource not found: other://123"))))
 
 (ert-deftest test-mcp-server-lib-resource-template-empty-parameter-value ()
@@ -2005,7 +1988,7 @@ from a function loaded from bytecode rather than interpreted elisp."
    ;; Verify the unregistered template no longer matches
    (mcp-server-lib-test--read-resource-error
     "doc://manual.pdf"
-    mcp-server-lib-test--error-invalid-params
+    mcp-server-lib-jsonrpc-error-invalid-params
     "Resource not found: doc://manual.pdf")))
 
 (ert-deftest test-mcp-server-lib-resources-read-template-handler-error ()
@@ -2017,7 +2000,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Error Template"
      (mcp-server-lib-test--check-resource-read-error
        "error://test"
-       mcp-server-lib-test--error-internal
+       mcp-server-lib-jsonrpc-error-internal
        "Error reading resource error://test: Generic error occurred"))))
 
 (ert-deftest test-mcp-server-lib-resources-read-template-handler-nil ()
@@ -2047,7 +2030,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         ;; Try to read the resource - should return an error
         (mcp-server-lib-test--read-resource-error
          "undefined://test-123"
-         mcp-server-lib-test--error-internal
+         mcp-server-lib-jsonrpc-error-internal
          "Error reading resource undefined://test-123: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined"))))))
 
 (ert-deftest test-mcp-server-lib-resource-template-scheme-case-insensitive ()
@@ -2121,7 +2104,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       ;; Test mixed case path doesn't match either
       (mcp-server-lib-test--read-resource-error
        "test://Path/789"
-       mcp-server-lib-test--error-invalid-params
+       mcp-server-lib-jsonrpc-error-invalid-params
        "Resource not found: test://Path/789")))))
 
 (ert-deftest test-mcp-server-lib-resource-template-unicode-in-variables ()
@@ -2213,7 +2196,7 @@ from a function loaded from bytecode rather than interpreted elisp."
    ;; Test with string params instead of object
    (mcp-server-lib-test--check-resource-read-request-error
     "invalid string params"
-    mcp-server-lib-test--error-internal
+    mcp-server-lib-jsonrpc-error-internal
     "Internal error: Wrong type argument: listp, \"invalid string params\"")))
 
 (ert-deftest test-mcp-server-lib-resources-read-missing-uri ()
@@ -2222,7 +2205,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     ;; Test missing uri parameter
     (mcp-server-lib-test--check-resource-read-request-error
      nil ; No uri
-     mcp-server-lib-test--error-invalid-params
+     mcp-server-lib-jsonrpc-error-invalid-params
      "Resource not found: nil")))
 
 (ert-deftest test-mcp-server-lib-resources-read-numeric-uri ()
@@ -2231,7 +2214,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     ;; Test with number uri
     (mcp-server-lib-test--check-resource-read-request-error
      '((uri . 123))
-     mcp-server-lib-test--error-invalid-params
+     mcp-server-lib-jsonrpc-error-invalid-params
      "Resource not found: 123")))
 
 (ert-deftest test-mcp-server-lib-resources-read-array-uri ()
@@ -2240,7 +2223,7 @@ from a function loaded from bytecode rather than interpreted elisp."
     ;; Test with array uri
     (mcp-server-lib-test--check-resource-read-request-error
      '((uri . ["test" "array"]))
-     mcp-server-lib-test--error-invalid-params
+     mcp-server-lib-jsonrpc-error-invalid-params
      "Resource not found: [test array]")))
 
 (ert-deftest test-mcp-server-lib-resource-template-handler-wrong-signature ()
@@ -2251,7 +2234,7 @@ from a function loaded from bytecode rather than interpreted elisp."
      :name "Wrong Signature Handler"))
    (mcp-server-lib-test--read-resource-error
     "test://123"
-    mcp-server-lib-test--error-internal
+    mcp-server-lib-jsonrpc-error-internal
     (if (version< emacs-version "30.1")
         "Error reading resource test://123: Wrong number of arguments: ((t) nil \"Generic handler to return a test string.\" \"test result\"), 1"
       "Error reading resource test://123: Wrong number of arguments: #[nil (\"test result\") (t) nil \"Generic handler to return a test string.\"], 1"))))
