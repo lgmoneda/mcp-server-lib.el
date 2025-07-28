@@ -60,6 +60,8 @@ fi
 # Only run indentation if there are no syntax errors
 if [ $ELISP_SYNTAX_FAILED -eq 0 ]; then
 	echo -n "Running elisp-autofmt... "
+	# Note: elisp-autofmt and elisp-lint may disagree on cl-defmacro formatting
+	# See https://codeberg.org/ideasman42/emacs-elisp-autofmt/issues/10
 	if eask format elisp-autofmt; then
 		echo "OK!"
 	else
