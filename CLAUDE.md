@@ -6,7 +6,7 @@ guidelines at ~/.claude/CLAUDE.md locally or
 <https://raw.githubusercontent.com/laurynas-biveinis/dotfiles/refs/heads/master/ai/.claude/CLAUDE.md>
 online.
 
-User-facing documentation is in README.org.
+User-facing documentation is in README.org and in NEWS.
 
 This is an Elisp project, and should follow user's Elisp guidelines at
 @~/.claude/CLAUDE-elisp.md.

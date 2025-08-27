@@ -1,0 +1,46 @@
+mcp-server-lib.el NEWS -- history of user-visible changes
+
+* Changes in mcp-server-lib 0.2.0 (unreleased)
+
+** New Features
+*** Enhanced testing support for MCP servers
+    The library now provides testing utilities through the mcp-server-lib-ert
+    module for dependent packages.
+
+** Bug Fixes
+*** Fixed resources/list endpoint to match MCP specification
+    resources/list now correctly returns only direct resources,
+    while templates are returned via the separate resources/templates/list
+    endpoint as required by the protocol.
+
+** API Changes
+*** Made mcp-server-lib-name a public constant
+
+*** Added public constants for JSON-RPC error codes
+    - mcp-server-lib-jsonrpc-error-parse (-32700)
+    - mcp-server-lib-jsonrpc-error-invalid-request (-32600)
+    - mcp-server-lib-jsonrpc-error-method-not-found (-32601)
+    - mcp-server-lib-jsonrpc-error-invalid-params (-32602)
+    - mcp-server-lib-jsonrpc-error-internal (-32603)
+
+*** Added ERT testing utilities
+    - mcp-server-lib-ert-with-server
+    - mcp-server-lib-ert-verify-resource-read
+    - mcp-server-lib-ert-check-error-object
+    - mcp-server-lib-ert-get-resource-list
+    - mcp-server-lib-ert-get-success-result
+    - mcp-server-lib-ert-verify-req-success
+    - mcp-server-lib-ert-with-metrics-tracking
+    - mcp-server-lib-ert-assert-initialize-result
+    - mcp-server-lib-ert-get-initialize-result
+
+* Changes in mcp-server-lib 0.1.0 (2025-07-22)
+
+** Initial release
+*** Core MCP server functionality
+*** Tool registration and invocation
+*** Resource registration (static and templates with {variable} syntax)
+*** JSON-RPC communication
+*** Stdio transport support via emacs-mcp-stdio.sh
+*** Metrics collection and reporting
+*** Basic testing utilities
