@@ -70,7 +70,7 @@ readonly STDIO_CMD="./emacs-mcp-stdio.sh --socket=$TEST_SERVER_NAME"
 emacs -Q --daemon="$TEST_SERVER_NAME" --load "$(pwd)/mcp-server-lib-metrics.el" --load "$(pwd)/mcp-server-lib.el" --load "$(pwd)/mcp-server-lib-commands.el" --eval "(mcp-server-lib-start)" 2>/dev/null &
 readonly SERVER_PID=$!
 
-# shellcheck disable=SC2317  # Called by trap
+# shellcheck disable=SC2317,SC2329  # Called by trap
 cleanup() {
 	[ -n "${debug_log_file:-}" ] && [ -f "$debug_log_file" ] && rm -f "$debug_log_file"
 	rm -f "stdio-response.txt"

@@ -569,6 +569,8 @@ Returns a JSON-RPC response string for the request."
       (mcp-server-lib--handle-tools-list id))
      ((equal method "resources/list")
       (mcp-server-lib--handle-resources-list id))
+     ((equal method "resources/templates/list")
+      (mcp-server-lib--handle-resources-templates-list id))
      ((equal method "resources/read")
       (mcp-server-lib--handle-resources-read
        id params method-metrics))
@@ -695,15 +697,20 @@ Returns a vector of resource entries."
 
 Returns a list of all registered resources with their metadata."
   (let ((resource-list
-         (vconcat
-          ;; Direct resources
-          (mcp-server-lib--collect-resources-from-hash
-           mcp-server-lib--resources nil)
-          ;; Resource templates
-          (mcp-server-lib--collect-resources-from-hash
-           mcp-server-lib--resource-templates t))))
+         (mcp-server-lib--collect-resources-from-hash
+          mcp-server-lib--resources nil)))
     (mcp-server-lib--jsonrpc-response
      id `((resources . ,resource-list)))))
+
+(defun mcp-server-lib--handle-resources-templates-list (id)
+  "Handle resources/templates/list request with ID.
+
+Returns a list of all registered resource templates."
+  (let ((template-list
+         (mcp-server-lib--collect-resources-from-hash
+          mcp-server-lib--resource-templates t)))
+    (mcp-server-lib--jsonrpc-response
+     id `((resourceTemplates . ,template-list)))))
 
 (defun mcp-server-lib--handle-tools-call (id params method-metrics)
   "Handle tools/call request with ID and PARAMS.
@@ -899,6 +906,15 @@ If ID is not provided, it defaults to 1."
   (json-encode
    `(("jsonrpc" . "2.0")
      ("method" . "resources/list")
+     ("id" . ,(or id 1)))))
+
+(defun mcp-server-lib-create-resources-templates-list-request
+    (&optional id)
+  "Create a resources/templates/list JSON-RPC request with optional ID.
+If ID is not provided, it defaults to 1."
+  (json-encode
+   `(("jsonrpc" . "2.0")
+     ("method" . "resources/templates/list")
      ("id" . ,(or id 1)))))
 
 (defun mcp-server-lib-create-resources-read-request (uri &optional id)

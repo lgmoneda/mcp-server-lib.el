@@ -265,6 +265,11 @@ The URI-TEMPLATE is searched as uriTemplate in JSON."
   (seq-find (lambda (r) (equal (alist-get 'uriTemplate r) uri-template))
   resources))
 
+(defun mcp-server-lib-test--is-template-resource (resource-spec)
+  "Return non-nil if RESOURCE-SPEC represents a template resource.
+RESOURCE-SPEC is a list where the first element is the URI or template."
+  (string-match-p "{" (car resource-spec)))
+
 (defun mcp-server-lib-test--build-resource-verification (resource-spec)
   "Build verification code for a single RESOURCE-SPEC.
 RESOURCE-SPEC is a list of (URI HANDLER &rest PROPERTIES).
@@ -307,13 +312,27 @@ Arguments:
   BODY       Forms to execute with server running and resources registered"
   (declare (indent 1) (debug t))
   ;; Build the verification code
-  (let ((verification-code
-         `(let ((resource-list (mcp-server-lib-ert-get-resource-list)))
-            ;; Check we have the expected number of resources
-            (should (= ,(length resources) (length resource-list)))
-            ;; Verify each registered resource appears in the list
-            ,@(mapcar #'mcp-server-lib-test--build-resource-verification
-                      resources))))
+  ;; Separate direct resources and templates
+  (let* ((direct-resources (cl-remove-if #'mcp-server-lib-test--is-template-resource
+                                          resources))
+         (template-resources (cl-set-difference resources direct-resources :test #'equal))
+         (verification-code
+          `(progn
+             ;; Verify direct resources in resources/list
+             (let ((resource-list (mcp-server-lib-ert-get-resource-list)))
+               ;; Check we have the expected number of DIRECT resources only
+               (should (= ,(length direct-resources) (length resource-list)))
+               ;; Verify only direct resources appear in the list
+               ,@(mapcar #'mcp-server-lib-test--build-resource-verification
+                         direct-resources))
+             ;; Verify templates in resources/templates/list
+             ,@(when template-resources
+                 `((let ((resource-list (mcp-server-lib-ert-get-resource-templates-list)))
+                     ;; Check we have the expected number of templates
+                     (should (= ,(length template-resources) (length resource-list)))
+                     ;; Verify templates appear in the template list
+                     ,@(mapcar #'mcp-server-lib-test--build-resource-verification
+                               template-resources)))))))
     ;; Build nested mcp-server-lib-test--register-resource calls
     ;; wrapping server start, verification, and body execution
     (let ((server-and-body
@@ -1687,10 +1706,40 @@ from a function loaded from bytecode rather than interpreted elisp."
      (mcp-server-lib-ert-with-metrics-tracking
       (("resources/read" 1 1))
       ;; Try to read the resource - should return an error
-      (mcp-server-lib-test--read-resource-error
-       "test://undefined-handler"
-       mcp-server-lib-jsonrpc-error-internal
-       "Error reading resource test://undefined-handler: Symbol’s function definition is void: mcp-server-lib-test--handler-to-be-undefined")))))
+      ;; Note: error-message-string may use Unicode or ASCII quotes depending on locale
+      (let* ((response (mcp-server-lib-ert--read-resource "test://undefined-handler"))
+             (error-obj (alist-get 'error response))
+             (actual-message (alist-get 'message error-obj)))
+        (should (equal mcp-server-lib-jsonrpc-error-internal (alist-get 'code error-obj)))
+        ;; Check message contains expected parts (quotes may vary by locale)
+        (should (string-match-p "^Error reading resource test://undefined-handler: Symbol.s function definition is void: mcp-server-lib-test--handler-to-be-undefined$"
+                                actual-message)))))))
+
+(ert-deftest test-mcp-server-lib-resources-list-mixed ()
+  "Test listing both direct resources and templates."
+  (mcp-server-lib-test--with-resources
+   (("test://direct1"
+     #'mcp-server-lib-test--return-string
+     :name "Direct Resource 1")
+    ("org://{filename}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params
+     :name "Org Template")
+    ("test://direct2"
+     #'mcp-server-lib-test--return-string
+     :name "Direct Resource 2"
+     :mime-type "text/plain")
+    ("doc://{docname}"
+     #'mcp-server-lib-test--resource-template-handler-dump-params-2
+     :name "Doc Template"))
+   ;; Verify we can read both types
+   (mcp-server-lib-ert-verify-resource-read
+    "test://direct1"
+    '((uri . "test://direct1")
+      (text . "test result")))
+   (mcp-server-lib-ert-verify-resource-read
+    "org://example.org"
+    '((uri . "org://example.org")
+      (text . "params: ((\"filename\" . \"example.org\"))")))))
 
 ;;; Resource Template Invalid Syntax Tests
 
@@ -1961,12 +2010,12 @@ from a function loaded from bytecode rather than interpreted elisp."
      #'mcp-server-lib-test--resource-template-handler-dump-params
      :name "Test Files"))
    ;; Verify all three are listed
-   (let ((resources (mcp-server-lib-ert-get-resource-list)))
+   (let ((resources (mcp-server-lib-ert-get-resource-templates-list)))
      (should (= 3 (length resources))))
    ;; Unregister the middle one
    (mcp-server-lib-unregister-resource "doc://{docname}")
    ;; Verify only two remain
-   (let ((resources (mcp-server-lib-ert-get-resource-list)))
+   (let ((resources (mcp-server-lib-ert-get-resource-templates-list)))
      (should (= 2 (length resources)))
      ;; Check the remaining ones
      (should (mcp-server-lib-test--find-resource-by-uri-template
@@ -2065,7 +2114,7 @@ from a function loaded from bytecode rather than interpreted elisp."
       #'mcp-server-lib-test--resource-template-handler-dump-params-2
       :name "Uppercase Template"
       ;; Both templates should be registered
-      (let ((resources (mcp-server-lib-ert-get-resource-list)))
+      (let ((resources (mcp-server-lib-ert-get-resource-templates-list)))
         (should (= 2 (length resources))))
       ;; Test that they extract different variables
       (mcp-server-lib-ert-verify-resource-read
@@ -2089,7 +2138,7 @@ from a function loaded from bytecode rather than interpreted elisp."
         (format "UPPERCASE PATH: %s" (alist-get "id" params nil nil #'string=)))
       :name "Uppercase Path Template"
       ;; Both templates should be registered
-      (let ((resources (mcp-server-lib-ert-get-resource-list)))
+      (let ((resources (mcp-server-lib-ert-get-resource-templates-list)))
         (should (= 2 (length resources))))
       ;; Test lowercase path matches only lowercase template
       (mcp-server-lib-ert-verify-resource-read
@@ -2185,7 +2234,7 @@ from a function loaded from bytecode rather than interpreted elisp."
        '((uri . "test://item/123")
          (text . "params: ((\"id\" . \"item/123\"))")))
       ;; Verify both templates are registered
-      (let ((resources (mcp-server-lib-ert-get-resource-list)))
+      (let ((resources (mcp-server-lib-ert-get-resource-templates-list)))
         (should (= 2 (length resources))))))))
 
 (ert-deftest test-mcp-server-lib-resources-read-malformed-params ()
