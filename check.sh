@@ -202,6 +202,14 @@ else
 	ERRORS=$((ERRORS + 1))
 fi
 
+echo -n "Checking GitHub Actions security... $(echo .github/workflows/*.yml) "
+if zizmor .github/workflows/*.yml; then
+	echo "OK!"
+else
+	echo "zizmor check failed!"
+	ERRORS=$((ERRORS + 1))
+fi
+
 echo -n "Checking YAML formatting... $(echo .github/workflows/*.yml) "
 if prettier --log-level warn --check .github/workflows/*.yml; then
 	echo "OK!"
