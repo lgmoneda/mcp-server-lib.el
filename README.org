@@ -127,13 +127,44 @@ The library uses a unified API for both static and templated resources. The pres
   :description "Get specific headline from org file")
 #+end_src
 
-Static resource handlers take no arguments and return strings. Template resource handlers receive an alist of parameters extracted from the URI. Use regular =error= for failures.
+Static resource handlers take no arguments and return strings. Template resource handlers receive an alist of parameters extracted from the URI.
 
 Supported template syntax (RFC 6570 subset):
 - ={variable}= - Simple variable expansion
 - ={+variable}= - Reserved expansion (allows slashes)
 
 Direct resources take precedence over templates when both match a URI.
+
+*** Resource Error Handling
+
+Resource handlers can signal specific JSON-RPC error codes to provide meaningful error information to clients:
+
+#+begin_src elisp
+;; Signal that client provided invalid parameters
+(defun my-file-resource-handler (params)
+  (let ((file (alist-get "filename" params nil nil #'string=)))
+    (unless (file-exists-p file)
+      (mcp-server-lib-resource-signal-error
+       mcp-server-lib-jsonrpc-error-invalid-params
+       (format "File not found: %s" file)))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (buffer-string))))
+
+;; Signal an internal server error
+(defun my-database-resource-handler ()
+  (unless (database-connected-p)
+    (mcp-server-lib-resource-signal-error
+     mcp-server-lib-jsonrpc-error-internal
+     "Database connection unavailable"))
+  (query-database))
+#+end_src
+
+Available error codes:
+- =mcp-server-lib-jsonrpc-error-invalid-params= (-32602): Client provided invalid parameters, resource not found
+- =mcp-server-lib-jsonrpc-error-internal= (-32603): Server-side processing error
+
+It is also possible to use regular =error= or =signal= calls, which would return internal error (-32603).
 
 *** Working with Resource Templates
 

@@ -133,6 +133,18 @@ MCP Parameters:"
   "Test template handler to ignore PARAMS and return nil."
   nil)
 
+(defun mcp-server-lib-test--resource-signal-error-invalid-params ()
+  "Test handler that signals invalid params error."
+  (mcp-server-lib-resource-signal-error
+   mcp-server-lib-jsonrpc-error-invalid-params
+   "Custom invalid params message"))
+
+(defun mcp-server-lib-test--resource-signal-error-internal ()
+  "Test handler that signals internal error."
+  (mcp-server-lib-resource-signal-error
+   mcp-server-lib-jsonrpc-error-internal
+   "Database connection failed"))
+
 ;;; Test helpers
 
 (defmacro mcp-server-lib-test--with-undefined-function (function-symbol &rest body)
@@ -1695,6 +1707,39 @@ from a function loaded from bytecode rather than interpreted elisp."
      "test://error-resource"
      mcp-server-lib-jsonrpc-error-internal
      "Error reading resource test://error-resource: Generic error occurred")))
+
+(ert-deftest mcp-server-lib-test-resource-signal-error-invalid-params ()
+  "Test signaling invalid params error from resource handler."
+  (mcp-server-lib-test--with-resources
+   (("test://signal-error"
+     #'mcp-server-lib-test--resource-signal-error-invalid-params
+     :name "Signal Error Resource"))
+   (mcp-server-lib-test--check-resource-read-error
+     "test://signal-error"
+     mcp-server-lib-jsonrpc-error-invalid-params
+     "Custom invalid params message")))
+
+(ert-deftest mcp-server-lib-test-resource-signal-error-internal ()
+  "Test signaling internal error from resource handler."
+  (mcp-server-lib-test--with-resources
+   (("test://internal-error"
+     #'mcp-server-lib-test--resource-signal-error-internal
+     :name "Internal Error Resource"))
+   (mcp-server-lib-test--check-resource-read-error
+     "test://internal-error"
+     mcp-server-lib-jsonrpc-error-internal
+     "Database connection failed")))
+
+(ert-deftest mcp-server-lib-test-resource-regular-error-backward-compat ()
+  "Test that regular errors still work and return internal error code."
+  (mcp-server-lib-test--with-resources
+   (("test://regular-error"
+     #'mcp-server-lib-test--generic-error-handler
+     :name "Regular Error Resource"))
+   (mcp-server-lib-test--check-resource-read-error
+     "test://regular-error"
+     mcp-server-lib-jsonrpc-error-internal
+     "Error reading resource test://regular-error: Generic error occurred")))
 
 (ert-deftest mcp-server-lib-test-resources-read-handler-undefined ()
   "Test reading a resource whose handler function no longer exists."

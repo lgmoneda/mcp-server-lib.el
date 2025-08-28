@@ -7,6 +7,11 @@ mcp-server-lib.el NEWS -- history of user-visible changes
     The library now provides testing utilities through the mcp-server-lib-ert
     module for dependent packages.
 
+*** Resource error handling with custom error codes
+    Resource handlers can now signal specific JSON-RPC error codes using
+    mcp-server-lib-resource-signal-error to provide meaningful error
+    information to MCP clients.
+
 ** Bug Fixes
 *** Fixed resources/list endpoint to match MCP specification
     resources/list now correctly returns only direct resources,
@@ -33,6 +38,9 @@ mcp-server-lib.el NEWS -- history of user-visible changes
     - mcp-server-lib-ert-with-metrics-tracking
     - mcp-server-lib-ert-assert-initialize-result
     - mcp-server-lib-ert-get-initialize-result
+
+*** Added resource error signaling API
+    - mcp-server-lib-resource-signal-error for signaling custom error codes
 
 * Changes in mcp-server-lib 0.1.0 (2025-07-22)
 
