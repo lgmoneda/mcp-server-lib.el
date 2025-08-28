@@ -335,6 +335,7 @@ To install the script to a different location:
 * Similar packages
 
 - https://github.com/utsahi/mcp-server.el
+- https://github.com/rhblind/emacs-mcp-server
 
 * License
 
