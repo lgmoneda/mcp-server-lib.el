@@ -219,6 +219,64 @@ Extracts parameter descriptions from the docstring if available."
       (error
        "Only functions with zero or one argument are supported")))))
 
+(defun mcp-server-lib--generate-schema-from-args (args)
+  "Generate JSON schema from explicit ARGS specification.
+Returns a schema object suitable for tool registration.
+ARGS should be a list of plists with argument specifications."
+  (if (null args)
+      ;; No arguments case
+      '((type . "object"))
+    ;; Build schema from argument specifications
+    (let ((properties '())
+          (required '()))
+      (dolist (arg args)
+        (let* ((name (plist-get arg :name))
+               (type (plist-get arg :type))
+               (description (plist-get arg :description))
+               (optional (plist-get arg :optional))
+               (enum (plist-get arg :enum)))
+          
+          ;; Build property schema
+          (let ((property-schema `((type . ,(symbol-name type)))))
+            
+            ;; Add description
+            (when description
+              (setq property-schema
+                    (cons `(description . ,description) property-schema)))
+            
+            ;; Add enum values
+            (when enum
+              (setq property-schema
+                    (cons `(enum . ,enum) property-schema)))
+            
+            ;; Add to properties list
+            (push `(,(intern name) . ,property-schema) properties)
+            
+            ;; Add to required if not optional
+            (unless optional
+              (push name required)))))
+      
+      ;; Return complete schema
+      `((type . "object")
+        (properties . ,(nreverse properties))
+        ,@(when required
+            `((required . ,(vconcat (nreverse required)))))))))
+
+(defun mcp-server-lib--call-handler-with-args (handler tool tool-args)
+  "Call HANDLER with arguments extracted from TOOL-ARGS using TOOL schema.
+HANDLER is the function to call.
+TOOL is the tool plist containing the schema.
+TOOL-ARGS is an alist of argument names to values from the MCP call."
+  (let* ((schema (plist-get tool :schema))
+         (properties (alist-get 'properties schema))
+         (required (alist-get 'required schema))
+         (arg-names (mapcar (lambda (prop) (symbol-name (car prop))) properties))
+         (arg-values (mapcar (lambda (name)
+                              (alist-get name tool-args nil nil #'string=))
+                            arg-names)))
+    ;; Call handler with argument values in schema order
+    (apply handler arg-values)))
+
 (defun mcp-server-lib--ref-counted-register (key item table)
   "Register ITEM with KEY in TABLE with reference counting.
 If KEY already exists, increment its reference count.
@@ -730,11 +788,10 @@ METHOD-METRICS is used to track errors for this method."
           (condition-case err
               (let*
                   ((result
-                    ;; Pass first arg value for single-string-arg tools
-                    ;; when arguments are present
+                    ;; Extract argument values and call handler appropriately
                     (if (and tool-args (not (equal tool-args '())))
-                        (let ((first-arg-value (cdr (car tool-args))))
-                          (funcall handler first-arg-value))
+                        (mcp-server-lib--call-handler-with-args 
+                         handler tool tool-args)
                       (funcall handler)))
                    ;; Ensure result is a string, convert nil to empty string
                    (result-text (or result ""))
@@ -941,87 +998,118 @@ Example:
 
 ;;; API - Tools
 
-(defun mcp-server-lib-register-tool (handler &rest properties)
-  "Register a tool with the MCP server.
+(defun mcp-server-lib-register-tool (&rest slots)
+  "Create and register a tool with explicit argument specification.
 
-Arguments:
-  HANDLER          Function to handle tool invocations
-  PROPERTIES       Property list with tool attributes
+This function uses the same API as claude-code-ide-make-tool for consistency.
 
-Required properties:
-  :id              String identifier for the tool (e.g., \"list-files\")
-  :description     String describing what the tool does
+Required keyword arguments:
+  :function     Function to handle tool invocations (function or symbol)
+  :name         String identifier for the tool (snake_case recommended)
+  :description  String describing what the tool does
 
-Optional properties:
-  :title           User-friendly display name for the tool
-  :read-only       If true, indicates tool doesn't modify its environment
+Optional keyword arguments:
+  :args         List of argument specifications (see below)
+  :title        User-friendly display name for the tool
+  :read-only    If true, indicates tool doesn't modify its environment
+  :category     String indicating a category for the tool
 
-The HANDLER function's signature determines its input schema.
-Currently only no-argument and single-argument handlers are supported.
+Argument specifications (:args):
+Each argument is a plist with these keys:
+  :name         Argument name (string)
+  :type         Argument type (symbol: string, number, integer, boolean, array, object, null)
+  :description  Argument description (string)
+  :optional     Whether the argument is optional (boolean, default nil)
+  :enum         For enumerated types, a vector of allowed values
+  :items        For array types, a plist describing the array items
+  :properties   For object types, a plist of property specifications
 
 Example:
-  ;; Simple tool with no arguments
-  (mcp-server-lib-register-tool #\\='my-org-files-handler
-    :id \"org-list-files\"
-    :description \"Lists all available Org mode files for task management\")
+  (mcp-server-lib-register-tool
+   :function #'my-project-grep
+   :name \"my_project_grep\"
+   :description \"Search for pattern in project files\"
+   :args '((:name \"pattern\"
+            :type string
+            :description \"Pattern to search for\")
+           (:name \"case_sensitive\"
+            :type boolean
+            :description \"Whether search should be case sensitive\"
+            :optional t)))
 
-  ;; With optional properties
-  (mcp-server-lib-register-tool #\\='my-org-files-handler
-    :id \"org-list-files\"
-    :description \"Lists all available Org mode files for task management\"
-    :title \"List Org Files\"
-    :read-only t)
-
-  ;; Tool with one argument - parameter description in docstring
-  (defun my-file-reader (path)
-    \"Read file at PATH.
-
-MCP Parameters:
-  path - absolute path to the file to read\"
-    (mcp-server-lib-with-error-handling
-      (with-temp-buffer
-        (insert-file-contents path)
-        (buffer-string))))
-  (mcp-server-lib-register-tool #\\='my-file-reader
-    :id \"read-file\"
-    :description \"Read contents of a file\")
-
-See also:
-  `mcp-server-lib-unregister-tool' - Remove a registered tool
-  `mcp-server-lib-with-error-handling' - Error handling for tool handlers
-  `mcp-server-lib-tool-throw' - Signal errors from tool handlers"
-  (let* ((id (plist-get properties :id))
-         (description (plist-get properties :description))
-         (title (plist-get properties :title))
-         (read-only (plist-get properties :read-only)))
-    ;; Error checking for required properties
-    (unless (functionp handler)
-      (error "Tool registration requires handler function"))
-    (unless id
-      (error "Tool registration requires :id property"))
+Returns the tool specification for convenience."
+  (let ((function (plist-get slots :function))
+        (name (plist-get slots :name))
+        (description (plist-get slots :description))
+        (args (plist-get slots :args))
+        (title (plist-get slots :title))
+        (read-only (plist-get slots :read-only))
+        (category (plist-get slots :category)))
+    
+    ;; Validate required parameters
+    (unless function
+      (error "Tool :function is required"))
+    (unless name
+      (error "Tool :name is required"))
     (unless description
-      (error "Tool registration requires :description property"))
-    ;; Check for existing registration
-    (if-let* ((existing (gethash id mcp-server-lib--tools)))
-      (mcp-server-lib--ref-counted-register
-       id existing mcp-server-lib--tools)
-      (let* ((schema
-              (mcp-server-lib--generate-schema-from-function handler))
-             (tool
-              (list
-               :id id
-               :description description
-               :handler handler
-               :schema schema)))
-        ;; Add optional properties if provided
-        (when title
-          (setq tool (plist-put tool :title title)))
-        ;; Always include :read-only if it was specified, even if nil
-        (when (plist-member properties :read-only)
-          (setq tool (plist-put tool :read-only read-only)))
-        ;; Register the tool
+      (error "Tool :description is required"))
+    (unless (functionp function)
+      (error "Tool :function must be a function"))
+    (unless (stringp name)
+      (error "Tool :name must be a string"))
+    (unless (stringp description)
+      (error "Tool :description must be a string"))
+    
+    ;; Validate optional parameters
+    (when title
+      (unless (stringp title)
+        (error "Tool :title must be a string")))
+    (when category
+      (unless (stringp category)
+        (error "Tool :category must be a string")))
+    
+    ;; Validate and process arguments
+    (when args
+      (unless (listp args)
+        (error "Tool :args must be a list"))
+      (dolist (arg args)
+        (unless (listp arg)
+          (error "Each argument specification must be a plist"))
+        (let ((arg-name (plist-get arg :name))
+              (arg-type (plist-get arg :type))
+              (arg-desc (plist-get arg :description)))
+          (unless (stringp arg-name)
+            (error "Argument :name must be a string"))
+          (unless (symbolp arg-type)
+            (error "Argument :type must be a symbol"))
+          (unless (stringp arg-desc)
+            (error "Argument :description must be a string"))
+          (unless (memq arg-type '(string number integer boolean array object null))
+            (error "Argument :type must be one of: string, number, integer, boolean, array, object, null")))))
+    
+    ;; Generate schema from explicit args specification
+    (let* ((schema (mcp-server-lib--generate-schema-from-args args))
+           (tool (list :id name
+                       :description description
+                       :handler function
+                       :schema schema)))
+      ;; Add optional properties
+      (when title
+        (setq tool (plist-put tool :title title)))
+      (when (plist-member slots :read-only)
+        (setq tool (plist-put tool :read-only read-only)))
+      (when category
+        (setq tool (plist-put tool :category category)))
+      
+      ;; Register the tool
+      (if-let* ((existing (gethash name mcp-server-lib--tools)))
+          (mcp-server-lib--ref-counted-register
+           name existing mcp-server-lib--tools)
         (mcp-server-lib--ref-counted-register
-         id tool mcp-server-lib--tools)))))
+         name tool mcp-server-lib--tools))
+      
+      ;; Return the tool spec for convenience
+      tool)))
 
 (defun mcp-server-lib-unregister-tool (tool-id)
   "Unregister a tool with ID TOOL-ID from the MCP server.

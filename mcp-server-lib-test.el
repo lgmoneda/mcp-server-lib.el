@@ -2333,6 +2333,256 @@ from a function loaded from bytecode rather than interpreted elisp."
         "Error reading resource test://123: Wrong number of arguments: ((t) nil \"Generic handler to return a test string.\" \"test result\"), 1"
       "Error reading resource test://123: Wrong number of arguments: #[nil (\"test result\") (t) nil \"Generic handler to return a test string.\"], 1"))))
 
+;;; `mcp-server-lib-make-tool' tests
+
+(defun mcp-server-lib-test--pattern-search (pattern)
+  "Test function that searches for PATTERN."
+  (format "Found pattern: %s" pattern))
+
+(defun mcp-server-lib-test--file-operation (file operation)
+  "Test function that performs OPERATION on FILE."
+  (format "Operation %s on file %s" operation file))
+
+(defun mcp-server-lib-test--no-args-tool ()
+  "Test function with no arguments."
+  "no args result")
+
+(ert-deftest mcp-server-lib-test-make-tool-basic ()
+  "Test basic mcp-server-lib-make-tool functionality."
+  (mcp-server-lib-ert-with-server
+   :tools nil :resources nil
+   (let ((tool (mcp-server-lib-make-tool
+                :function #'mcp-server-lib-test--pattern-search
+                :name "test_pattern_search"
+                :description "Search for a pattern"
+                :args '((:name "pattern"
+                         :type string
+                         :description "Pattern to search for")))))
+     
+     ;; Tool should be registered
+     (should (hash-table-p mcp-server-lib--tools))
+     (should (gethash "test_pattern_search" mcp-server-lib--tools))
+     
+     ;; Tool should have correct properties
+     (should (equal (plist-get tool :id) "test_pattern_search"))
+     (should (equal (plist-get tool :description) "Search for a pattern"))
+     (should (functionp (plist-get tool :handler)))
+     
+     ;; Test tool invocation
+     (let* ((request (mcp-server-lib-create-tools-call-request
+                     "test_pattern_search" 1 '(("pattern" . "test"))))
+            (response (mcp-server-lib-process-jsonrpc-parsed request))
+            (result (alist-get 'result response)))
+       (should result)
+       (should (string= (alist-get 'content result) "Found pattern: test"))))))
+
+(ert-deftest mcp-server-lib-test-make-tool-no-args ()
+  "Test mcp-server-lib-make-tool with no arguments."
+  (mcp-server-lib-ert-with-server
+   :tools nil :resources nil
+   (let ((tool (mcp-server-lib-make-tool
+                :function #'mcp-server-lib-test--no-args-tool
+                :name "test_no_args"
+                :description "Tool with no arguments")))
+     
+     ;; Tool should be registered
+     (should (gethash "test_no_args" mcp-server-lib--tools))
+     
+     ;; Test tool invocation with no args
+     (let* ((request (mcp-server-lib-create-tools-call-request
+                     "test_no_args" 1))
+            (response (mcp-server-lib-process-jsonrpc-parsed request))
+            (result (alist-get 'result response)))
+       (should result)
+       (should (string= (alist-get 'content result) "no args result"))))))
+
+(ert-deftest mcp-server-lib-test-make-tool-multiple-args ()
+  "Test mcp-server-lib-make-tool with multiple arguments."
+  (mcp-server-lib-ert-with-server
+   :tools nil :resources nil
+   (let ((tool (mcp-server-lib-make-tool
+                :function #'mcp-server-lib-test--file-operation
+                :name "test_file_op"
+                :description "File operation tool"
+                :args '((:name "file"
+                         :type string
+                         :description "File path")
+                        (:name "operation"
+                         :type string
+                         :description "Operation to perform")))))
+     
+     ;; Test schema generation
+     (let ((schema (plist-get tool :schema)))
+       (should (equal (alist-get 'type schema) "object"))
+       (should (alist-get 'properties schema))
+       (should (alist-get 'required schema)))
+     
+     ;; Test tool invocation
+     (let* ((request (mcp-server-lib-create-tools-call-request
+                     "test_file_op" 1 
+                     '(("file" . "test.txt")
+                       ("operation" . "read"))))
+            (response (mcp-server-lib-process-jsonrpc-parsed request))
+            (result (alist-get 'result response)))
+       (should result)
+       (should (string= (alist-get 'content result) 
+                       "Operation read on file test.txt"))))))
+
+(ert-deftest mcp-server-lib-test-make-tool-optional-args ()
+  "Test mcp-server-lib-make-tool with optional arguments."
+  (mcp-server-lib-ert-with-server
+   :tools nil :resources nil
+   (let ((tool (mcp-server-lib-make-tool
+                :function #'mcp-server-lib-test--pattern-search
+                :name "test_optional"
+                :description "Tool with optional args"
+                :args '((:name "pattern"
+                         :type string
+                         :description "Required pattern")
+                        (:name "case_sensitive"
+                         :type boolean
+                         :description "Case sensitive search"
+                         :optional t)))))
+     
+     ;; Check schema has correct required fields
+     (let ((schema (plist-get tool :schema)))
+       (should (equal (aref (alist-get 'required schema)) "pattern"))
+       (should (= 1 (length (alist-get 'required schema))))))))
+
+(ert-deftest mcp-server-lib-test-make-tool-with-title ()
+  "Test mcp-server-lib-make-tool with optional title."
+  (mcp-server-lib-ert-with-server
+   :tools nil :resources nil
+   (let ((tool (mcp-server-lib-make-tool
+                :function #'mcp-server-lib-test--pattern-search
+                :name "test_titled"
+                :description "Tool with title"
+                :title "Pattern Search Tool"
+                :args '((:name "pattern"
+                         :type string
+                         :description "Pattern to search")))))
+     
+     (should (equal (plist-get tool :title) "Pattern Search Tool")))))
+
+(ert-deftest mcp-server-lib-test-make-tool-with-read-only ()
+  "Test mcp-server-lib-make-tool with read-only flag."
+  (mcp-server-lib-ert-with-server
+   :tools nil :resources nil
+   (let ((tool (mcp-server-lib-make-tool
+                :function #'mcp-server-lib-test--pattern-search
+                :name "test_readonly"
+                :description "Read-only tool"
+                :read-only t
+                :args '((:name "pattern"
+                         :type string
+                         :description "Pattern to search")))))
+     
+     (should (plist-get tool :read-only)))))
+
+(ert-deftest mcp-server-lib-test-make-tool-validation-errors ()
+  "Test mcp-server-lib-make-tool validation errors."
+  ;; Missing function
+  (should-error
+   (mcp-server-lib-make-tool
+    :name "test"
+    :description "Test")
+   :type 'error)
+  
+  ;; Missing name
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :description "Test")
+   :type 'error)
+  
+  ;; Missing description
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :name "test")
+   :type 'error)
+  
+  ;; Invalid function
+  (should-error
+   (mcp-server-lib-make-tool
+    :function "not-a-function"
+    :name "test"
+    :description "Test")
+   :type 'error)
+  
+  ;; Invalid name type
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :name 123
+    :description "Test")
+   :type 'error)
+  
+  ;; Invalid description type
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :name "test"
+    :description 123)
+   :type 'error))
+
+(ert-deftest mcp-server-lib-test-make-tool-args-validation ()
+  "Test mcp-server-lib-make-tool argument validation."
+  ;; Invalid args type
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :name "test"
+    :description "Test"
+    :args "not-a-list")
+   :type 'error)
+  
+  ;; Invalid argument spec
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :name "test"
+    :description "Test"
+    :args '("not-a-plist"))
+   :type 'error)
+  
+  ;; Missing argument name
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :name "test"
+    :description "Test"
+    :args '((:type string :description "Test")))
+   :type 'error)
+  
+  ;; Invalid argument type
+  (should-error
+   (mcp-server-lib-make-tool
+    :function #'mcp-server-lib-test--pattern-search
+    :name "test"
+    :description "Test"
+    :args '((:name "test" :type invalid_type :description "Test")))
+   :type 'error))
+
+(ert-deftest mcp-server-lib-test-make-tool-enum-type ()
+  "Test mcp-server-lib-make-tool with enum argument type."
+  (mcp-server-lib-ert-with-server
+   :tools nil :resources nil
+   (let ((tool (mcp-server-lib-make-tool
+                :function #'mcp-server-lib-test--pattern-search
+                :name "test_enum"
+                :description "Tool with enum"
+                :args '((:name "mode"
+                         :type string
+                         :description "Search mode"
+                         :enum ["exact" "fuzzy" "regex"])))))
+     
+     ;; Check schema includes enum
+     (let* ((schema (plist-get tool :schema))
+            (properties (alist-get 'properties schema))
+            (mode-prop (alist-get 'mode properties)))
+       (should (equal (alist-get 'enum mode-prop) ["exact" "fuzzy" "regex"]))))))
+
 (provide 'mcp-server-lib-test)
 
 ;; Local Variables:
