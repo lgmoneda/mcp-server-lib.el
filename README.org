@@ -90,6 +90,60 @@ Optional properties:
 - =:title= - User-friendly display name
 - =:read-only= - Set to =t= if tool doesn't modify state
 
+*** Modern Tool Registration (Recommended)
+
+The new =mcp-server-lib-make-tool= function provides explicit argument specification instead of relying on function introspection:
+
+#+begin_src elisp
+(mcp-server-lib-make-tool
+ :function #'my-project-grep
+ :name "my_project_grep"
+ :description "Search for pattern in project files"
+ :args '((:name "pattern"
+          :type string
+          :description "Pattern to search for")
+         (:name "case_sensitive"
+          :type boolean
+          :description "Whether search should be case sensitive"
+          :optional t)))
+
+;; Tool handler function
+(defun my-project-grep (pattern case_sensitive)
+  "Search for PATTERN in project files.
+CASE_SENSITIVE controls case sensitivity."
+  (mcp-server-lib-with-error-handling
+    ;; Your implementation here
+    (format "Found matches for: %s" pattern)))
+#+end_src
+
+Required keyword arguments:
+- =:function= - Function to handle tool invocations
+- =:name= - String identifier for the tool (snake_case recommended)
+- =:description= - String describing what the tool does
+
+Optional keyword arguments:
+- =:args= - List of argument specifications (see below)
+- =:title= - User-friendly display name for the tool
+- =:read-only= - If true, indicates tool doesn't modify its environment
+- =:category= - String indicating a category for the tool
+
+Argument specifications (=:args=):
+Each argument is a plist with these keys:
+- =:name= - Argument name (string)
+- =:type= - Argument type (symbol: string, number, integer, boolean, array, object, null)
+- =:description= - Argument description (string)
+- =:optional= - Whether the argument is optional (boolean, default nil)
+- =:enum= - For enumerated types, a vector of allowed values
+- =:items= - For array types, a plist describing the array items
+- =:properties= - For object types, a plist of property specifications
+
+Benefits over =mcp-server-lib-register-tool=:
+- Explicit type declarations enable better validation
+- No need to parse docstrings for parameter information
+- Support for complex argument types (arrays, objects, enums)
+- Cleaner, more maintainable code
+- Better integration with modern tooling
+
 *** Registering Resources
 
 The library uses a unified API for both static and templated resources. The presence of ={variable}= syntax automatically determines whether a resource is static or templated:
